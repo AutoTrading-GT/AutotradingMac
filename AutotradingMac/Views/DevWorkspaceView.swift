@@ -6,33 +6,66 @@
 import SwiftUI
 
 struct DevWorkspaceView: View {
+    @EnvironmentObject private var store: MonitoringStore
     @State private var selected: DevSubsection? = .signalsRisk
 
     var body: some View {
-        HStack(spacing: 0) {
-            List(DevSubsection.allCases, selection: $selected) { section in
-                Label(section.title, systemImage: section.icon)
-                    .tag(section)
-            }
-            .frame(minWidth: 220, maxWidth: 260)
+        VStack(alignment: .leading, spacing: 12) {
+            devConnectionTools
 
-            Divider()
-
-            Group {
-                switch selected ?? .signalsRisk {
-                case .signalsRisk:
-                    SignalsRiskView()
-                case .ordersFills:
-                    OrdersFillsView()
-                case .positionsPnl:
-                    PositionsPnLView()
-                case .runtimeWorkers:
-                    RuntimeWorkersView()
+            HStack(spacing: 0) {
+                List(DevSubsection.allCases, selection: $selected) { section in
+                    Label(section.title, systemImage: section.icon)
+                        .tag(section)
                 }
+                .frame(minWidth: 220, maxWidth: 260)
+
+                Divider()
+
+                Group {
+                    switch selected ?? .signalsRisk {
+                    case .signalsRisk:
+                        SignalsRiskView()
+                    case .ordersFills:
+                        OrdersFillsView()
+                    case .positionsPnl:
+                        PositionsPnLView()
+                    case .runtimeWorkers:
+                        RuntimeWorkersView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Dev")
+    }
+
+    private var devConnectionTools: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Dev 연결 도구")
+                    .font(.headline)
+                Spacer()
+                StatusBadge(
+                    text: store.connectionState.rawValue,
+                    tone: .fromStatus(store.connectionState.rawValue)
+                )
+            }
+
+            HStack(spacing: 8) {
+                Button("Reload Snapshot") {
+                    Task { await store.reloadSnapshot() }
+                }
+                Button("Reconnect WS") {
+                    store.reconnectWebSocket()
+                }
+                Text("마지막 갱신: \(DisplayFormatters.dateTime(store.lastUpdatedAt))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

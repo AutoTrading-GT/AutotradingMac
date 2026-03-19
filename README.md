@@ -18,17 +18,14 @@
   - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
-- 연결 상태 / 마지막 업데이트 시각 / 오류 상태 표시
 - 역할 분리
   - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
   - 개발/디버깅: Dev 하위 화면
+- 상단 정보 계층 분리
+  - Global top bar(운영): 페이지명, 자동매매 상태, 장 상태, 마지막 갱신, `시작/일시정지/긴급 정지`(placeholder)
+  - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
 
 ## Dashboard 레이아웃(현재)
-- 최상단 운영 상태 bar
-  - 자동매매 상태
-  - 장 상태(Asia/Seoul, 09:00~15:30 단순 계산)
-  - 마지막 갱신 상대시간(예: 방금 전, n분 전)
-  - `시작/일시정지/긴급 정지` 버튼(UI placeholder, 실제 제어 미연결)
 - 상단 KPI 4카드
   - 총 평가금액
   - 예수금(placeholder)
@@ -52,4 +49,5 @@ Xcode Scheme 환경변수로 설정 가능합니다.
 
 ## 주의사항
 - 거래 실행/설정 저장/제어 기능은 구현하지 않음 (read-only)
+- `시작/일시정지/긴급 정지`는 UI placeholder이며 백엔드 제어 API와 연결되지 않음
 - 백엔드 계약(`/api/monitoring/*`, `/ws/events`)을 변경하지 않는 전제

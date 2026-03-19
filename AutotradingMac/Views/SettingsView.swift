@@ -13,7 +13,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Settings")
                     .font(.title3.bold())
-                Text("읽기 전용 운영 설정/연결 상태 페이지")
+                Text("읽기 전용 연결 정보/런타임 기본 정보 페이지")
                     .foregroundStyle(.secondary)
 
                 connectionSection
@@ -38,26 +38,10 @@ struct SettingsView: View {
                     Text("WebSocket URL").foregroundStyle(.secondary)
                     Text(AppConfig.webSocketURL.absoluteString).textSelection(.enabled)
                 }
-                GridRow {
-                    Text("WS State").foregroundStyle(.secondary)
-                    StatusBadge(
-                        text: store.connectionState.rawValue,
-                        tone: .fromStatus(store.connectionState.rawValue)
-                    )
-                }
-                GridRow {
-                    Text("Last Update").foregroundStyle(.secondary)
-                    Text(DisplayFormatters.dateTime(store.lastUpdatedAt))
-                }
             }
-            HStack {
-                Button("Reload Snapshot") {
-                    Task { await store.reloadSnapshot() }
-                }
-                Button("Reconnect WebSocket") {
-                    store.reconnectWebSocket()
-                }
-            }
+            Text("연결 상태 확인/재연결/스냅샷 강제 갱신은 Dev 화면에서 수행합니다.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding()
         .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))

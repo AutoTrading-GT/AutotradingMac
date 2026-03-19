@@ -17,22 +17,29 @@ struct AppShellView: View {
             }
             .navigationTitle("Autotrading Console")
         } detail: {
-            Group {
-                switch selectedSection ?? .dashboard {
-                case .dashboard:
-                    DashboardView()
-                case .scanner:
-                    MarketView()
-                case .chart:
-                    ChartView()
-                case .logs:
-                    LogsView()
-                case .settings:
-                    SettingsView()
-                case .dev:
-                    DevWorkspaceView()
+            VStack(alignment: .leading, spacing: 12) {
+                GlobalTopBarView(currentPageTitle: currentSection.title)
+
+                Group {
+                    switch currentSection {
+                    case .dashboard:
+                        DashboardView()
+                    case .scanner:
+                        MarketView()
+                    case .chart:
+                        ChartView()
+                    case .logs:
+                        LogsView()
+                    case .settings:
+                        SettingsView()
+                    case .dev:
+                        DevWorkspaceView()
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
+            .padding([.top, .horizontal], 12)
+            .padding(.bottom, 8)
             .overlay {
                 if store.isLoadingSnapshot && !store.snapshotLoaded {
                     ProgressView("Loading snapshot...")
@@ -40,21 +47,11 @@ struct AppShellView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .automatic) {
-                    StatusBadge(
-                        text: store.connectionState.rawValue,
-                        tone: .fromStatus(store.connectionState.rawValue)
-                    )
-                    Button("Reload Snapshot") {
-                        Task { await store.reloadSnapshot() }
-                    }
-                    Button("Reconnect WS") {
-                        store.reconnectWebSocket()
-                    }
-                }
-            }
         }
+    }
+
+    private var currentSection: ConsoleSection {
+        selectedSection ?? .dashboard
     }
 }
 
