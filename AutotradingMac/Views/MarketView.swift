@@ -40,7 +40,7 @@ struct MarketView: View {
         .onChange(of: scanMode) { _ in
             syncSelection()
         }
-        .frame(minWidth: 1260, minHeight: 760, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 1260, maxWidth: .infinity, minHeight: 760, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var scannerHeader: some View {
