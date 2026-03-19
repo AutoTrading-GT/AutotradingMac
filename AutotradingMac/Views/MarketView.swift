@@ -24,10 +24,11 @@ struct MarketView: View {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 16) {
                         scannerListPane
-                            .frame(minWidth: 420, maxWidth: 460, maxHeight: .infinity, alignment: .topLeading)
+                            .frame(minWidth: 460, maxWidth: 520, maxHeight: .infinity, alignment: .topLeading)
                         scannerDetailPane
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     VStack(alignment: .leading, spacing: 12) {
                         scannerListPane
                         scannerDetailPane
@@ -45,13 +46,11 @@ struct MarketView: View {
         .onChange(of: scanMode) { _ in
             syncSelection()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var scannerHeader: some View {
         HStack(alignment: .center, spacing: 10) {
-            Text("좌측 후보를 선택하면 우측 상세/차트가 즉시 갱신됩니다.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
             Spacer()
 
             Text("마지막 갱신 \(DisplayFormatters.dateTime(store.lastUpdatedAt))")
@@ -61,7 +60,7 @@ struct MarketView: View {
     }
 
     private var scannerListPane: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("스캔 후보")
                     .font(.headline)
@@ -70,31 +69,45 @@ struct MarketView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Picker("스캔 기준", selection: $scanMode) {
+
+            Picker("", selection: $scanMode) {
                 ForEach(ScannerMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
+            .frame(maxWidth: .infinity)
 
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(candidates) { candidate in
-                        Button {
-                            store.setSelectedScannerCode(candidate.code)
-                        } label: {
-                            ScannerCandidateRowView(
-                                candidate: candidate,
-                                isSelected: candidate.code == selectedCandidate?.code
-                            )
+            VStack(spacing: 0) {
+                scannerTableHeader
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                    .background(.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(candidates) { candidate in
+                            Button {
+                                store.setSelectedScannerCode(candidate.code)
+                            } label: {
+                                ScannerCandidateRowView(
+                                    candidate: candidate,
+                                    isSelected: candidate.code == selectedCandidate?.code
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.top, 6)
+                    .padding(.horizontal, 2)
+                    .padding(.bottom, 2)
                 }
-                .padding(.vertical, 4)
+                .frame(maxHeight: .infinity)
             }
+            .frame(maxHeight: .infinity)
         }
         .padding()
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
     }
 
@@ -113,6 +126,7 @@ struct MarketView: View {
                 )
             }
         }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func summaryCard(for candidate: ScannerCandidate) -> some View {
@@ -145,8 +159,6 @@ struct MarketView: View {
             }
 
             HStack(spacing: 8) {
-                StatusBadge(text: "기준: \(scanMode.title)", tone: .info)
-                StatusBadge(text: "현재 순위 \(candidate.displayRank)", tone: .neutral)
                 StatusBadge(text: holding ? "보유 중" : "미보유", tone: holding ? .warning : .neutral)
                 if let signal, !signal.isEmpty {
                     StatusBadge(text: "최근 신호 \(signal)", tone: .fromStatus(signal))
@@ -178,10 +190,8 @@ struct MarketView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("가격 흐름")
-                    .font(.headline)
                 Spacer()
-                Picker("차트 구간", selection: $chartTimeframe) {
+                Picker("", selection: $chartTimeframe) {
                     ForEach(ChartTimeframe.allCases) { timeframe in
                         Text(timeframe.title).tag(timeframe)
                     }
@@ -253,12 +263,7 @@ struct MarketView: View {
         }
 
         return sortedRows.enumerated().map { index, row in
-            let displayRank: Int
-            if scanMode == .turnover, let rowRank = row.rank {
-                displayRank = rowRank
-            } else {
-                displayRank = index + 1
-            }
+            let displayRank = index + 1
             return ScannerCandidate(
                 row: row,
                 displayRank: displayRank,
@@ -266,6 +271,31 @@ struct MarketView: View {
                 reason: reasonText(for: row, rank: displayRank)
             )
         }
+    }
+
+    private var scannerTableHeader: some View {
+        HStack(spacing: 8) {
+            Text("순위")
+                .font(.caption.weight(.semibold))
+                .frame(width: 52, alignment: .center)
+
+            Text("종목명")
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("현재가")
+                .font(.caption.weight(.semibold))
+                .frame(width: 110, alignment: .trailing)
+
+            Text("등락률")
+                .font(.caption.weight(.semibold))
+                .frame(width: 96, alignment: .trailing)
+
+            Text("거래대금")
+                .font(.caption.weight(.semibold))
+                .frame(width: 120, alignment: .trailing)
+        }
+        .foregroundStyle(.secondary)
     }
 
     private var candidateCodes: [String] {
@@ -311,9 +341,9 @@ struct MarketView: View {
     private func reasonText(for row: MarketRow, rank: Int) -> String {
         switch scanMode {
         case .turnover:
-            return "거래대금 순위 \(rank)위 기준으로 노출 중입니다. 거래대금 \(DisplayFormatters.metricKorean(row.metric)), 등락률 \(DisplayFormatters.signedPercent(row.changePct))."
+            return "거래대금 순위 \(rank) 기준으로 노출 중입니다. 거래대금 \(DisplayFormatters.metricKorean(row.metric)), 등락률 \(DisplayFormatters.signedPercent(row.changePct))."
         case .surge:
-            return "급등률 순위 \(rank)위 기준으로 노출 중입니다. 등락률 \(DisplayFormatters.signedPercent(row.changePct)), 거래대금 \(DisplayFormatters.metricKorean(row.metric))."
+            return "급등률 순위 \(rank) 기준으로 노출 중입니다. 등락률 \(DisplayFormatters.signedPercent(row.changePct)), 거래대금 \(DisplayFormatters.metricKorean(row.metric))."
         }
     }
 
@@ -496,54 +526,79 @@ private struct ScannerCandidateRowView: View {
     var body: some View {
         let trend = TrendDirection.from(changePercent: candidate.row.changePct)
 
-        HStack(spacing: 10) {
-            VStack(spacing: 4) {
-                Text("\(candidate.displayRank)")
-                    .font(.subheadline.weight(.bold))
-                Text("위")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(width: 38, height: 44)
-            .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 8))
+        HStack(spacing: 8) {
+            rankBox
+                .frame(width: 52, alignment: .center)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(candidate.displayName)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 Text(candidate.code)
-                    .font(.caption.monospaced())
+                    .font(.caption2.monospaced())
                     .foregroundStyle(.secondary)
-                Text("거래대금 \(DisplayFormatters.metricKorean(candidate.row.metric))")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(DisplayFormatters.krw(candidate.row.price))
-                    .font(.subheadline.monospacedDigit())
-                Text("\(trend.symbol) \(DisplayFormatters.signedPercent(candidate.row.changePct))")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(trend.color)
-                    .lineLimit(1)
-                Text("점수 \(candidate.score)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+            Text(DisplayFormatters.krw(candidate.row.price))
+                .font(.subheadline.monospacedDigit())
+                .frame(width: 110, alignment: .trailing)
+
+            Text("\(trend.symbol) \(DisplayFormatters.signedPercent(candidate.row.changePct))")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(trend.color)
+                .lineLimit(1)
+                .frame(width: 96, alignment: .trailing)
+
+            Text(DisplayFormatters.metricKorean(candidate.row.metric))
+                .font(.caption.monospacedDigit())
+                .frame(width: 120, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentColor.opacity(0.24) : Color.black.opacity(0.14))
+                .fill(isSelected ? Color.accentColor.opacity(0.20) : Color.black.opacity(0.10))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? Color.accentColor.opacity(0.8) : Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(isSelected ? Color.accentColor.opacity(0.85) : Color.white.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private var rankBox: some View {
+        Text("\(candidate.displayRank)")
+            .font(.subheadline.monospacedDigit().weight(.bold))
+            .frame(width: 34, height: 26)
+            .background(rankBackgroundColor, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(rankBorderColor, lineWidth: 1)
+            )
+    }
+
+    private var rankBackgroundColor: Color {
+        switch candidate.displayRank {
+        case 1:
+            return Color.blue.opacity(0.34)
+        case 2:
+            return Color.blue.opacity(0.26)
+        case 3:
+            return Color.blue.opacity(0.18)
+        default:
+            return Color.black.opacity(0.20)
+        }
+    }
+
+    private var rankBorderColor: Color {
+        switch candidate.displayRank {
+        case 1...3:
+            return Color.blue.opacity(0.50)
+        default:
+            return Color.white.opacity(0.14)
+        }
     }
 }
 
