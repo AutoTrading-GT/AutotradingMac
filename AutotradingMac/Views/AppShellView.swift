@@ -28,7 +28,7 @@ struct AppShellView: View {
                 case .ordersFills:
                     OrdersFillsView()
                 case .positionsPnl:
-                    PositionsPnlView()
+                    PositionsPnLView()
                 }
             }
             .overlay {
