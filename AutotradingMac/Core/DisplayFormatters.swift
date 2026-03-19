@@ -36,6 +36,15 @@ enum DisplayFormatters {
         return formatter
     }()
 
+    private static let krwFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "₩"
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
+
     static func dateTime(_ value: Date?) -> String {
         guard let value else { return "-" }
         return dateTimeFormatter.string(from: value)
@@ -75,5 +84,36 @@ enum DisplayFormatters {
         let sign = value > 0 ? "+" : ""
         let raw = decimalFormatter.string(from: NSNumber(value: value)) ?? "-"
         return "\(sign)\(raw)"
+    }
+
+    static func krw(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return krwFormatter.string(from: NSNumber(value: value)) ?? "-"
+    }
+
+    static func signedNumber(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        let sign = value > 0 ? "+" : ""
+        return "\(sign)\(number(value))"
+    }
+
+    static func signedPercent(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        let sign = value > 0 ? "+" : ""
+        return "\(sign)\(percent(value))"
+    }
+
+    static func metricKorean(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        let absValue = abs(value)
+        let sign = value < 0 ? "-" : ""
+
+        if absValue >= 100_000_000 {
+            return "\(sign)\(number(absValue / 100_000_000))억"
+        }
+        if absValue >= 10_000 {
+            return "\(sign)\(number(absValue / 10_000))만"
+        }
+        return "\(sign)\(number(absValue))"
     }
 }

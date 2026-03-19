@@ -29,6 +29,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var connectionState: WebSocketConnectionState = .disconnected
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var selectedScannerCode: String?
 
     private let apiClient: MonitoringAPIClientProtocol
     private let webSocketClient: MonitoringWebSocketClient
@@ -75,6 +76,10 @@ final class MonitoringStore: ObservableObject {
     func reconnectWebSocket() {
         webSocketClient.disconnect()
         webSocketClient.connect()
+    }
+
+    func setSelectedScannerCode(_ code: String?) {
+        selectedScannerCode = code
     }
 
     var workerRows: [WorkerStatusRow] {
@@ -205,6 +210,7 @@ final class MonitoringStore: ObservableObject {
         currentPositions = snapshot.currentPositions
         recentClosedPositions = snapshot.recentClosedPositions
         pnlSummary = snapshot.pnlSummary
+        ensureSelectedScannerCode()
     }
 
     private func handle(event: EventEnvelope) {
@@ -229,6 +235,7 @@ final class MonitoringStore: ObservableObject {
         case "market.tick":
             if let payload = decodePayload(MarketTickPayload.self, from: event.data) {
                 latestTicks[payload.code] = payload
+                ensureSelectedScannerCode()
             }
         case "signal.generated":
             if let payload = decodePayload(SignalGeneratedPayload.self, from: event.data) {
@@ -321,6 +328,7 @@ final class MonitoringStore: ObservableObject {
                 return lhs.code < rhs.code
             }
         }
+        ensureSelectedScannerCode()
     }
 
     private func appendSignal(payload: SignalGeneratedPayload) {
@@ -546,5 +554,17 @@ final class MonitoringStore: ObservableObject {
             lastErrorMessage = "Event decode failed (\(type)): \(error.localizedDescription)"
             return nil
         }
+    }
+
+    private func ensureSelectedScannerCode() {
+        let rows = marketRows
+        guard !rows.isEmpty else {
+            selectedScannerCode = nil
+            return
+        }
+        if let selectedScannerCode, rows.contains(where: { $0.code == selectedScannerCode }) {
+            return
+        }
+        selectedScannerCode = rows.first?.code
     }
 }
