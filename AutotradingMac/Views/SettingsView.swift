@@ -11,8 +11,6 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Settings")
-                    .font(.title3.bold())
                 Text("읽기 전용 연결 정보/런타임 기본 정보 페이지")
                     .foregroundStyle(.secondary)
 
@@ -22,7 +20,6 @@ struct SettingsView: View {
             }
             .padding()
         }
-        .navigationTitle("Settings")
     }
 
     private var connectionSection: some View {

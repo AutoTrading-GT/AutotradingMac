@@ -19,7 +19,6 @@ struct PositionsPnLView: View {
             }
             .padding()
         }
-        .navigationTitle("Positions / PnL")
     }
 
     private var pnlSummaryCards: some View {

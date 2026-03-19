@@ -8,62 +8,70 @@ import SwiftUI
 struct GlobalTopBarView: View {
     @EnvironmentObject private var store: MonitoringStore
 
-    let currentPageTitle: String
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TimelineView(.periodic(from: Date(), by: 30)) { _ in
-                HStack(alignment: .center, spacing: 12) {
-                    Text(currentPageTitle)
-                        .font(.title3.bold())
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                statusCluster
 
-                    Spacer(minLength: 12)
+                Spacer(minLength: 12)
 
-                    Label("자동매매", systemImage: "bolt.horizontal.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    StatusBadge(text: automationStatusText, tone: automationStatusTone)
-
-                    Divider()
-                        .frame(height: 16)
-
-                    Label("장 상태", systemImage: "clock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    StatusBadge(text: marketStatusText, tone: marketStatusTone)
-
-                    Divider()
-                        .frame(height: 16)
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(.secondary)
-                        Text(lastUpdatedRelativeText)
-                            .foregroundStyle(.secondary)
-                    }
-                    .font(.caption)
-                }
+                actionButtons
             }
+            .padding()
+            .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
 
-            HStack(spacing: 8) {
-                Button("시작") {}
-                    .buttonStyle(.borderedProminent)
-                    .disabled(true)
-                Button("일시정지") {}
-                    .buttonStyle(.bordered)
-                    .disabled(true)
-                Button("긴급 정지", role: .destructive) {}
-                    .buttonStyle(.bordered)
-                    .disabled(true)
-
-                Text("제어 기능 미연결 (UI placeholder)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 4)
+            VStack(alignment: .leading, spacing: 10) {
+                statusCluster
+                actionButtons
             }
+            .padding()
+            .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
         }
-        .padding()
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var statusCluster: some View {
+        TimelineView(.periodic(from: Date(), by: 30)) { _ in
+            HStack(alignment: .center, spacing: 10) {
+                Label("자동매매", systemImage: "bolt.horizontal.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                StatusBadge(text: automationStatusText, tone: automationStatusTone)
+
+                Divider()
+                    .frame(height: 16)
+
+                Label("장 상태", systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                StatusBadge(text: marketStatusText, tone: marketStatusTone)
+
+                Divider()
+                    .frame(height: 16)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(.secondary)
+                    Text(lastUpdatedRelativeText)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 8) {
+            Button("시작") {}
+                .buttonStyle(.borderedProminent)
+                .disabled(true)
+            Button("일시정지") {}
+                .buttonStyle(.bordered)
+                .disabled(true)
+            Button("긴급 정지", role: .destructive) {}
+                .buttonStyle(.bordered)
+                .disabled(true)
+        }
     }
 
     private var automationStatusText: String {

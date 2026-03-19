@@ -18,7 +18,6 @@ struct OrdersFillsView: View {
             }
             .padding()
         }
-        .navigationTitle("Orders / Fills")
     }
 
     private var ordersTable: some View {

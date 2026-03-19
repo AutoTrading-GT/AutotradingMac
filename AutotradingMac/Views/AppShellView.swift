@@ -18,7 +18,7 @@ struct AppShellView: View {
             .navigationTitle("Autotrading Console")
         } detail: {
             VStack(alignment: .leading, spacing: 12) {
-                GlobalTopBarView(currentPageTitle: currentSection.title)
+                GlobalTopBarView()
 
                 Group {
                     switch currentSection {

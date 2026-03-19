@@ -37,7 +37,6 @@ struct DevWorkspaceView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("Dev")
     }
 
     private var devConnectionTools: some View {

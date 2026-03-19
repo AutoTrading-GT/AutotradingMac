@@ -11,8 +11,6 @@ struct LogsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Logs")
-                .font(.title3.bold())
             Text("좌측에서 최근 이벤트를 선택하고, 우측 패널에서 상세 정보를 확인합니다.")
                 .foregroundStyle(.secondary)
 
@@ -31,7 +29,6 @@ struct LogsView: View {
             }
         }
         .padding()
-        .navigationTitle("Logs")
         .onAppear {
             syncSelection()
         }

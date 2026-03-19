@@ -22,7 +22,9 @@
   - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
   - 개발/디버깅: Dev 하위 화면
 - 상단 정보 계층 분리
-  - Global top bar(운영): 페이지명, 자동매매 상태, 장 상태, 마지막 갱신, `시작/일시정지/긴급 정지`(placeholder)
+  - Global top bar(운영): 자동매매 상태, 장 상태, 마지막 갱신, `시작/일시정지/긴급 정지`(placeholder)
+  - 페이지 제목은 top bar에서 노출하지 않고, 사이드바 선택 상태로 현재 페이지를 파악
+  - 본문에서도 페이지 제목 헤더를 반복 노출하지 않고, 화면별 콘텐츠 영역에 집중
   - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
 - Logs 페이지(운영형 2-pane)
   - 좌측: 로그 피드(`시간 + 아이콘 + 한 줄 핵심 메시지`)

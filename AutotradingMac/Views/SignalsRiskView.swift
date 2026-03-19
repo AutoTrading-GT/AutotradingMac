@@ -18,7 +18,6 @@ struct SignalsRiskView: View {
             }
             .padding()
         }
-        .navigationTitle("Signals / Risk")
     }
 
     private var signalTable: some View {

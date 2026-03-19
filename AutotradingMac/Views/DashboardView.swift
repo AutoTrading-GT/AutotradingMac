@@ -16,7 +16,6 @@ struct DashboardView: View {
             }
             .padding()
         }
-        .navigationTitle("Dashboard")
     }
 
     private var kpiRow: some View {
