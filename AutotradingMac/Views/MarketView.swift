@@ -269,10 +269,10 @@ struct MarketView: View {
     }
 
     private var scannerTableHeader: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             Text("순위")
                 .font(.caption.weight(.semibold))
-                .frame(width: 48, alignment: .center)
+                .frame(width: 44, alignment: .center)
 
             Text("종목명")
                 .font(.caption.weight(.semibold))
@@ -280,15 +280,15 @@ struct MarketView: View {
 
             Text("현재가")
                 .font(.caption.weight(.semibold))
-                .frame(width: 102, alignment: .trailing)
+                .frame(width: 94, alignment: .trailing)
 
             Text("등락률")
                 .font(.caption.weight(.semibold))
-                .frame(width: 90, alignment: .trailing)
+                .frame(width: 84, alignment: .trailing)
 
             Text("거래대금")
                 .font(.caption.weight(.semibold))
-                .frame(width: 108, alignment: .trailing)
+                .frame(width: 96, alignment: .trailing)
         }
         .foregroundStyle(.secondary)
     }
@@ -521,33 +521,33 @@ private struct ScannerCandidateRowView: View {
     var body: some View {
         let trend = TrendDirection.from(changePercent: candidate.row.changePct)
 
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             rankBox
-                .frame(width: 48, alignment: .center)
+                .frame(width: 44, alignment: .center)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(candidate.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer(minLength: 4)
+            Text(candidate.displayName)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.9)
+                .allowsTightening(true)
+                .layoutPriority(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(DisplayFormatters.krw(candidate.row.price))
                 .font(.subheadline.monospacedDigit())
-                .frame(width: 102, alignment: .trailing)
+                .frame(width: 94, alignment: .trailing)
 
             Text("\(trend.symbol) \(DisplayFormatters.signedPercent(candidate.row.changePct))")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(trend.color)
                 .lineLimit(1)
-                .frame(width: 90, alignment: .trailing)
+                .frame(width: 84, alignment: .trailing)
 
             Text(DisplayFormatters.metricKorean(candidate.row.metric))
                 .font(.caption.monospacedDigit())
-                .frame(width: 108, alignment: .trailing)
+                .lineLimit(1)
+                .frame(width: 96, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
@@ -564,10 +564,12 @@ private struct ScannerCandidateRowView: View {
     private var rankBox: some View {
         Text("\(candidate.displayRank)")
             .font(.subheadline.monospacedDigit().weight(.bold))
-            .frame(width: 34, height: 26)
-            .background(rankBackgroundColor, in: RoundedRectangle(cornerRadius: 8))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .frame(width: 30, height: 24)
+            .background(rankBackgroundColor, in: RoundedRectangle(cornerRadius: 7))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 7)
                     .stroke(rankBorderColor, lineWidth: 1)
             )
     }
