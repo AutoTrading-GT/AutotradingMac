@@ -105,15 +105,22 @@ enum DisplayFormatters {
 
     static func metricKorean(_ value: Double?) -> String {
         guard let value else { return "-" }
+        guard value.isFinite else { return "-" }
+
+        let eokUnit = 100_000_000.0
+        let eokPerJo = 10_000
         let absValue = abs(value)
         let sign = value < 0 ? "-" : ""
+        let eokValue = absValue / eokUnit
 
-        if absValue >= 100_000_000 {
-            return "\(sign)\(number(absValue / 100_000_000))억"
+        let roundedEokOneDecimal = (eokValue * 10).rounded() / 10
+        if roundedEokOneDecimal >= Double(eokPerJo) {
+            let totalEokRounded = Int(eokValue.rounded())
+            let jo = totalEokRounded / eokPerJo
+            let remainderEok = totalEokRounded % eokPerJo
+            return "\(sign)\(jo)조 \(String(format: "%04d", remainderEok))억"
         }
-        if absValue >= 10_000 {
-            return "\(sign)\(number(absValue / 10_000))만"
-        }
-        return "\(sign)\(number(absValue))"
+
+        return "\(sign)\(String(format: "%06.1f", roundedEokOneDecimal))억"
     }
 }

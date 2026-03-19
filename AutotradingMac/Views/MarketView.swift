@@ -284,11 +284,11 @@ struct MarketView: View {
 
             Text("등락률")
                 .font(.caption.weight(.semibold))
-                .frame(width: 84, alignment: .trailing)
+                .frame(width: 75, alignment: .trailing)
 
             Text("거래대금")
                 .font(.caption.weight(.semibold))
-                .frame(width: 96, alignment: .trailing)
+                .frame(width: 85, alignment: .trailing)
         }
         .foregroundStyle(.secondary)
     }
