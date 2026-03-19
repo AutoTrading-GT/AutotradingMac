@@ -10,8 +10,10 @@ struct MarketView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Top Ranks + Latest Tick")
+            Text("Scanner")
                 .font(.title3.bold())
+            Text("Top ranks와 최신 tick을 기반으로 종목 스캔 정보를 표시합니다.")
+                .foregroundStyle(.secondary)
             Text("Last update: \(DisplayFormatters.dateTime(store.lastUpdatedAt))")
                 .foregroundStyle(.secondary)
 
@@ -44,7 +46,7 @@ struct MarketView: View {
             }
         }
         .padding()
-        .navigationTitle("Market")
+        .navigationTitle("Scanner")
     }
 
     private func colorForChange(_ value: Double?) -> Color {

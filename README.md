@@ -6,13 +6,22 @@
 ## 현재 범위
 - Sidebar 기반 화면
   - Dashboard
-  - Market
+  - Scanner
+  - Chart
+  - Logs
+  - Settings
+  - Dev
+- Dev 하위 화면
   - Signals / Risk
   - Orders / Fills
   - Positions / PnL
+  - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
 - 연결 상태 / 마지막 업데이트 시각 / 오류 상태 표시
+- 역할 분리
+  - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
+  - 개발/디버깅: Dev 하위 화면
 
 ## 백엔드 URL 설정
 Xcode Scheme 환경변수로 설정 가능합니다.

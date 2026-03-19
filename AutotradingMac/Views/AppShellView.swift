@@ -21,14 +21,16 @@ struct AppShellView: View {
                 switch selectedSection ?? .dashboard {
                 case .dashboard:
                     DashboardView()
-                case .market:
+                case .scanner:
                     MarketView()
-                case .signalsRisk:
-                    SignalsRiskView()
-                case .ordersFills:
-                    OrdersFillsView()
-                case .positionsPnl:
-                    PositionsPnLView()
+                case .chart:
+                    ChartView()
+                case .logs:
+                    LogsView()
+                case .settings:
+                    SettingsView()
+                case .dev:
+                    DevWorkspaceView()
                 }
             }
             .overlay {
@@ -58,10 +60,11 @@ struct AppShellView: View {
 
 enum ConsoleSection: String, CaseIterable, Identifiable {
     case dashboard
-    case market
-    case signalsRisk
-    case ordersFills
-    case positionsPnl
+    case scanner
+    case chart
+    case logs
+    case settings
+    case dev
 
     var id: String { rawValue }
 
@@ -69,14 +72,16 @@ enum ConsoleSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard:
             return "Dashboard"
-        case .market:
-            return "Market"
-        case .signalsRisk:
-            return "Signals / Risk"
-        case .ordersFills:
-            return "Orders / Fills"
-        case .positionsPnl:
-            return "Positions / PnL"
+        case .scanner:
+            return "Scanner"
+        case .chart:
+            return "Chart"
+        case .logs:
+            return "Logs"
+        case .settings:
+            return "Settings"
+        case .dev:
+            return "Dev"
         }
     }
 
@@ -84,14 +89,16 @@ enum ConsoleSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard:
             return "speedometer"
-        case .market:
+        case .scanner:
             return "chart.line.uptrend.xyaxis"
-        case .signalsRisk:
-            return "shield.lefthalf.filled"
-        case .ordersFills:
-            return "list.bullet.rectangle.portrait"
-        case .positionsPnl:
-            return "briefcase"
+        case .chart:
+            return "waveform.path.ecg"
+        case .logs:
+            return "text.append"
+        case .settings:
+            return "gearshape"
+        case .dev:
+            return "hammer"
         }
     }
 }
