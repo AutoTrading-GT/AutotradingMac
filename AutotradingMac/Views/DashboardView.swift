@@ -90,6 +90,7 @@ struct DashboardView: View {
             openOrdersSection
             recentLogsSection
             systemSummarySection
+            connectMapSection
         }
     }
 
@@ -231,6 +232,62 @@ struct DashboardView: View {
                 GridRow {
                     Text("에러 개수").foregroundStyle(.secondary)
                     Text("\(store.recentErrorItems.count)")
+                }
+            }
+        }
+        .dashboardPanel()
+    }
+
+    private var connectMapSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("연결 맵 요약")
+
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Snapshot API").foregroundStyle(.secondary)
+                    Text(AppConfig.snapshotURL.absoluteString)
+                        .font(.caption.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                GridRow {
+                    Text("WebSocket").foregroundStyle(.secondary)
+                    Text(AppConfig.webSocketURL.absoluteString)
+                        .font(.caption.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                GridRow {
+                    Text("Snapshot 상태").foregroundStyle(.secondary)
+                    StatusBadge(text: snapshotStatusText, tone: snapshotStatusTone)
+                }
+                GridRow {
+                    Text("WS 상태").foregroundStyle(.secondary)
+                    StatusBadge(text: wsStatusText, tone: wsStatusTone)
+                }
+                GridRow {
+                    Text("마지막 이벤트").foregroundStyle(.secondary)
+                    Text(DisplayFormatters.dateTime(store.lastUpdatedAt))
+                }
+            }
+
+            Text("REST snapshot -> MonitoringStore -> Dashboard/Scanner/Logs")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
+                ForEach(connectCounters) { counter in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(counter.title)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(counter.value)")
+                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
@@ -386,6 +443,46 @@ struct DashboardView: View {
         )
         return lines.sorted(by: { $0.timestamp > $1.timestamp })
     }
+
+    private var snapshotStatusText: String {
+        if store.isLoadingSnapshot { return "loading" }
+        return store.snapshotLoaded ? "loaded" : "not_loaded"
+    }
+
+    private var snapshotStatusTone: StatusTone {
+        if store.isLoadingSnapshot { return .info }
+        return store.snapshotLoaded ? .success : .warning
+    }
+
+    private var wsStatusText: String {
+        store.connectionState.rawValue
+    }
+
+    private var wsStatusTone: StatusTone {
+        switch store.connectionState {
+        case .connected:
+            return .success
+        case .connecting:
+            return .info
+        case .error:
+            return .danger
+        case .disconnected:
+            return .warning
+        }
+    }
+
+    private var connectCounters: [DashboardCounter] {
+        [
+            DashboardCounter(id: "ranks", title: "Ranks", value: store.marketTopRanks.count),
+            DashboardCounter(id: "ticks", title: "Ticks", value: store.latestTicks.count),
+            DashboardCounter(id: "signals", title: "Signals", value: store.recentSignals.count),
+            DashboardCounter(id: "risk", title: "Risk", value: store.recentRiskDecisions.count),
+            DashboardCounter(id: "orders", title: "Orders", value: store.recentOrders.count),
+            DashboardCounter(id: "fills", title: "Fills", value: store.recentFills.count),
+            DashboardCounter(id: "open-pos", title: "Open Pos", value: store.currentPositions.count),
+            DashboardCounter(id: "closed-pos", title: "Closed Pos", value: store.recentClosedPositions.count),
+        ]
+    }
 }
 
 private struct DashboardLogLine: Identifiable {
@@ -394,6 +491,12 @@ private struct DashboardLogLine: Identifiable {
     let category: String
     let status: String
     let message: String
+}
+
+private struct DashboardCounter: Identifiable {
+    let id: String
+    let title: String
+    let value: Int
 }
 
 private extension View {
