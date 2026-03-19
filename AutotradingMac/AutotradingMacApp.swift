@@ -19,5 +19,6 @@ struct AutotradingMacApp: App {
                     store.stop()
                 }
         }
+        .windowResizability(.contentSize)
     }
 }

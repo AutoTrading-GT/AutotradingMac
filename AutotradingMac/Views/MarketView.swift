@@ -5,6 +5,25 @@
 
 import SwiftUI
 
+private enum ScannerLayout {
+    static let paneSpacing: CGFloat = 16
+    static let leftPaneWidth: CGFloat = 520
+    static let rightPaneWidth: CGFloat = leftPaneWidth * 1.2
+    static let paneHeight: CGFloat = 660
+    static let contentPadding: CGFloat = 16
+
+    static let columnSpacing: CGFloat = 2
+    static let rankColumnWidth: CGFloat = 44
+    static let priceColumnWidth: CGFloat = 94
+    static let changeColumnWidth: CGFloat = 84
+    static let metricColumnWidth: CGFloat = 96
+
+    static let rowHeight: CGFloat = 38
+    static let rowSpacing: CGFloat = 4
+    static let visibleRows: CGFloat = 10
+    static let listViewportHeight: CGFloat = (visibleRows * rowHeight) + ((visibleRows - 1) * rowSpacing)
+}
+
 struct MarketView: View {
     @EnvironmentObject private var store: MonitoringStore
     @State private var scanMode: ScannerMode = .turnover
@@ -21,16 +40,20 @@ struct MarketView: View {
                     description: Text("snapshot 또는 websocket market 이벤트 수신 후 후보가 표시됩니다.")
                 )
             } else {
-                HStack(alignment: .top, spacing: 16) {
+                HStack(alignment: .top, spacing: ScannerLayout.paneSpacing) {
                     scannerListPane
-                        .frame(minWidth: 500, idealWidth: 540, maxWidth: 560, maxHeight: .infinity, alignment: .topLeading)
+                        .frame(width: ScannerLayout.leftPaneWidth, height: ScannerLayout.paneHeight, alignment: .topLeading)
                     scannerDetailPane
-                        .frame(minWidth: 700, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .frame(width: ScannerLayout.rightPaneWidth, height: ScannerLayout.paneHeight, alignment: .topLeading)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(
+                    width: ScannerLayout.leftPaneWidth + ScannerLayout.rightPaneWidth + ScannerLayout.paneSpacing,
+                    height: ScannerLayout.paneHeight,
+                    alignment: .topLeading
+                )
             }
         }
-        .padding()
+        .padding(ScannerLayout.contentPadding)
         .onAppear {
             syncSelection()
         }
@@ -40,7 +63,11 @@ struct MarketView: View {
         .onChange(of: scanMode) { _ in
             syncSelection()
         }
-        .frame(minWidth: 1260, maxWidth: .infinity, minHeight: 760, maxHeight: .infinity, alignment: .topLeading)
+        .frame(
+            width: ScannerLayout.leftPaneWidth + ScannerLayout.rightPaneWidth + ScannerLayout.paneSpacing + (ScannerLayout.contentPadding * 2),
+            height: ScannerLayout.paneHeight + 92,
+            alignment: .topLeading
+        )
     }
 
     private var scannerHeader: some View {
@@ -70,7 +97,7 @@ struct MarketView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .frame(minWidth: 420, maxWidth: .infinity)
+            .frame(maxWidth: .infinity)
 
             VStack(spacing: 0) {
                 scannerTableHeader
@@ -79,7 +106,7 @@ struct MarketView: View {
                     .background(.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
 
                 ScrollView {
-                    LazyVStack(spacing: 6) {
+                    LazyVStack(spacing: ScannerLayout.rowSpacing) {
                         ForEach(candidates) { candidate in
                             Button {
                                 store.setSelectedScannerCode(candidate.code)
@@ -90,13 +117,14 @@ struct MarketView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .frame(height: ScannerLayout.rowHeight)
                         }
                     }
                     .padding(.top, 6)
                     .padding(.horizontal, 2)
                     .padding(.bottom, 2)
                 }
-                .frame(maxHeight: .infinity)
+                .frame(height: ScannerLayout.listViewportHeight)
             }
             .frame(maxHeight: .infinity)
         }
@@ -196,35 +224,45 @@ struct MarketView: View {
             }
 
             ScannerLineChartView(points: points, trend: trend)
-                .frame(height: 260)
+                .frame(minHeight: 220, maxHeight: .infinity)
 
-            HStack(spacing: 10) {
-                chartMetricCard(title: "시가", value: DisplayFormatters.krw(metrics.open))
-                chartMetricCard(title: "고가", value: DisplayFormatters.krw(metrics.high))
-                chartMetricCard(title: "저가", value: DisplayFormatters.krw(metrics.low))
-                chartMetricCard(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose))
-                chartMetricCard(title: "변동성", value: DisplayFormatters.percent(metrics.volatility))
-            }
+            chartSupportInfoRow(metrics: metrics)
 
             Text(candidate.reason)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .padding()
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    private func chartMetricCard(title: String, value: String) -> some View {
+    private func chartSupportInfoRow(metrics: ScannerChartMetrics) -> some View {
+        HStack(spacing: 0) {
+            chartSupportInfoItem(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: .primary)
+            Divider()
+            chartSupportInfoItem(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: .red.opacity(0.9))
+            Divider()
+            chartSupportInfoItem(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: .blue.opacity(0.9))
+            Divider()
+            chartSupportInfoItem(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: .primary)
+            Divider()
+            chartSupportInfoItem(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: .secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func chartSupportInfoItem(title: String, value: String, valueColor: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.subheadline.monospacedDigit())
+                .foregroundStyle(valueColor)
         }
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var candidates: [ScannerCandidate] {
@@ -269,10 +307,10 @@ struct MarketView: View {
     }
 
     private var scannerTableHeader: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: ScannerLayout.columnSpacing) {
             Text("순위")
                 .font(.caption.weight(.semibold))
-                .frame(width: 44, alignment: .center)
+                .frame(width: ScannerLayout.rankColumnWidth, alignment: .center)
 
             Text("종목명")
                 .font(.caption.weight(.semibold))
@@ -280,15 +318,15 @@ struct MarketView: View {
 
             Text("현재가")
                 .font(.caption.weight(.semibold))
-                .frame(width: 94, alignment: .trailing)
+                .frame(width: ScannerLayout.priceColumnWidth, alignment: .trailing)
 
             Text("등락률")
                 .font(.caption.weight(.semibold))
-                .frame(width: 75, alignment: .trailing)
+                .frame(width: ScannerLayout.changeColumnWidth, alignment: .trailing)
 
             Text("거래대금")
                 .font(.caption.weight(.semibold))
-                .frame(width: 85, alignment: .trailing)
+                .frame(width: ScannerLayout.metricColumnWidth, alignment: .trailing)
         }
         .foregroundStyle(.secondary)
     }
@@ -521,9 +559,9 @@ private struct ScannerCandidateRowView: View {
     var body: some View {
         let trend = TrendDirection.from(changePercent: candidate.row.changePct)
 
-        HStack(spacing: 2) {
+        HStack(spacing: ScannerLayout.columnSpacing) {
             rankBox
-                .frame(width: 44, alignment: .center)
+                .frame(width: ScannerLayout.rankColumnWidth, alignment: .center)
 
             Text(candidate.displayName)
                 .font(.subheadline.weight(.semibold))
@@ -536,18 +574,18 @@ private struct ScannerCandidateRowView: View {
 
             Text(DisplayFormatters.krw(candidate.row.price))
                 .font(.subheadline.monospacedDigit())
-                .frame(width: 94, alignment: .trailing)
+                .frame(width: ScannerLayout.priceColumnWidth, alignment: .trailing)
 
             Text("\(trend.symbol) \(DisplayFormatters.signedPercent(candidate.row.changePct))")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(trend.color)
                 .lineLimit(1)
-                .frame(width: 84, alignment: .trailing)
+                .frame(width: ScannerLayout.changeColumnWidth, alignment: .trailing)
 
             Text(DisplayFormatters.metricKorean(candidate.row.metric))
                 .font(.caption.monospacedDigit())
                 .lineLimit(1)
-                .frame(width: 96, alignment: .trailing)
+                .frame(width: ScannerLayout.metricColumnWidth, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)

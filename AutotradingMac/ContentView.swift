@@ -12,6 +12,7 @@ struct ContentView: View {
 
     var body: some View {
         AppShellView()
+            .frame(width: 1460, height: 860)
             .task {
                 await store.start()
             }
