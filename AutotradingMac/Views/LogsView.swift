@@ -42,15 +42,18 @@ struct LogsView: View {
 
     private var listPane: some View {
         List(logEntries, selection: $selectedLogID) { entry in
-            LogListRow(entry: entry)
+            LogFeedRow(
+                entry: entry,
+                isSelected: selectedLogID == entry.id
+            )
                 .tag(entry.id)
-                .listRowBackground(
-                    selectedLogID == entry.id
-                        ? Color.accentColor.opacity(0.22)
-                        : Color.clear
-                )
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                .listRowBackground(Color.clear)
         }
-        .listStyle(.inset)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.black.opacity(0.08))
         .frame(minWidth: 440, maxWidth: 520, maxHeight: .infinity)
     }
 
@@ -106,9 +109,11 @@ struct LogsView: View {
                     symbol: signal.symbol,
                     title: title,
                     summary: "signal=\(signal.signalType) confidence=\(DisplayFormatters.number(signal.confidence))",
+                    feedMessage: "\(title) 신호 발생 (\(signal.signalType))",
                     status: signal.signalType,
                     source: "strategy",
-                    iconName: "waveform.path.ecg",
+                    iconName: "dot.radiowaves.left.and.right",
+                    iconTone: .info,
                     metaPairs: [
                         .init(key: "signal_type", value: signal.signalType),
                         .init(key: "confidence", value: DisplayFormatters.number(signal.confidence)),
@@ -130,9 +135,13 @@ struct LogsView: View {
                     symbol: risk.symbol,
                     title: title,
                     summary: risk.reason,
+                    feedMessage: risk.decision.lowercased() == "blocked"
+                        ? "\(title) 신호가 리스크 규칙으로 차단됨"
+                        : "\(title) 신호가 리스크 규칙을 통과함",
                     status: risk.decision,
                     source: "risk",
-                    iconName: "shield.lefthalf.filled",
+                    iconName: risk.decision.lowercased() == "blocked" ? "exclamationmark.shield" : "checkmark.shield",
+                    iconTone: risk.decision.lowercased() == "blocked" ? .danger : .success,
                     metaPairs: [
                         .init(key: "decision", value: risk.decision),
                         .init(key: "blocked", value: optionalBool(risk.blocked)),
@@ -156,9 +165,11 @@ struct LogsView: View {
                     symbol: order.symbol,
                     title: title,
                     summary: "\(order.side) qty=\(DisplayFormatters.number(order.orderQty)) status=\(order.status)",
+                    feedMessage: "\(title) \(order.side.uppercased()) 주문 상태: \(order.status)",
                     status: order.status,
                     source: order.executionMode ?? "execution",
-                    iconName: "cart",
+                    iconName: order.status.lowercased() == "rejected" ? "xmark.circle" : "shippingbox",
+                    iconTone: .fromStatus(order.status),
                     metaPairs: [
                         .init(key: "order_id", value: "\(order.orderId)"),
                         .init(key: "side", value: order.side),
@@ -184,9 +195,11 @@ struct LogsView: View {
                     symbol: fill.symbol,
                     title: title,
                     summary: "\(fill.side) qty=\(DisplayFormatters.number(fill.filledQty)) @ \(DisplayFormatters.number(fill.filledPrice))",
+                    feedMessage: "\(title) \(fill.side.uppercased()) 체결 \(DisplayFormatters.number(fill.filledQty)) @ \(DisplayFormatters.number(fill.filledPrice))",
                     status: fill.side,
                     source: fill.executionMode ?? "execution",
-                    iconName: "checkmark.seal",
+                    iconName: "checkmark.circle.fill",
+                    iconTone: .success,
                     metaPairs: [
                         .init(key: "fill_id", value: "\(fill.fillId)"),
                         .init(key: "order_id", value: "\(fill.orderId)"),
@@ -210,9 +223,11 @@ struct LogsView: View {
                     symbol: position.symbol,
                     title: title,
                     summary: "qty=\(DisplayFormatters.number(position.qty)) unrealized=\(DisplayFormatters.pnl(position.unrealizedPnl))",
+                    feedMessage: "\(title) 포지션 갱신, 평가손익 \(DisplayFormatters.pnl(position.unrealizedPnl))",
                     status: position.side,
                     source: position.markPriceSource ?? "execution",
                     iconName: "briefcase",
+                    iconTone: .fromStatus(position.side),
                     metaPairs: [
                         .init(key: "side", value: position.side),
                         .init(key: "qty", value: DisplayFormatters.number(position.qty)),
@@ -237,9 +252,11 @@ struct LogsView: View {
                     symbol: closed.symbol,
                     title: title,
                     summary: "realized_pnl=\(DisplayFormatters.pnl(closed.realizedPnl)) reason=\(closed.reason ?? "-")",
+                    feedMessage: "\(title) 포지션 종료, 실현손익 \(DisplayFormatters.pnl(closed.realizedPnl))",
                     status: closed.reason,
                     source: "execution",
                     iconName: "flag.checkered",
+                    iconTone: toneForPnL(closed.realizedPnl),
                     metaPairs: [
                         .init(key: "position_id", value: optionalInt(closed.positionId)),
                         .init(key: "closed_qty", value: DisplayFormatters.number(closed.closedQty)),
@@ -274,6 +291,13 @@ struct LogsView: View {
         guard let value else { return "-" }
         return value ? "true" : "false"
     }
+
+    private func toneForPnL(_ value: Double?) -> StatusTone {
+        guard let value else { return .neutral }
+        if value > 0 { return .success }
+        if value < 0 { return .danger }
+        return .neutral
+    }
 }
 
 private struct LogMetaPair: Identifiable {
@@ -290,42 +314,57 @@ private struct LogEntry: Identifiable {
     let symbol: String?
     let title: String
     let summary: String
+    let feedMessage: String
     let status: String?
     let source: String
     let iconName: String
+    let iconTone: StatusTone
     let metaPairs: [LogMetaPair]
 }
 
-private struct LogListRow: View {
+private struct LogFeedRow: View {
     let entry: LogEntry
+    let isSelected: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(DisplayFormatters.dateTime(entry.timestamp))
-                    .font(.caption.monospaced())
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 10) {
+                Text(displayTime(entry.timestamp))
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
-                StatusBadge(
-                    text: entry.eventType,
-                    tone: .fromStatus(entry.status ?? entry.eventType)
-                )
-                Spacer()
-            }
+                    .frame(width: 78, alignment: .leading)
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Image(systemName: entry.iconName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(entry.title)
-                    .font(.callout.weight(.semibold))
-            }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(entry.iconTone.foreground)
+                    .frame(width: 18)
 
-            Text(entry.summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+                Text(entry.feedMessage)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .background(
+                isSelected
+                    ? Color.accentColor.opacity(0.26)
+                    : Color.white.opacity(0.01),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+                .padding(.leading, 8)
+                .padding(.trailing, 4)
         }
-        .padding(.vertical, 4)
+    }
+
+    private func displayTime(_ value: Date) -> String {
+        let full = DisplayFormatters.dateTime(value)
+        return String(full.suffix(8))
     }
 }
 

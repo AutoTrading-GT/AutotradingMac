@@ -25,7 +25,7 @@
   - Global top bar(운영): 페이지명, 자동매매 상태, 장 상태, 마지막 갱신, `시작/일시정지/긴급 정지`(placeholder)
   - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
 - Logs 페이지(운영형 2-pane)
-  - 좌측: 최근 이벤트 리스트(시간, 이벤트 타입 배지, 종목/코드, 한 줄 요약)
+  - 좌측: 로그 피드(`시간 + 아이콘 + 한 줄 핵심 메시지`)
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
   - 로그 미선택 시 우측 empty state 표시
 
