@@ -9,9 +9,15 @@ import SwiftUI
 
 @main
 struct AutotradingMacApp: App {
+    @StateObject private var store = MonitoringStore()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(store)
+                .onDisappear {
+                    store.stop()
+                }
         }
     }
 }

@@ -8,17 +8,17 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var store: MonitoringStore
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        AppShellView()
+            .task {
+                await store.start()
+            }
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(MonitoringStore())
 }
