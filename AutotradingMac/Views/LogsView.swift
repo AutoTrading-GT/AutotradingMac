@@ -101,6 +101,7 @@ struct LogsView: View {
         rows.append(
             contentsOf: store.recentSignals.map { signal in
                 let title = instrumentTitle(symbol: signal.symbol, code: signal.code)
+                let displayName = instrumentDisplayName(symbol: signal.symbol, code: signal.code)
                 return LogEntry(
                     id: "signal-\(signal.id)",
                     timestamp: signal.createdAt,
@@ -109,7 +110,11 @@ struct LogsView: View {
                     symbol: signal.symbol,
                     title: title,
                     summary: "signal=\(signal.signalType) confidence=\(DisplayFormatters.number(signal.confidence))",
-                    feedMessage: "\(title) 신호 발생 (\(signal.signalType))",
+                    feedMessage: signalFeedMessage(
+                        instrumentName: displayName,
+                        signalType: signal.signalType,
+                        confidence: signal.confidence
+                    ),
                     status: signal.signalType,
                     source: "strategy",
                     iconName: "dot.radiowaves.left.and.right",
@@ -127,6 +132,7 @@ struct LogsView: View {
         rows.append(
             contentsOf: store.recentRiskDecisions.map { risk in
                 let title = instrumentTitle(symbol: risk.symbol, code: risk.code)
+                let displayName = instrumentDisplayName(symbol: risk.symbol, code: risk.code)
                 return LogEntry(
                     id: "risk-\(risk.id)",
                     timestamp: risk.createdAt,
@@ -135,9 +141,12 @@ struct LogsView: View {
                     symbol: risk.symbol,
                     title: title,
                     summary: risk.reason,
-                    feedMessage: risk.decision.lowercased() == "blocked"
-                        ? "\(title) 신호가 리스크 규칙으로 차단됨"
-                        : "\(title) 신호가 리스크 규칙을 통과함",
+                    feedMessage: riskFeedMessage(
+                        instrumentName: displayName,
+                        decision: risk.decision,
+                        reason: risk.reason,
+                        signalType: risk.signalType
+                    ),
                     status: risk.decision,
                     source: "risk",
                     iconName: risk.decision.lowercased() == "blocked" ? "exclamationmark.shield" : "checkmark.shield",
@@ -157,6 +166,7 @@ struct LogsView: View {
         rows.append(
             contentsOf: store.recentOrders.map { order in
                 let title = instrumentTitle(symbol: order.symbol, code: order.code)
+                let displayName = instrumentDisplayName(symbol: order.symbol, code: order.code)
                 return LogEntry(
                     id: "order-\(order.orderId)-\(order.updatedAt.timeIntervalSince1970)",
                     timestamp: order.updatedAt,
@@ -165,7 +175,13 @@ struct LogsView: View {
                     symbol: order.symbol,
                     title: title,
                     summary: "\(order.side) qty=\(DisplayFormatters.number(order.orderQty)) status=\(order.status)",
-                    feedMessage: "\(title) \(order.side.uppercased()) 주문 상태: \(order.status)",
+                    feedMessage: orderFeedMessage(
+                        instrumentName: displayName,
+                        side: order.side,
+                        qty: order.orderQty,
+                        price: order.orderPrice,
+                        status: order.status
+                    ),
                     status: order.status,
                     source: order.executionMode ?? "execution",
                     iconName: order.status.lowercased() == "rejected" ? "xmark.circle" : "shippingbox",
@@ -187,6 +203,7 @@ struct LogsView: View {
         rows.append(
             contentsOf: store.recentFills.map { fill in
                 let title = instrumentTitle(symbol: fill.symbol, code: fill.code)
+                let displayName = instrumentDisplayName(symbol: fill.symbol, code: fill.code)
                 return LogEntry(
                     id: "fill-\(fill.fillId)",
                     timestamp: fill.filledAt,
@@ -195,7 +212,12 @@ struct LogsView: View {
                     symbol: fill.symbol,
                     title: title,
                     summary: "\(fill.side) qty=\(DisplayFormatters.number(fill.filledQty)) @ \(DisplayFormatters.number(fill.filledPrice))",
-                    feedMessage: "\(title) \(fill.side.uppercased()) 체결 \(DisplayFormatters.number(fill.filledQty)) @ \(DisplayFormatters.number(fill.filledPrice))",
+                    feedMessage: fillFeedMessage(
+                        instrumentName: displayName,
+                        side: fill.side,
+                        qty: fill.filledQty,
+                        price: fill.filledPrice
+                    ),
                     status: fill.side,
                     source: fill.executionMode ?? "execution",
                     iconName: "checkmark.circle.fill",
@@ -215,6 +237,7 @@ struct LogsView: View {
         rows.append(
             contentsOf: store.currentPositions.map { position in
                 let title = instrumentTitle(symbol: position.symbol, code: position.code)
+                let displayName = instrumentDisplayName(symbol: position.symbol, code: position.code)
                 return LogEntry(
                     id: "position-updated-\(position.id)-\(position.updatedAt.timeIntervalSince1970)",
                     timestamp: position.updatedAt,
@@ -223,7 +246,10 @@ struct LogsView: View {
                     symbol: position.symbol,
                     title: title,
                     summary: "qty=\(DisplayFormatters.number(position.qty)) unrealized=\(DisplayFormatters.pnl(position.unrealizedPnl))",
-                    feedMessage: "\(title) 포지션 갱신, 평가손익 \(DisplayFormatters.pnl(position.unrealizedPnl))",
+                    feedMessage: positionUpdateFeedMessage(
+                        instrumentName: displayName,
+                        pnl: position.unrealizedPnl
+                    ),
                     status: position.side,
                     source: position.markPriceSource ?? "execution",
                     iconName: "briefcase",
@@ -244,6 +270,7 @@ struct LogsView: View {
         rows.append(
             contentsOf: store.recentClosedPositions.map { closed in
                 let title = instrumentTitle(symbol: closed.symbol, code: closed.code)
+                let displayName = instrumentDisplayName(symbol: closed.symbol, code: closed.code)
                 return LogEntry(
                     id: "position-closed-\(closed.id)",
                     timestamp: closed.createdAt,
@@ -252,7 +279,11 @@ struct LogsView: View {
                     symbol: closed.symbol,
                     title: title,
                     summary: "realized_pnl=\(DisplayFormatters.pnl(closed.realizedPnl)) reason=\(closed.reason ?? "-")",
-                    feedMessage: "\(title) 포지션 종료, 실현손익 \(DisplayFormatters.pnl(closed.realizedPnl))",
+                    feedMessage: positionClosedFeedMessage(
+                        instrumentName: displayName,
+                        reason: closed.reason,
+                        realizedPnl: closed.realizedPnl
+                    ),
                     status: closed.reason,
                     source: "execution",
                     iconName: "flag.checkered",
@@ -282,6 +313,16 @@ struct LogsView: View {
         return "\(symbol) (\(codeText))"
     }
 
+    private func instrumentDisplayName(symbol: String?, code: String?) -> String {
+        if let symbol, !symbol.isEmpty {
+            return symbol
+        }
+        if let code, !code.isEmpty {
+            return code
+        }
+        return "종목"
+    }
+
     private func optionalInt(_ value: Int?) -> String {
         guard let value else { return "-" }
         return "\(value)"
@@ -297,6 +338,173 @@ struct LogsView: View {
         if value > 0 { return .success }
         if value < 0 { return .danger }
         return .neutral
+    }
+
+    private func signalFeedMessage(instrumentName: String, signalType: String, confidence: Double?) -> String {
+        let normalized = signalType.lowercased()
+        let scoreText = confidenceScoreText(confidence)
+
+        let base: String
+        if normalized.contains("sell") || normalized.contains("exit") {
+            base = "\(instrumentName) 매도 신호 생성"
+        } else if normalized.contains("maintained") || normalized.contains("watch") || normalized.contains("wait") {
+            base = "\(instrumentName) 관망 신호"
+        } else {
+            base = "\(instrumentName) 매수 신호 생성"
+        }
+
+        let reason: String
+        if normalized.contains("jump") || normalized.contains("break") || normalized.contains("momentum") {
+            reason = "모멘텀 돌파"
+        } else if normalized.contains("new_entry") || normalized.contains("entry") {
+            reason = "순위권 진입"
+        } else if normalized.contains("maintained") {
+            reason = "횡보 지속"
+        } else if normalized.contains("resistance") {
+            reason = "저항선 도달"
+        } else {
+            reason = ""
+        }
+
+        var suffix: [String] = []
+        if !scoreText.isEmpty {
+            suffix.append("점수: \(scoreText)")
+        }
+        if !reason.isEmpty {
+            suffix.append(reason)
+        }
+
+        if suffix.isEmpty {
+            return base
+        }
+        return "\(base) (\(suffix.joined(separator: ", ")))"
+    }
+
+    private func riskFeedMessage(instrumentName: String, decision: String, reason: String, signalType: String?) -> String {
+        let normalizedDecision = decision.lowercased()
+        let normalizedReason = reason.lowercased()
+        let normalizedSignalType = signalType?.lowercased() ?? ""
+
+        if normalizedDecision == "approved" {
+            return "\(instrumentName) 진입 승인"
+        }
+
+        if normalizedReason.contains("already_holding") || normalizedReason.contains("position") {
+            return "\(instrumentName) 보유 중 종목으로 진입 보류"
+        }
+        if normalizedReason.contains("cooldown") || normalizedReason.contains("recent") {
+            return "\(instrumentName) 재진입 대기 중으로 진입 보류"
+        }
+        if normalizedReason.contains("max_concurrent") {
+            return "\(instrumentName) 동시 진입 한도 초과로 진입 보류"
+        }
+        if normalizedReason.contains("signal_type_not_allowed") || normalizedSignalType.contains("maintained") {
+            return "\(instrumentName) 관망 신호로 진입 보류"
+        }
+        if normalizedReason.contains("stop_loss") {
+            return "\(instrumentName) 손절 보호 규칙으로 진입 보류"
+        }
+        if normalizedReason.contains("take_profit") {
+            return "\(instrumentName) 익절 보호 규칙으로 진입 보류"
+        }
+        return "\(instrumentName) 리스크 규칙으로 진입 보류"
+    }
+
+    private func orderFeedMessage(
+        instrumentName: String,
+        side: String,
+        qty: Double?,
+        price: Double?,
+        status: String
+    ) -> String {
+        let sideText = sideTextKo(side)
+        let qtyText = quantityText(qty)
+        let orderTypeText = (price ?? 0) > 0 ? "지정가" : "시장가"
+        let statusKey = status.lowercased()
+
+        if statusKey == "submitted" || statusKey == "created" {
+            return "\(instrumentName) \(orderTypeText) \(sideText) 주문 접수"
+        }
+        if statusKey == "rejected" {
+            return "\(instrumentName) \(sideText) 주문 거부"
+        }
+        if statusKey == "cancelled" {
+            return "\(instrumentName) \(sideText) 주문 취소"
+        }
+        if statusKey == "partially_filled" {
+            return "\(instrumentName) \(sideText) 주문 부분 체결 진행"
+        }
+        if statusKey == "filled" {
+            if !qtyText.isEmpty {
+                return "\(instrumentName) \(qtyText) \(sideText) 주문 체결 완료"
+            }
+            return "\(instrumentName) \(sideText) 주문 체결 완료"
+        }
+        return "\(instrumentName) 주문 상태 업데이트"
+    }
+
+    private func fillFeedMessage(instrumentName: String, side: String, qty: Double?, price: Double?) -> String {
+        let sideText = sideTextKo(side)
+        let qtyText = quantityText(qty)
+        let priceText = currencyText(price)
+
+        if !qtyText.isEmpty && !priceText.isEmpty {
+            return "\(instrumentName) \(qtyText) \(sideText) 체결 @ \(priceText)"
+        }
+        if !qtyText.isEmpty {
+            return "\(instrumentName) \(qtyText) \(sideText) 체결"
+        }
+        return "\(instrumentName) \(sideText) 체결"
+    }
+
+    private func positionUpdateFeedMessage(instrumentName: String, pnl: Double?) -> String {
+        if let pnl, pnl != 0 {
+            return "\(instrumentName) 포지션 갱신, 평가손익 \(DisplayFormatters.pnl(pnl))"
+        }
+        return "\(instrumentName) 포지션 갱신"
+    }
+
+    private func positionClosedFeedMessage(instrumentName: String, reason: String?, realizedPnl: Double?) -> String {
+        let normalizedReason = reason?.lowercased() ?? ""
+        let pnlText = DisplayFormatters.pnl(realizedPnl)
+
+        if normalizedReason.contains("stop_loss") {
+            return "\(instrumentName) 손절 청산 완료 (\(pnlText))"
+        }
+        if normalizedReason.contains("take_profit") {
+            return "\(instrumentName) 익절 청산 완료 (\(pnlText))"
+        }
+        if normalizedReason.contains("time") || normalizedReason.contains("holding") {
+            return "\(instrumentName) 보유시간 만료로 청산 (\(pnlText))"
+        }
+        return "\(instrumentName) 포지션 종료 (\(pnlText))"
+    }
+
+    private func confidenceScoreText(_ confidence: Double?) -> String {
+        guard let confidence else { return "" }
+        let score = confidence <= 1.0 ? confidence * 100.0 : confidence
+        return "\(Int(score.rounded()))"
+    }
+
+    private func sideTextKo(_ side: String) -> String {
+        let normalized = side.lowercased()
+        if normalized == "buy" { return "매수" }
+        if normalized == "sell" { return "매도" }
+        return "주문"
+    }
+
+    private func quantityText(_ qty: Double?) -> String {
+        guard let qty, qty > 0 else { return "" }
+        let isInteger = abs(qty.rounded() - qty) < 0.000001
+        if isInteger {
+            return "\(Int(qty.rounded()))주"
+        }
+        return "\(DisplayFormatters.number(qty))주"
+    }
+
+    private func currencyText(_ price: Double?) -> String {
+        guard let price, price > 0 else { return "" }
+        return "\(DisplayFormatters.number(price))원"
     }
 }
 

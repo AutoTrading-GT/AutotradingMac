@@ -26,6 +26,7 @@
   - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
 - Logs 페이지(운영형 2-pane)
   - 좌측: 로그 피드(`시간 + 아이콘 + 한 줄 핵심 메시지`)
+  - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
   - 로그 미선택 시 우측 empty state 표시
 
