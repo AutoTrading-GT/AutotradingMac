@@ -77,7 +77,7 @@ struct DashboardView: View {
                     }
                     TableColumn("Error") { row in
                         Text(row.error ?? "-")
-                            .foregroundStyle((row.error == nil) ? .secondary : .red)
+                            .foregroundStyle((row.error == nil) ? Color.secondary : Color.red)
                     }
                 }
                 .frame(minHeight: 180)
