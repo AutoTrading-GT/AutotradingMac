@@ -18,6 +18,7 @@
   - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
+- 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
 - 역할 분리
   - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
   - 개발/디버깅: Dev 하위 화면
