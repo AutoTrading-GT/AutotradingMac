@@ -21,19 +21,13 @@ struct MarketView: View {
                     description: Text("snapshot 또는 websocket market 이벤트 수신 후 후보가 표시됩니다.")
                 )
             } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 16) {
-                        scannerListPane
-                            .frame(minWidth: 460, maxWidth: 520, maxHeight: .infinity, alignment: .topLeading)
-                        scannerDetailPane
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    VStack(alignment: .leading, spacing: 12) {
-                        scannerListPane
-                        scannerDetailPane
-                    }
+                HStack(alignment: .top, spacing: 16) {
+                    scannerListPane
+                        .frame(minWidth: 500, idealWidth: 540, maxWidth: 560, maxHeight: .infinity, alignment: .topLeading)
+                    scannerDetailPane
+                        .frame(minWidth: 700, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .padding()
@@ -46,7 +40,7 @@ struct MarketView: View {
         .onChange(of: scanMode) { _ in
             syncSelection()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 1260, minHeight: 760, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var scannerHeader: some View {
@@ -76,7 +70,7 @@ struct MarketView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 420, maxWidth: .infinity)
 
             VStack(spacing: 0) {
                 scannerTableHeader
@@ -117,6 +111,7 @@ struct MarketView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     summaryCard(for: selectedCandidate)
                     chartCard(for: selectedCandidate)
+                    Spacer(minLength: 0)
                 }
             } else {
                 ContentUnavailableView(
@@ -274,10 +269,10 @@ struct MarketView: View {
     }
 
     private var scannerTableHeader: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Text("순위")
                 .font(.caption.weight(.semibold))
-                .frame(width: 52, alignment: .center)
+                .frame(width: 48, alignment: .center)
 
             Text("종목명")
                 .font(.caption.weight(.semibold))
@@ -285,15 +280,15 @@ struct MarketView: View {
 
             Text("현재가")
                 .font(.caption.weight(.semibold))
-                .frame(width: 110, alignment: .trailing)
+                .frame(width: 102, alignment: .trailing)
 
             Text("등락률")
                 .font(.caption.weight(.semibold))
-                .frame(width: 96, alignment: .trailing)
+                .frame(width: 90, alignment: .trailing)
 
             Text("거래대금")
                 .font(.caption.weight(.semibold))
-                .frame(width: 120, alignment: .trailing)
+                .frame(width: 108, alignment: .trailing)
         }
         .foregroundStyle(.secondary)
     }
@@ -526,35 +521,33 @@ private struct ScannerCandidateRowView: View {
     var body: some View {
         let trend = TrendDirection.from(changePercent: candidate.row.changePct)
 
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             rankBox
-                .frame(width: 52, alignment: .center)
+                .frame(width: 48, alignment: .center)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(candidate.displayName)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Text(candidate.code)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             Text(DisplayFormatters.krw(candidate.row.price))
                 .font(.subheadline.monospacedDigit())
-                .frame(width: 110, alignment: .trailing)
+                .frame(width: 102, alignment: .trailing)
 
             Text("\(trend.symbol) \(DisplayFormatters.signedPercent(candidate.row.changePct))")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(trend.color)
                 .lineLimit(1)
-                .frame(width: 96, alignment: .trailing)
+                .frame(width: 90, alignment: .trailing)
 
             Text(DisplayFormatters.metricKorean(candidate.row.metric))
                 .font(.caption.monospacedDigit())
-                .frame(width: 120, alignment: .trailing)
+                .frame(width: 108, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
