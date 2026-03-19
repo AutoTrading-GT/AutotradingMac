@@ -7,16 +7,16 @@ import SwiftUI
 
 private enum ScannerLayout {
     static let paneSpacing: CGFloat = 16
-    static let leftPaneWidth: CGFloat = 520
-    static let rightPaneWidth: CGFloat = leftPaneWidth * 1.2
+    static let leftPaneWidth: CGFloat = 660
+    static let rightPaneWidth: CGFloat = 440
     static let paneHeight: CGFloat = 660
     static let contentPadding: CGFloat = 16
 
     static let columnSpacing: CGFloat = 2
     static let rankColumnWidth: CGFloat = 44
-    static let priceColumnWidth: CGFloat = 94
-    static let changeColumnWidth: CGFloat = 84
-    static let metricColumnWidth: CGFloat = 96
+    static let priceColumnWidth: CGFloat = 88
+    static let changeColumnWidth: CGFloat = 78
+    static let metricColumnWidth: CGFloat = 88
 
     static let rowHeight: CGFloat = 38
     static let rowSpacing: CGFloat = 4
@@ -134,22 +134,23 @@ struct MarketView: View {
     }
 
     private var scannerDetailPane: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 12) {
             if let selectedCandidate {
-                VStack(alignment: .leading, spacing: 14) {
-                    summaryCard(for: selectedCandidate)
-                    chartCard(for: selectedCandidate)
-                    Spacer(minLength: 0)
-                }
+                summaryCard(for: selectedCandidate)
+                chartCard(for: selectedCandidate)
+                    .frame(maxHeight: .infinity, alignment: .top)
             } else {
                 ContentUnavailableView(
                     "선택된 종목이 없습니다",
                     systemImage: "cursorarrow.click",
                     description: Text("좌측 후보에서 종목을 선택하면 상세가 표시됩니다.")
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .padding()
         .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func summaryCard(for candidate: ScannerCandidate) -> some View {
