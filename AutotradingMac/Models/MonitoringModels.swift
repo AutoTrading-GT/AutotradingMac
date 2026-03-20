@@ -25,6 +25,14 @@ struct RuntimeStatusSnapshot: Decodable {
     var env: String
     var appStatus: String
     var executionMode: String
+    var engineState: String?
+    var engineAvailableActions: [String]?
+    var engineTransitioningAction: String?
+    var engineLastAction: String?
+    var engineLastError: String?
+    var engineMessage: String?
+    var engineEmergencyLatched: Bool?
+    var engineUpdatedAt: Date?
     var databaseStatus: String
     var databaseConnected: Bool
     var readinessStatus: String
@@ -186,4 +194,22 @@ struct MarketRow: Identifiable {
     let metric: Double?
     let source: String?
     let updatedAt: Date?
+}
+
+struct EngineControlSnapshot: Decodable {
+    let state: String
+    let transitioningAction: String?
+    let lastAction: String?
+    let lastError: String?
+    let message: String?
+    let emergencyLatched: Bool
+    let availableActions: [String]
+    let updatedAt: Date
+}
+
+struct EngineControlCommandResponse: Decodable {
+    let ok: Bool
+    let action: String
+    let message: String
+    let engine: EngineControlSnapshot
 }

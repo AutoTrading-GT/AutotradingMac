@@ -7,6 +7,7 @@ import SwiftUI
 
 struct GlobalTopBarView: View {
     @EnvironmentObject private var store: MonitoringStore
+    @State private var showEmergencyConfirmation = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -41,6 +42,18 @@ struct GlobalTopBarView: View {
         )
         .shadow(color: DesignTokens.Shadows.cardBase.opacity(0.55), radius: 8, y: 3)
         .shadow(color: DesignTokens.Shadows.cardEmphasis.opacity(0.32), radius: 18, y: 8)
+        .confirmationDialog(
+            "긴급 정지를 실행할까요?",
+            isPresented: $showEmergencyConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("긴급 정지", role: .destructive) {
+                Task { await store.performEngineAction(.emergencyStop) }
+            }
+            Button("취소", role: .cancel) { }
+        } message: {
+            Text("신규 처리 파이프라인이 중단되고 복구는 서버 재기동 절차가 필요할 수 있습니다.")
+        }
     }
 
     private var statusCluster: some View {
@@ -82,6 +95,27 @@ struct GlobalTopBarView: View {
                     Capsule(style: .continuous)
                         .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
                 )
+
+                if let controlFeedbackText {
+                    HStack(spacing: 6) {
+                        Image(systemName: controlFeedbackIcon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(controlFeedbackText)
+                            .lineLimit(1)
+                    }
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(controlFeedbackColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(DesignTokens.Colors.surface1)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                    )
+                }
             }
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -122,32 +156,41 @@ struct GlobalTopBarView: View {
     private var actionButtons: some View {
         HStack(spacing: 8) {
             Button {
+                Task { await store.performEngineAction(.start) }
             } label: {
-                topActionLabel("시작", icon: "play.fill")
+                topActionLabel("시작", icon: "play.fill", action: .start)
             }
             .buttonStyle(TopBarActionButtonStyle(tone: .start))
-            .disabled(true)
+            .disabled(isActionDisabled(.start))
 
             Button {
+                Task { await store.performEngineAction(.pause) }
             } label: {
-                topActionLabel("일시정지", icon: "pause.fill")
+                topActionLabel("일시정지", icon: "pause.fill", action: .pause)
             }
             .buttonStyle(TopBarActionButtonStyle(tone: .pause))
-            .disabled(true)
+            .disabled(isActionDisabled(.pause))
 
             Button(role: .destructive) {
+                showEmergencyConfirmation = true
             } label: {
-                topActionLabel("긴급 정지", icon: "stop.fill")
+                topActionLabel("긴급 정지", icon: "stop.fill", action: .emergencyStop)
             }
             .buttonStyle(TopBarActionButtonStyle(tone: .emergency))
-                .disabled(true)
+            .disabled(isActionDisabled(.emergencyStop))
         }
     }
 
-    private func topActionLabel(_ title: String, icon: String) -> some View {
+    private func topActionLabel(_ title: String, icon: String, action: EngineControlAction) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
+            if store.engineActionInFlight == action {
+                ProgressView()
+                    .controlSize(.small)
+                    .progressViewStyle(.circular)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+            }
             Text(title)
                 .font(DesignTokens.Typography.caption.weight(.semibold))
         }
@@ -156,26 +199,35 @@ struct GlobalTopBarView: View {
         .padding(.vertical, 8)
     }
 
-    private var automationStatusText: String {
-        guard let runtime = store.runtime else { return "자동매매 상태 확인 중" }
-        let mode = runtime.executionMode.lowercased()
-        let status = runtime.appStatus.lowercased()
+    private func isActionDisabled(_ action: EngineControlAction) -> Bool {
+        if store.engineActionInFlight != nil {
+            return true
+        }
+        return !store.canPerformEngineAction(action)
+    }
 
-        if status != "ready" {
-            return "자동매매 점검 필요"
-        }
-        if mode == "disabled" {
-            return "자동매매 대기 중"
-        }
-        if mode == "paper" || mode == "kis_virtual" {
+    private var automationStatusText: String {
+        let state = store.runtime?.engineState?.lowercased()
+        switch state {
+        case "running":
             return "자동매매 실행 중"
+        case "paused":
+            return "자동매매 일시정지"
+        case "stopped":
+            return "자동매매 정지"
+        case "emergency_stopped":
+            return "긴급 정지 상태"
+        case "transitioning":
+            return "상태 전환 중"
+        default:
+            return "자동매매 상태 확인 중"
         }
-        return "자동매매 상태 확인 중"
     }
 
     private var automationStatusTone: StatusTone {
         if automationStatusText.contains("실행 중") { return .success }
-        if automationStatusText.contains("점검") { return .warning }
+        if automationStatusText.contains("긴급") { return .danger }
+        if automationStatusText.contains("전환") { return .warning }
         return .neutral
     }
 
@@ -233,6 +285,27 @@ struct GlobalTopBarView: View {
         if delta < 60 { return "\(delta)초 전" }
         if delta < 3600 { return "\(delta / 60)분 전" }
         return "\(delta / 3600)시간 전"
+    }
+
+    private var controlFeedbackText: String? {
+        if let error = store.lastErrorMessage, error.contains("엔진 제어 실패") {
+            return error
+        }
+        return store.engineActionResultMessage
+    }
+
+    private var controlFeedbackIcon: String {
+        if let error = store.lastErrorMessage, error.contains("엔진 제어 실패") {
+            return "exclamationmark.triangle.fill"
+        }
+        return "checkmark.circle.fill"
+    }
+
+    private var controlFeedbackColor: Color {
+        if let error = store.lastErrorMessage, error.contains("엔진 제어 실패") {
+            return DesignTokens.Colors.warningMuted
+        }
+        return DesignTokens.Colors.successMuted
     }
 }
 

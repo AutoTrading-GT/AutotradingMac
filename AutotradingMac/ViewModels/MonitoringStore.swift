@@ -29,12 +29,24 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var connectionState: WebSocketConnectionState = .disconnected
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var engineActionInFlight: EngineControlAction?
+    @Published private(set) var engineActionResultMessage: String?
     @Published private(set) var selectedScannerCode: String?
 
     private let apiClient: MonitoringAPIClientProtocol
     private let webSocketClient: MonitoringWebSocketClient
     private var started = false
     private let maxRecentItems = 100
+    private static let iso8601WithFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private static let iso8601Basic: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     init(
         apiClient: MonitoringAPIClientProtocol = MonitoringAPIClient(),
@@ -76,6 +88,63 @@ final class MonitoringStore: ObservableObject {
     func reconnectWebSocket() {
         webSocketClient.disconnect()
         webSocketClient.connect()
+    }
+
+    func performEngineAction(_ action: EngineControlAction) async {
+        guard engineActionInFlight == nil else { return }
+        guard canPerformEngineAction(action) else {
+            lastErrorMessage = "현재 상태에서는 \(action.label) 동작을 수행할 수 없습니다."
+            return
+        }
+
+        engineActionInFlight = action
+        defer { engineActionInFlight = nil }
+
+        do {
+            let result: EngineControlCommandResponse
+            switch action {
+            case .start:
+                result = try await apiClient.startEngine()
+            case .pause:
+                result = try await apiClient.pauseEngine()
+            case .emergencyStop:
+                result = try await apiClient.emergencyStopEngine()
+            }
+            applyEngineControlSnapshot(result.engine)
+            engineActionResultMessage = result.message
+            lastErrorMessage = nil
+            lastUpdatedAt = Date()
+            await reloadSnapshot()
+        } catch {
+            lastErrorMessage = "엔진 제어 실패: \(error.localizedDescription)"
+        }
+    }
+
+    func canPerformEngineAction(_ action: EngineControlAction) -> Bool {
+        if let inFlight = engineActionInFlight, inFlight != action {
+            return false
+        }
+        guard let runtime else { return false }
+        let allowed = Set(runtime.engineAvailableActions ?? [])
+        if !allowed.isEmpty {
+            return allowed.contains(action.apiAction)
+        }
+
+        let state = runtime.engineState?.lowercased() ?? "unknown"
+        switch (state, action) {
+        case ("running", .pause), ("running", .emergencyStop):
+            return true
+        case ("paused", .start), ("paused", .emergencyStop):
+            return true
+        case ("stopped", .start), ("stopped", .emergencyStop):
+            return true
+        default:
+            return false
+        }
+    }
+
+    func clearEngineActionResultMessage() {
+        engineActionResultMessage = nil
     }
 
     func setSelectedScannerCode(_ code: String?) {
@@ -298,6 +367,44 @@ final class MonitoringStore: ObservableObject {
         if let executionMode = payload.details?["execution_mode"]?.stringValue {
             runtime.executionMode = executionMode
         }
+        if let engineState = payload.details?["engine_state"]?.stringValue {
+            runtime.engineState = engineState
+        }
+        if let transition = payload.details?["engine_transitioning_action"]?.stringValue {
+            runtime.engineTransitioningAction = transition
+        }
+        if let lastAction = payload.details?["engine_last_action"]?.stringValue {
+            runtime.engineLastAction = lastAction
+        }
+        if let lastError = payload.details?["engine_last_error"]?.stringValue {
+            runtime.engineLastError = lastError
+        }
+        if let message = payload.details?["engine_message"]?.stringValue {
+            runtime.engineMessage = message
+        }
+        if let emergencyLatched = payload.details?["engine_emergency_latched"]?.boolValue {
+            runtime.engineEmergencyLatched = emergencyLatched
+        }
+        if let actionValues = payload.details?["engine_available_actions"]?.arrayStringValues {
+            runtime.engineAvailableActions = actionValues
+        }
+        if let updatedAtText = payload.details?["engine_updated_at"]?.stringValue {
+            runtime.engineUpdatedAt = parseISODate(updatedAtText)
+        }
+        self.runtime = runtime
+    }
+
+    private func applyEngineControlSnapshot(_ snapshot: EngineControlSnapshot) {
+        guard var runtime else { return }
+        runtime.engineState = snapshot.state
+        runtime.engineTransitioningAction = snapshot.transitioningAction
+        runtime.engineLastAction = snapshot.lastAction
+        runtime.engineLastError = snapshot.lastError
+        runtime.engineMessage = snapshot.message
+        runtime.engineEmergencyLatched = snapshot.emergencyLatched
+        runtime.engineAvailableActions = snapshot.availableActions
+        runtime.engineUpdatedAt = snapshot.updatedAt
+        runtime.appStatus = snapshot.state == "emergency_stopped" ? "degraded" : runtime.appStatus
         self.runtime = runtime
     }
 
@@ -566,5 +673,37 @@ final class MonitoringStore: ObservableObject {
             return
         }
         selectedScannerCode = rows.first?.code
+    }
+
+    private func parseISODate(_ raw: String) -> Date? {
+        Self.iso8601WithFractional.date(from: raw) ?? Self.iso8601Basic.date(from: raw)
+    }
+}
+
+enum EngineControlAction: Equatable {
+    case start
+    case pause
+    case emergencyStop
+
+    var apiAction: String {
+        switch self {
+        case .start:
+            return "start"
+        case .pause:
+            return "pause"
+        case .emergencyStop:
+            return "emergency_stop"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .start:
+            return "시작"
+        case .pause:
+            return "일시정지"
+        case .emergencyStop:
+            return "긴급 정지"
+        }
     }
 }

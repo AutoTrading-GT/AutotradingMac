@@ -22,6 +22,18 @@ enum AppConfig {
         backendBaseURL.appendingPathComponent("api/monitoring/snapshot")
     }
 
+    static var engineStartURL: URL {
+        backendBaseURL.appendingPathComponent("api/engine/start")
+    }
+
+    static var enginePauseURL: URL {
+        backendBaseURL.appendingPathComponent("api/engine/pause")
+    }
+
+    static var engineEmergencyStopURL: URL {
+        backendBaseURL.appendingPathComponent("api/engine/emergency-stop")
+    }
+
     static var webSocketURL: URL {
         let env = ProcessInfo.processInfo.environment[websocketEnvKey]
         let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)

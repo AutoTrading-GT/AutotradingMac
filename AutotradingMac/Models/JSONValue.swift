@@ -110,4 +110,16 @@ enum JSONValue: Codable {
         }
         return nil
     }
+
+    var arrayValue: [JSONValue]? {
+        if case .array(let value) = self {
+            return value
+        }
+        return nil
+    }
+
+    var arrayStringValues: [String]? {
+        guard let arrayValue else { return nil }
+        return arrayValue.compactMap(\.stringValue)
+    }
 }
