@@ -781,3 +781,171 @@ private enum TrendDirection {
         }
     }
 }
+
+#if DEBUG
+private struct MarketViewPreviewContainer: View {
+    @StateObject private var store = MonitoringStore(
+        apiClient: MarketViewPreviewAPIClient()
+    )
+
+    var body: some View {
+        MarketView()
+            .environmentObject(store)
+            .task {
+                guard !store.snapshotLoaded, !store.isLoadingSnapshot else { return }
+                await store.reloadSnapshot()
+            }
+            .background(DesignTokens.Colors.background)
+    }
+}
+
+private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
+    private static let previewSnapshot: MonitoringSnapshotResponse = {
+        let json = """
+        {
+          "runtime": {
+            "timestamp": "2026-03-20T09:10:00Z",
+            "app_name": "autotrading-core",
+            "app_version": "0.1.0",
+            "env": "dev",
+            "app_status": "ready",
+            "order_mode": "paper",
+            "account_mode": "paper",
+            "engine_state": "running",
+            "engine_available_actions": ["pause", "emergency_stop"],
+            "engine_message": "engine running",
+            "database_status": "connected",
+            "database_connected": true,
+            "readiness_status": "ready",
+            "startup_ok": true,
+            "startup_status": "ok",
+            "active_ws_clients": 1,
+            "account_summary": {
+              "mode": "paper",
+              "source": "paper_internal",
+              "available": true,
+              "account_label": "paper 내부계좌",
+              "masked_account": "paper",
+              "total_account_value": 100182400.0,
+              "cash_balance": 95062400.0,
+              "unrealized_pnl_total": 512000.0
+            },
+            "workers": {
+              "summary": {
+                "count": 4,
+                "running": 4,
+                "error": 0,
+                "stopping": 0,
+                "starting": 0,
+                "stopped": 0
+              },
+              "workers": {
+                "market_data": { "status": "running" },
+                "strategy": { "status": "running" },
+                "risk": { "status": "running" },
+                "execution": { "status": "running" }
+              }
+            }
+          },
+          "market_top_ranks": [
+            { "code": "005930", "symbol": "삼성전자", "rank": 1, "metric": 285000000000.0, "price": 71200.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "000660", "symbol": "SK하이닉스", "rank": 2, "metric": 232000000000.0, "price": 162500.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "005380", "symbol": "현대자동차", "rank": 3, "metric": 188000000000.0, "price": 251500.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "035420", "symbol": "NAVER", "rank": 4, "metric": 171500000000.0, "price": 214000.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "068270", "symbol": "셀트리온", "rank": 5, "metric": 158100000000.0, "price": 173000.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "005490", "symbol": "POSCO홀딩스", "rank": 6, "metric": 141600000000.0, "price": 359000.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "051910", "symbol": "LG화학", "rank": 7, "metric": 134200000000.0, "price": 402000.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "207940", "symbol": "삼성바이오로직스", "rank": 8, "metric": 120800000000.0, "price": 828000.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "003670", "symbol": "포스코퓨처엠", "rank": 9, "metric": 99800000000.0, "price": 259500.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" },
+            { "code": "035720", "symbol": "카카오", "rank": 10, "metric": 88400000000.0, "price": 48700.0, "source": "preview.mock", "captured_at": "2026-03-20T09:09:58Z" }
+          ],
+          "recent_signals": [
+            {
+              "signal_id": 1102,
+              "code": "005930",
+              "symbol": "삼성전자",
+              "signal_type": "new_entry",
+              "confidence": 92.4,
+              "source_snapshot_id": 8010,
+              "previous_snapshot_id": 8008,
+              "created_at": "2026-03-20T09:09:40Z"
+            }
+          ],
+          "recent_risk_decisions": [],
+          "recent_orders": [],
+          "recent_fills": [],
+          "current_positions": [
+            {
+              "position_id": 301,
+              "code": "005930",
+              "symbol": "삼성전자",
+              "side": "buy",
+              "qty": 120.0,
+              "avg_price": 71200.0,
+              "mark_price": 71900.0,
+              "mark_price_source": "preview.mock",
+              "unrealized_pnl": 84000.0,
+              "unrealized_pnl_pct": 0.98,
+              "updated_at": "2026-03-20T09:09:59Z"
+            }
+          ],
+          "recent_closed_positions": [],
+          "pnl_summary": {
+            "open_positions": 1,
+            "unrealized_pnl_total": 84000.0,
+            "realized_pnl_recent_total": null,
+            "recent_closed_count": 0
+          },
+          "limits": {
+            "market_top_ranks": 50
+          }
+        }
+        """
+
+        do {
+            return try MonitoringCoding.decoder().decode(
+                MonitoringSnapshotResponse.self,
+                from: Data(json.utf8)
+            )
+        } catch {
+            fatalError("MarketView preview snapshot decode failed: \(error)")
+        }
+    }()
+
+    func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
+        Self.previewSnapshot
+    }
+
+    func fetchRuntime() async throws -> RuntimeStatusSnapshot {
+        Self.previewSnapshot.runtime
+    }
+
+    func startEngine() async throws -> EngineControlCommandResponse {
+        throw URLError(.unsupportedURL)
+    }
+
+    func pauseEngine() async throws -> EngineControlCommandResponse {
+        throw URLError(.unsupportedURL)
+    }
+
+    func emergencyStopEngine() async throws -> EngineControlCommandResponse {
+        throw URLError(.unsupportedURL)
+    }
+
+    func clearEmergencyStop() async throws -> EngineControlCommandResponse {
+        throw URLError(.unsupportedURL)
+    }
+
+    func setOrderMode(_ mode: String, confirmLive: Bool) async throws -> EngineModeCommandResponse {
+        throw URLError(.unsupportedURL)
+    }
+
+    func setAccountMode(_ mode: String) async throws -> EngineModeCommandResponse {
+        throw URLError(.unsupportedURL)
+    }
+}
+
+#Preview("Scanner / Mock Data") {
+    MarketViewPreviewContainer()
+}
+#endif
