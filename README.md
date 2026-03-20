@@ -101,6 +101,9 @@ Xcode Scheme 환경변수로 설정 가능합니다.
 - macOS 앱이 로컬에서 실행되고 백엔드가 원격 Linux 서버에서 실행되는 경우 `127.0.0.1`을 사용하면 안 됩니다.
 - `127.0.0.1`은 Mac 자기 자신을 가리키므로, 반드시 원격 서버 IP 또는 도메인으로 설정해야 합니다.
 - URL 환경변수가 비어 있으면 앱은 `backend-url-not-configured.invalid` placeholder로 실패하도록 동작하며, 시작 로그에서 최종 URL을 확인할 수 있습니다.
+- ATS(App Transport Security) 개발 설정:
+  - 현재 개발 편의를 위해 `NSAllowsArbitraryLoads = YES`가 적용되어 HTTP/WS(`http://`, `ws://`) 접속을 허용합니다.
+  - 운영 배포에서는 반드시 HTTPS/WSS로 전환하거나 도메인 단위 예외(`NSExceptionDomains`)로 축소해야 합니다.
 
 ## 로컬 실행
 1. macOS에서 `AutotradingMac.xcodeproj` 오픈
