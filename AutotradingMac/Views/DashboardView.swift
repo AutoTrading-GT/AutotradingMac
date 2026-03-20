@@ -10,311 +10,481 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                kpiRow
-                bodyColumns
+            VStack(alignment: .leading, spacing: 20) {
+                metricsRow
+                contentColumns
             }
-            .padding()
+            .padding(16)
         }
     }
 
-    private var kpiRow: some View {
+    private var metricsRow: some View {
         HStack(spacing: 12) {
-            kpiCard(
-                title: "총 평가금액",
+            dashboardMetricCard(
+                label: "총 평가금액",
                 value: totalEvaluationText,
-                helper: totalEvaluationHelper,
-                tone: .neutral
+                change: totalEvaluationChangeText,
+                trend: trendForValue(totalEvaluationChangeValue)
             )
-            kpiCard(
-                title: "예수금",
+            dashboardMetricCard(
+                label: "예수금",
                 value: cashText,
-                helper: "계좌 현금 데이터 연동 전",
-                tone: .neutral
+                change: nil,
+                trend: .flat
             )
-            kpiCard(
-                title: "평가손익",
+            dashboardMetricCard(
+                label: "평가손익",
                 value: valuationPnLText,
-                helper: "PnL summary 기반",
-                tone: toneForPnL(store.pnlSummary.unrealizedPnlTotal)
+                change: valuationPnLChangeText,
+                trend: trendForValue(store.pnlSummary.unrealizedPnlTotal)
             )
-            kpiCard(
-                title: "승률",
+            dashboardMetricCard(
+                label: "승률",
                 value: winRateText,
-                helper: winRateHelper,
-                tone: toneForWinRate
+                change: winRateChangeText,
+                trend: trendForValue(winRateDelta),
+                iconSystemName: "target"
             )
         }
     }
 
-    private func kpiCard(title: String, value: String, helper: String, tone: StatusTone) -> some View {
+    private func dashboardMetricCard(
+        label: String,
+        value: String,
+        change: String?,
+        trend: DashboardTrend,
+        iconSystemName: String? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let iconSystemName {
+                    Image(systemName: iconSystemName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Text(value)
                 .font(.title3.weight(.semibold))
-            HStack {
-                StatusBadge(text: value, tone: tone)
-                Spacer()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+
+            if let change {
+                HStack(spacing: 6) {
+                    Text(change)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(trend.color)
+                    Spacer(minLength: 0)
+                }
+            } else {
+                Text(" ")
+                    .font(.caption)
             }
-            Text(helper)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
         }
-        .padding()
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .background(DesignTokens.Colors.bgPanel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+        )
     }
 
-    private var bodyColumns: some View {
-        HStack(alignment: .top, spacing: 16) {
-            leftColumn
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+    private var contentColumns: some View {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                scannerPanel
+                holdingsPanel
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
 
-            rightColumn
-                .frame(minWidth: 360, maxWidth: 440, alignment: .topLeading)
+            VStack(alignment: .leading, spacing: 18) {
+                signalsPanel
+                openOrdersPanel
+                recentLogsPanel
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
-    private var leftColumn: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            scannerSection
-            holdingsSection
-        }
-    }
-
-    private var rightColumn: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            signalsSection
-            openOrdersSection
-            recentLogsSection
-            systemSummarySection
-            connectMapSection
-        }
-    }
-
-    private var scannerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("스캔종목")
-            if scannerRows.isEmpty {
-                emptyState("표시 가능한 스캔 종목이 없습니다.")
+    private var scannerPanel: some View {
+        dashboardPanel(title: "스캔 종목", subtitle: "마지막 스캔: \(lastScanText)", noPadding: true) {
+            if scannerItems.isEmpty {
+                panelEmptyState("표시 가능한 스캔 종목이 없습니다.")
             } else {
-                Table(scannerRows) {
-                    TableColumn("코드", value: \.code)
-                    TableColumn("종목", value: \.symbol)
-                    TableColumn("순위") { row in
-                        Text(DisplayFormatters.integer(row.rank))
-                    }
-                    TableColumn("현재가") { row in
-                        Text(DisplayFormatters.number(row.price))
-                    }
-                    TableColumn("거래대금") { row in
-                        Text(DisplayFormatters.metric(row.metric))
+                VStack(spacing: 0) {
+                    ForEach(scannerItems) { item in
+                        dashboardRow {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    Text(item.code)
+                                        .font(.caption2)
+                                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                                }
+                                Spacer(minLength: 8)
+                                scoreBadge(item.score)
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    Text(DisplayFormatters.number(item.price))
+                                        .font(.subheadline.monospacedDigit())
+                                    Text(DisplayFormatters.signedPercent(item.changePct))
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(trendForValue(item.changePct).color)
+                                }
+                                Text(item.metricText)
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                    .frame(minWidth: 72, alignment: .trailing)
+                            }
+                        }
                     }
                 }
-                .frame(minHeight: 220)
             }
         }
-        .dashboardPanel()
     }
 
-    private var holdingsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("보유종목")
-            if store.currentPositions.isEmpty {
-                emptyState("현재 보유 종목이 없습니다.")
+    private var holdingsPanel: some View {
+        dashboardPanel(title: "보유 종목", subtitle: "\(store.currentPositions.count)개", noPadding: true) {
+            if holdingItems.isEmpty {
+                panelEmptyState("현재 보유 종목이 없습니다.")
             } else {
-                Table(store.currentPositions) {
-                    TableColumn("코드", value: \.code)
-                    TableColumn("종목") { row in
-                        Text(row.symbol ?? "-")
-                    }
-                    TableColumn("수량") { row in
-                        Text(DisplayFormatters.number(row.qty))
-                    }
-                    TableColumn("평균단가") { row in
-                        Text(DisplayFormatters.number(row.avgPrice))
-                    }
-                    TableColumn("평가손익") { row in
-                        Text(DisplayFormatters.pnl(row.unrealizedPnl))
-                            .foregroundStyle(colorForPnL(row.unrealizedPnl))
+                VStack(spacing: 0) {
+                    ForEach(holdingItems) { item in
+                        dashboardRow {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    Text("\(DisplayFormatters.number(item.qty))주")
+                                        .font(.caption2)
+                                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                                }
+                                Spacer(minLength: 8)
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    Text("평단: \(DisplayFormatters.number(item.avgPrice))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                    Text(DisplayFormatters.number(item.currentPrice))
+                                        .font(.subheadline.monospacedDigit())
+                                }
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    Text(DisplayFormatters.pnl(item.pnl))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(trendForValue(item.pnl).color)
+                                    Text(DisplayFormatters.percent(item.pnlPercent))
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(trendForValue(item.pnl).color.opacity(0.85))
+                                }
+                            }
+                        }
                     }
                 }
-                .frame(minHeight: 220)
             }
         }
-        .dashboardPanel()
     }
 
-    private var signalsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("매매신호")
-            if store.recentSignals.isEmpty {
-                emptyState("최근 생성된 매매신호가 없습니다.")
+    private var signalsPanel: some View {
+        dashboardPanel(title: "매매 신호", noPadding: true) {
+            if signalItems.isEmpty {
+                panelEmptyState("최근 생성된 매매신호가 없습니다.")
             } else {
-                Table(Array(store.recentSignals.prefix(12))) {
-                    TableColumn("시간") { row in
-                        Text(DisplayFormatters.dateTime(row.createdAt))
+                VStack(spacing: 0) {
+                    ForEach(signalItems) { item in
+                        dashboardRow {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    Text(item.reason)
+                                        .font(.caption2)
+                                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 8)
+                                signalBadge(item.signalLabel, tone: item.signalTone)
+                                StatusBadge(text: item.statusText, tone: item.statusTone)
+                            }
+                        }
                     }
-                    TableColumn("코드", value: \.code)
-                    TableColumn("타입", value: \.signalType)
                 }
-                .frame(minHeight: 190)
             }
         }
-        .dashboardPanel()
     }
 
-    private var openOrdersSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("미체결주문")
-            if openOrders.isEmpty {
-                emptyState("미체결 주문이 없습니다.")
+    private var openOrdersPanel: some View {
+        dashboardPanel(title: "미체결 주문", noPadding: true) {
+            if openOrderItems.isEmpty {
+                panelEmptyState("미체결 주문이 없습니다.")
             } else {
-                Table(openOrders) {
-                    TableColumn("시간") { row in
-                        Text(DisplayFormatters.dateTime(row.updatedAt))
-                    }
-                    TableColumn("코드", value: \.code)
-                    TableColumn("구분", value: \.side)
-                    TableColumn("수량") { row in
-                        Text(DisplayFormatters.number(row.orderQty))
-                    }
-                    TableColumn("상태") { row in
-                        StatusBadge(text: row.status, tone: .fromStatus(row.status))
+                VStack(spacing: 0) {
+                    ForEach(openOrderItems) { item in
+                        dashboardRow {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    Text(item.typeText)
+                                        .font(.caption2)
+                                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                }
+                                Spacer(minLength: 8)
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    Text("\(DisplayFormatters.number(item.qty))주")
+                                        .font(.caption.monospacedDigit())
+                                    Text(item.priceText)
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                }
+                                StatusBadge(text: item.statusText, tone: item.statusTone)
+                            }
+                        }
                     }
                 }
-                .frame(minHeight: 190)
             }
         }
-        .dashboardPanel()
     }
 
-    private var recentLogsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("최근로그")
-            if logLines.isEmpty {
-                emptyState("표시할 최근 로그가 없습니다.")
+    private var recentLogsPanel: some View {
+        dashboardPanel(title: "최근 로그", noPadding: true) {
+            if logItems.isEmpty {
+                panelEmptyState("표시할 최근 로그가 없습니다.")
             } else {
-                ForEach(logLines.prefix(12), id: \.id) { line in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(DisplayFormatters.dateTime(line.timestamp))
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                        StatusBadge(text: line.category, tone: .fromStatus(line.status))
-                        Text(line.message)
-                            .font(.callout)
-                            .lineLimit(1)
+                VStack(spacing: 0) {
+                    ForEach(logItems.prefix(8)) { item in
+                        dashboardRow {
+                            HStack(spacing: 10) {
+                                Text(timeString(item.timestamp))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                    .frame(width: 62, alignment: .leading)
+                                Circle()
+                                    .fill(item.tone.color)
+                                    .frame(width: 7, height: 7)
+                                Text(item.message)
+                                    .font(.callout)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                            }
+                        }
                     }
                 }
             }
         }
-        .dashboardPanel()
     }
 
-    private var systemSummarySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("시스템 요약")
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                GridRow {
-                    Text("앱 상태").foregroundStyle(.secondary)
-                    Text(store.runtime?.appStatus ?? "-")
+    private func dashboardPanel<Content: View>(
+        title: String,
+        subtitle: String? = nil,
+        noPadding: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
-                GridRow {
-                    Text("실행 모드").foregroundStyle(.secondary)
-                    Text(store.runtime?.executionMode ?? "-")
-                }
-                GridRow {
-                    Text("워커 상태").foregroundStyle(.secondary)
-                    Text(workerHealthSummary)
-                }
-                GridRow {
-                    Text("에러 개수").foregroundStyle(.secondary)
-                    Text("\(store.recentErrorItems.count)")
-                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+
+            Divider().opacity(0.35)
+
+            if noPadding {
+                content()
+            } else {
+                content().padding(12)
             }
         }
-        .dashboardPanel()
+        .background(DesignTokens.Colors.bgPanel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+        )
     }
 
-    private var connectMapSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("연결 맵 요약")
-
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                GridRow {
-                    Text("Snapshot API").foregroundStyle(.secondary)
-                    Text(AppConfig.snapshotURL.absoluteString)
-                        .font(.caption.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                GridRow {
-                    Text("WebSocket").foregroundStyle(.secondary)
-                    Text(AppConfig.webSocketURL.absoluteString)
-                        .font(.caption.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                GridRow {
-                    Text("Snapshot 상태").foregroundStyle(.secondary)
-                    StatusBadge(text: snapshotStatusText, tone: snapshotStatusTone)
-                }
-                GridRow {
-                    Text("WS 상태").foregroundStyle(.secondary)
-                    StatusBadge(text: wsStatusText, tone: wsStatusTone)
-                }
-                GridRow {
-                    Text("마지막 이벤트").foregroundStyle(.secondary)
-                    Text(DisplayFormatters.dateTime(store.lastUpdatedAt))
-                }
-            }
-
-            Text("REST snapshot -> MonitoringStore -> Dashboard/Scanner/Logs")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
-                ForEach(connectCounters) { counter in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(counter.title)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text("\(counter.value)")
-                            .font(.subheadline.monospacedDigit().weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 10)
-                    .background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-                }
-            }
+    private func dashboardRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            content()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            Divider().opacity(0.22)
         }
-        .dashboardPanel()
     }
 
-    private func sectionTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.headline)
-    }
-
-    private func emptyState(_ text: String) -> some View {
+    private func panelEmptyState(_ text: String) -> some View {
         Text(text)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
     }
 
-    private var scannerRows: [MarketRow] {
-        Array(store.marketRows.prefix(20))
+    private func scoreBadge(_ value: Int) -> some View {
+        Text("\(value)")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(value >= 85 ? DesignTokens.Colors.success : DesignTokens.Colors.info)
+            .frame(width: 30, height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(value >= 85 ? DesignTokens.Colors.successBackground : DesignTokens.Colors.infoBackground)
+            )
     }
 
-    private var openOrders: [OrderSnapshotItem] {
-        store.recentOrders.filter { order in
-            let state = order.status.lowercased()
-            return state != "filled" && state != "rejected" && state != "cancelled"
+    private func signalBadge(_ text: String, tone: StatusTone) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tone.foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(tone.background.opacity(0.9))
+            )
+    }
+
+    private var scannerItems: [ScannerItem] {
+        Array(store.marketRows.prefix(6)).map { row in
+            ScannerItem(
+                code: row.code,
+                name: row.symbol.isEmpty || row.symbol == "-" ? row.code : row.symbol,
+                score: scannerScore(for: row),
+                price: row.price,
+                changePct: row.changePct,
+                metricText: DisplayFormatters.metricKorean(row.metric)
+            )
         }
+    }
+
+    private var holdingItems: [HoldingItem] {
+        Array(store.currentPositions.prefix(6)).map { row in
+            let price = row.markPrice ?? row.avgPrice
+            let pnl = row.unrealizedPnl
+            let basis = (row.avgPrice ?? 0) * row.qty
+            let percent = basis > 0 && pnl != nil ? (pnl! / basis) * 100.0 : nil
+            return HoldingItem(
+                code: row.code,
+                name: (row.symbol ?? "-").isEmpty ? row.code : (row.symbol ?? row.code),
+                qty: row.qty,
+                avgPrice: row.avgPrice,
+                currentPrice: price,
+                pnl: pnl,
+                pnlPercent: percent
+            )
+        }
+    }
+
+    private var signalItems: [SignalItem] {
+        Array(store.recentSignals.prefix(6)).map { row in
+            let label: String
+            if row.signalType.contains("buy") || row.signalType.contains("entry") {
+                label = "매수"
+            } else if row.signalType.contains("sell") || row.signalType.contains("exit") {
+                label = "매도"
+            } else {
+                label = "관망"
+            }
+
+            let reason = row.signalType
+            return SignalItem(
+                id: row.id,
+                name: row.symbol ?? row.code,
+                signalLabel: label,
+                signalTone: toneForSignalLabel(label),
+                reason: reason,
+                statusText: "모니터링",
+                statusTone: .neutral
+            )
+        }
+    }
+
+    private var openOrderItems: [OpenOrderItem] {
+        store.recentOrders
+            .filter { row in
+                let state = row.status.lowercased()
+                return state != "filled" && state != "rejected" && state != "cancelled"
+            }
+            .prefix(6)
+            .map { row in
+                OpenOrderItem(
+                    id: row.orderId,
+                    name: row.symbol ?? row.code,
+                    qty: row.orderQty,
+                    typeText: row.side == "buy" ? "매수 주문" : "매도 주문",
+                    priceText: DisplayFormatters.number(row.orderPrice),
+                    statusText: row.status,
+                    statusTone: .fromStatus(row.status)
+                )
+            }
+    }
+
+    private var logItems: [DashboardLogItem] {
+        var items: [DashboardLogItem] = []
+        items.append(
+            contentsOf: store.recentFills.map { row in
+                DashboardLogItem(
+                    id: "fill-\(row.fillId)",
+                    timestamp: row.filledAt,
+                    tone: .success,
+                    message: "\(row.symbol ?? row.code) \(DisplayFormatters.number(row.filledQty))주 \(row.sideText) 체결 @ \(DisplayFormatters.number(row.filledPrice))"
+                )
+            }
+        )
+        items.append(
+            contentsOf: store.recentOrders.map { row in
+                DashboardLogItem(
+                    id: "order-\(row.orderId)-\(row.updatedAt.timeIntervalSince1970)",
+                    timestamp: row.updatedAt,
+                    tone: .fromStatus(row.status),
+                    message: "\(row.symbol ?? row.code) \(row.sideText) 주문 \(row.status)"
+                )
+            }
+        )
+        items.append(
+            contentsOf: store.recentSignals.map { row in
+                DashboardLogItem(
+                    id: "signal-\(row.id)",
+                    timestamp: row.createdAt,
+                    tone: .info,
+                    message: "\(row.symbol ?? row.code) \(row.signalType) 신호 생성"
+                )
+            }
+        )
+        items.append(
+            contentsOf: store.recentErrorItems.enumerated().map { idx, value in
+                DashboardLogItem(
+                    id: "err-\(idx)",
+                    timestamp: store.lastUpdatedAt ?? Date(),
+                    tone: .danger,
+                    message: value
+                )
+            }
+        )
+        return items.sorted(by: { $0.timestamp > $1.timestamp })
+    }
+
+    private func scannerScore(for row: MarketRow) -> Int {
+        let rankScore: Double
+        if let rank = row.rank {
+            rankScore = max(0, 100 - (Double(rank) * 3.0))
+        } else {
+            rankScore = 50
+        }
+        let changeScore = min(max((row.changePct ?? 0) * 3.0, -20), 20)
+        return max(0, min(100, Int((rankScore + changeScore).rounded())))
     }
 
     private var totalEvaluationValue: Double? {
@@ -325,21 +495,23 @@ struct DashboardView: View {
         }
     }
 
-    private var totalEvaluationText: String {
-        DisplayFormatters.number(totalEvaluationValue)
+    private var totalEvaluationText: String { DisplayFormatters.number(totalEvaluationValue) }
+
+    private var totalEvaluationChangeValue: Double? { store.pnlSummary.unrealizedPnlTotal }
+
+    private var totalEvaluationChangeText: String? {
+        guard totalEvaluationChangeValue != nil else { return nil }
+        return DisplayFormatters.pnl(totalEvaluationChangeValue)
     }
 
-    private var totalEvaluationHelper: String {
-        guard totalEvaluationValue != nil else { return "보유종목 데이터 없음" }
-        return "보유 수량 x 평가가격 기준"
-    }
+    private var cashText: String { "-" }
 
-    private var cashText: String {
-        "-"
-    }
+    private var valuationPnLText: String { DisplayFormatters.pnl(store.pnlSummary.unrealizedPnlTotal) }
 
-    private var valuationPnLText: String {
-        DisplayFormatters.pnl(store.pnlSummary.unrealizedPnlTotal)
+    private var valuationPnLChangeText: String? {
+        guard let pnl = store.pnlSummary.unrealizedPnlTotal else { return nil }
+        guard let total = totalEvaluationValue, total > 0 else { return nil }
+        return DisplayFormatters.percent((pnl / total) * 100.0)
     }
 
     private var winRateValue: Double? {
@@ -350,159 +522,143 @@ struct DashboardView: View {
     }
 
     private var winRateText: String {
-        guard let winRateValue else { return "-" }
-        return DisplayFormatters.percent(winRateValue)
+        guard let value = winRateValue else { return "-" }
+        return DisplayFormatters.percent(value)
     }
 
-    private var winRateHelper: String {
-        guard winRateValue != nil else { return "종료 포지션 데이터 없음" }
-        return "최근 종료 포지션 기준"
+    private var winRateDelta: Double? {
+        guard let value = winRateValue else { return nil }
+        return value - 50.0
     }
 
-    private var toneForWinRate: StatusTone {
-        guard let value = winRateValue else { return .neutral }
-        if value >= 50.0 { return .success }
-        return .warning
+    private var winRateChangeText: String? {
+        guard let delta = winRateDelta else { return nil }
+        let sign = delta >= 0 ? "+" : ""
+        return "\(sign)\(String(format: "%.1f%%", delta))"
     }
 
-    private func toneForPnL(_ value: Double?) -> StatusTone {
-        guard let value else { return .neutral }
-        if value > 0 { return .success }
-        if value < 0 { return .danger }
-        return .neutral
+    private var lastScanText: String {
+        guard let last = store.lastUpdatedAt else { return "대기 중" }
+        let delta = max(Int(Date().timeIntervalSince(last)), 0)
+        if delta < 10 { return "방금 전" }
+        if delta < 60 { return "\(delta)초 전" }
+        if delta < 3600 { return "\(delta / 60)분 전" }
+        return "\(delta / 3600)시간 전"
     }
 
-    private func colorForPnL(_ value: Double?) -> Color {
-        guard let value else { return .secondary }
-        if value > 0 { return .green }
-        if value < 0 { return .red }
-        return .secondary
+    private func trendForValue(_ value: Double?) -> DashboardTrend {
+        guard let value else { return .flat }
+        if value > 0 { return .up }
+        if value < 0 { return .down }
+        return .flat
     }
 
-    private var workerHealthSummary: String {
-        guard let summary = store.runtime?.workers.summary else { return "-" }
-        return "\(summary.running)/\(summary.count) running"
-    }
-
-    private var logLines: [DashboardLogLine] {
-        var lines: [DashboardLogLine] = []
-        lines.append(
-            contentsOf: store.recentSignals.map {
-                DashboardLogLine(
-                    id: "sig-\($0.id)",
-                    timestamp: $0.createdAt,
-                    category: "signal",
-                    status: $0.signalType,
-                    message: "\($0.code) \($0.signalType)"
-                )
-            }
-        )
-        lines.append(
-            contentsOf: store.recentRiskDecisions.map {
-                DashboardLogLine(
-                    id: "risk-\($0.id)",
-                    timestamp: $0.createdAt,
-                    category: "risk",
-                    status: $0.decision,
-                    message: "\($0.code ?? "-") \($0.reason)"
-                )
-            }
-        )
-        lines.append(
-            contentsOf: store.recentOrders.map {
-                DashboardLogLine(
-                    id: "ord-\($0.orderId)-\($0.updatedAt.timeIntervalSince1970)",
-                    timestamp: $0.updatedAt,
-                    category: "order",
-                    status: $0.status,
-                    message: "\($0.code) \($0.side) qty=\(DisplayFormatters.number($0.orderQty))"
-                )
-            }
-        )
-        lines.append(
-            contentsOf: store.recentFills.map {
-                DashboardLogLine(
-                    id: "fill-\($0.fillId)",
-                    timestamp: $0.filledAt,
-                    category: "fill",
-                    status: $0.side,
-                    message: "\($0.code) qty=\(DisplayFormatters.number($0.filledQty)) @ \(DisplayFormatters.number($0.filledPrice))"
-                )
-            }
-        )
-        lines.append(
-            contentsOf: store.recentErrorItems.enumerated().map { index, item in
-                DashboardLogLine(
-                    id: "err-\(index)",
-                    timestamp: store.lastUpdatedAt ?? Date(),
-                    category: "error",
-                    status: "error",
-                    message: item
-                )
-            }
-        )
-        return lines.sorted(by: { $0.timestamp > $1.timestamp })
-    }
-
-    private var snapshotStatusText: String {
-        if store.isLoadingSnapshot { return "loading" }
-        return store.snapshotLoaded ? "loaded" : "not_loaded"
-    }
-
-    private var snapshotStatusTone: StatusTone {
-        if store.isLoadingSnapshot { return .info }
-        return store.snapshotLoaded ? .success : .warning
-    }
-
-    private var wsStatusText: String {
-        store.connectionState.rawValue
-    }
-
-    private var wsStatusTone: StatusTone {
-        switch store.connectionState {
-        case .connected:
+    private func toneForSignalLabel(_ label: String) -> StatusTone {
+        switch label {
+        case "매수":
             return .success
-        case .connecting:
-            return .info
-        case .error:
+        case "매도":
             return .danger
-        case .disconnected:
-            return .warning
+        default:
+            return .neutral
         }
-    }
-
-    private var connectCounters: [DashboardCounter] {
-        [
-            DashboardCounter(id: "ranks", title: "Ranks", value: store.marketTopRanks.count),
-            DashboardCounter(id: "ticks", title: "Ticks", value: store.latestTicks.count),
-            DashboardCounter(id: "signals", title: "Signals", value: store.recentSignals.count),
-            DashboardCounter(id: "risk", title: "Risk", value: store.recentRiskDecisions.count),
-            DashboardCounter(id: "orders", title: "Orders", value: store.recentOrders.count),
-            DashboardCounter(id: "fills", title: "Fills", value: store.recentFills.count),
-            DashboardCounter(id: "open-pos", title: "Open Pos", value: store.currentPositions.count),
-            DashboardCounter(id: "closed-pos", title: "Closed Pos", value: store.recentClosedPositions.count),
-        ]
     }
 }
 
-private struct DashboardLogLine: Identifiable {
+private struct ScannerItem: Identifiable {
+    let code: String
+    let name: String
+    let score: Int
+    let price: Double?
+    let changePct: Double?
+    let metricText: String
+    var id: String { code }
+}
+
+private struct HoldingItem: Identifiable {
+    let code: String
+    let name: String
+    let qty: Double?
+    let avgPrice: Double?
+    let currentPrice: Double?
+    let pnl: Double?
+    let pnlPercent: Double?
+    var id: String { code }
+}
+
+private struct SignalItem: Identifiable {
+    let id: String
+    let name: String
+    let signalLabel: String
+    let signalTone: StatusTone
+    let reason: String
+    let statusText: String
+    let statusTone: StatusTone
+}
+
+private struct OpenOrderItem: Identifiable {
+    let id: Int
+    let name: String
+    let qty: Double?
+    let typeText: String
+    let priceText: String
+    let statusText: String
+    let statusTone: StatusTone
+}
+
+private struct DashboardLogItem: Identifiable {
     let id: String
     let timestamp: Date
-    let category: String
-    let status: String
+    let tone: StatusTone
     let message: String
 }
 
-private struct DashboardCounter: Identifiable {
-    let id: String
-    let title: String
-    let value: Int
+private enum DashboardTrend {
+    case up
+    case down
+    case flat
+
+    var color: Color {
+        switch self {
+        case .up:
+            return DesignTokens.Colors.profit
+        case .down:
+            return DesignTokens.Colors.loss
+        case .flat:
+            return DesignTokens.Colors.textTertiary
+        }
+    }
 }
 
-private extension View {
-    func dashboardPanel() -> some View {
-        self
-            .padding()
-            .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+private extension FillSnapshotItem {
+    var sideText: String {
+        switch side.lowercased() {
+        case "buy":
+            return "매수"
+        case "sell":
+            return "매도"
+        default:
+            return side
+        }
     }
+}
+
+private extension OrderSnapshotItem {
+    var sideText: String {
+        switch side.lowercased() {
+        case "buy":
+            return "매수"
+        case "sell":
+            return "매도"
+        default:
+            return side
+        }
+    }
+}
+
+private func timeString(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "ko_KR")
+    formatter.dateFormat = "HH:mm:ss"
+    return formatter.string(from: date)
 }
