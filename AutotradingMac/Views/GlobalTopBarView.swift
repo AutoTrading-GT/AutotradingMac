@@ -138,7 +138,7 @@ struct GlobalTopBarView: View {
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
             Text(value)
                 .font(DesignTokens.Typography.caption.weight(.semibold))
-                .foregroundStyle(DesignTokens.Colors.textPrimary)
+                .foregroundStyle(tone.foreground)
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
@@ -235,10 +235,18 @@ struct GlobalTopBarView: View {
     }
 
     private var automationStatusTone: StatusTone {
-        if automationStatusText.contains("실행 중") { return .success }
-        if automationStatusText.contains("긴급") { return .danger }
-        if automationStatusText.contains("전환") { return .warning }
-        return .neutral
+        switch store.runtime?.engineState?.lowercased() {
+        case "running":
+            return .success
+        case "paused":
+            return .warning
+        case "emergency_stopped":
+            return .danger
+        case "transitioning":
+            return .warning
+        default:
+            return .neutral
+        }
     }
 
     private var isEmergencyStopped: Bool {
