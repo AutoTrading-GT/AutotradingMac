@@ -9,7 +9,7 @@ private enum ScannerLayout {
     static let paneSpacing: CGFloat = 16
     static let leftPaneWidth: CGFloat = 660
     static let rightPaneWidth: CGFloat = 440
-    static let paneHeight: CGFloat = 660
+    static let paneHeight: CGFloat = 500
     static let contentPadding: CGFloat = 16
 
     static let columnSpacing: CGFloat = 2
@@ -168,7 +168,7 @@ struct MarketView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding()
+        .padding(0)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .appPanelStyle()
     }
@@ -795,7 +795,7 @@ private struct MarketViewPreviewContainer: View {
                 guard !store.snapshotLoaded, !store.isLoadingSnapshot else { return }
                 await store.reloadSnapshot()
             }
-            .background(DesignTokens.Colors.background)
+            .background()
     }
 }
 
@@ -949,10 +949,4 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
     MarketViewPreviewContainer()
 }
 #endif
-=======
-#Preview("Scanner") {
-    MarketView()
-        .environmentObject(MonitoringStore())  // 스토어 주입
-        .previewLayout(.fixed(width: 1200, height: 800))  // macOS 크기
-}
 
