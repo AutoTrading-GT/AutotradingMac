@@ -102,6 +102,13 @@ struct SettingsView: View {
             settingsRow(icon: "key.horizontal", title: "App Key", value: "••••••••••••")
             settingsRow(icon: "lock.shield", title: "App Secret", value: "••••••••••••")
             settingsRow(icon: "wifi", title: "연결 상태", value: connectionHealthText, tone: connectionStatusTone)
+            settingsRow(
+                icon: "person.text.rectangle",
+                title: "계좌번호(마스킹)",
+                value: maskedAccountText,
+                tone: accountStatusTone,
+                mono: true
+            )
             Divider().opacity(0.25)
             settingsRow(title: "Backend Base URL", value: AppConfig.backendBaseURL.absoluteString, mono: true)
             settingsRow(title: "WebSocket URL", value: AppConfig.webSocketURL.absoluteString, mono: true)
@@ -481,6 +488,25 @@ struct SettingsView: View {
         case .error, .disconnected:
             return "주의 필요"
         }
+    }
+
+    private var accountStatusTone: StatusTone {
+        guard let accountSummary = store.runtime?.accountSummary else {
+            return .neutral
+        }
+        return accountSummary.available ? .success : .warning
+    }
+
+    private var maskedAccountText: String {
+        if let masked = store.runtime?.accountSummary?.maskedAccount,
+           !masked.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return masked
+        }
+        if let label = store.runtime?.accountSummary?.accountLabel,
+           !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return label
+        }
+        return "-"
     }
 
     private var appVersion: String {

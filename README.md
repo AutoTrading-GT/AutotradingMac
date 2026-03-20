@@ -43,6 +43,7 @@
   - 로그 미선택 시 우측 empty state 표시
 - Settings 페이지(운영형 2x2 패널)
   - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
+  - `API 연결` 패널에 `계좌번호(마스킹)` 표시(`runtime.account_summary.masked_account` 우선)
   - `design_ref/figma_web_export/src/app/pages/SettingsPage.tsx` 정보구조를 SwiftUI로 반영
   - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
 - Stategy 페이지(사이드바 독립 화면)
