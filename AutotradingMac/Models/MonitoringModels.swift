@@ -85,6 +85,60 @@ struct RuntimeStatusSnapshot: Decodable {
     var accountSummary: AccountSummarySnapshot?
     var workers: WorkersSnapshot
 
+    init(
+        timestamp: Date,
+        appName: String,
+        appVersion: String,
+        env: String,
+        appStatus: String,
+        orderMode: String,
+        accountMode: String,
+        executionMode: String?,
+        engineState: String?,
+        engineAvailableActions: [String]?,
+        engineTransitioningAction: String?,
+        engineLastAction: String?,
+        engineLastError: String?,
+        engineMessage: String?,
+        engineEmergencyLatched: Bool?,
+        engineUpdatedAt: Date?,
+        databaseStatus: String,
+        databaseConnected: Bool,
+        readinessStatus: String,
+        startupOk: Bool,
+        startupStatus: String,
+        startupError: String?,
+        activeWsClients: Int,
+        accountSummary: AccountSummarySnapshot?,
+        workers: WorkersSnapshot
+    ) {
+        self.timestamp = timestamp
+        self.appName = appName
+        self.appVersion = appVersion
+        self.env = env
+        self.appStatus = appStatus
+        self.orderMode = orderMode
+        self.accountMode = accountMode
+        self.executionMode = executionMode
+        self.engineState = engineState
+        self.engineAvailableActions = engineAvailableActions
+        self.engineTransitioningAction = engineTransitioningAction
+        self.engineLastAction = engineLastAction
+        self.engineLastError = engineLastError
+        self.engineMessage = engineMessage
+        self.engineEmergencyLatched = engineEmergencyLatched
+        self.engineUpdatedAt = engineUpdatedAt
+        self.databaseStatus = databaseStatus
+        self.databaseConnected = databaseConnected
+        self.readinessStatus = readinessStatus
+        self.startupOk = startupOk
+        self.startupStatus = startupStatus
+        self.startupError = startupError
+        self.activeWsClients = activeWsClients
+        self.accountSummary = accountSummary
+        self.workers = workers
+    }
+
     static let fallback = RuntimeStatusSnapshot(
         timestamp: Date(),
         appName: "autotrading-core",
