@@ -52,7 +52,7 @@ struct GlobalTopBarView: View {
             }
             Button("취소", role: .cancel) { }
         } message: {
-            Text("신규 처리 파이프라인이 중단되고 복구는 서버 재기동 절차가 필요할 수 있습니다.")
+            Text("신규 처리 파이프라인이 즉시 중단됩니다. 복구하려면 긴급정지 해제 후 다시 시작해야 합니다.")
         }
     }
 
@@ -155,6 +155,16 @@ struct GlobalTopBarView: View {
 
     private var actionButtons: some View {
         HStack(spacing: 8) {
+            if isEmergencyStopped {
+                Button {
+                    Task { await store.performEngineAction(.clearEmergencyStop) }
+                } label: {
+                    topActionLabel("해제", icon: "arrow.uturn.backward.circle.fill", action: .clearEmergencyStop)
+                }
+                .buttonStyle(TopBarActionButtonStyle(tone: .clear))
+                .disabled(isActionDisabled(.clearEmergencyStop))
+            }
+
             Button {
                 Task { await store.performEngineAction(.start) }
             } label: {
@@ -229,6 +239,10 @@ struct GlobalTopBarView: View {
         if automationStatusText.contains("긴급") { return .danger }
         if automationStatusText.contains("전환") { return .warning }
         return .neutral
+    }
+
+    private var isEmergencyStopped: Bool {
+        (store.runtime?.engineState?.lowercased() ?? "") == "emergency_stopped"
     }
 
     private var marketStatusText: String {
@@ -313,6 +327,7 @@ private enum TopBarActionTone {
     case start
     case pause
     case emergency
+    case clear
 }
 
 private struct TopBarActionButtonStyle: ButtonStyle {
@@ -343,6 +358,8 @@ private struct TopBarActionButtonStyle: ButtonStyle {
                 return DesignTokens.Colors.warningMuted
             case .emergency:
                 return DesignTokens.Colors.dangerMuted
+            case .clear:
+                return DesignTokens.Colors.info
             }
         }
 
@@ -379,6 +396,15 @@ private struct TopBarActionButtonStyle: ButtonStyle {
                 startPoint: .top,
                 endPoint: .bottom
             )
+        case .clear:
+            return LinearGradient(
+                colors: [
+                    DesignTokens.Colors.infoBackground.opacity(0.95 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
     }
 
@@ -390,6 +416,8 @@ private struct TopBarActionButtonStyle: ButtonStyle {
             return DesignTokens.Colors.warningBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
         case .emergency:
             return DesignTokens.Colors.dangerBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+        case .clear:
+            return DesignTokens.Colors.infoBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
         }
     }
 
@@ -404,6 +432,8 @@ private struct TopBarActionButtonStyle: ButtonStyle {
             return DesignTokens.Colors.warningBackground.opacity(0.30)
         case .emergency:
             return DesignTokens.Colors.dangerBackground.opacity(0.32)
+        case .clear:
+            return DesignTokens.Colors.infoBackground.opacity(0.32)
         }
     }
 }

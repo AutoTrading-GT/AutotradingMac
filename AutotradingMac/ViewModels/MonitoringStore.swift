@@ -109,6 +109,8 @@ final class MonitoringStore: ObservableObject {
                 result = try await apiClient.pauseEngine()
             case .emergencyStop:
                 result = try await apiClient.emergencyStopEngine()
+            case .clearEmergencyStop:
+                result = try await apiClient.clearEmergencyStop()
             }
             applyEngineControlSnapshot(result.engine)
             engineActionResultMessage = result.message
@@ -137,6 +139,8 @@ final class MonitoringStore: ObservableObject {
         case ("paused", .start), ("paused", .emergencyStop):
             return true
         case ("stopped", .start), ("stopped", .emergencyStop):
+            return true
+        case ("emergency_stopped", .clearEmergencyStop):
             return true
         default:
             return false
@@ -684,6 +688,7 @@ enum EngineControlAction: Equatable {
     case start
     case pause
     case emergencyStop
+    case clearEmergencyStop
 
     var apiAction: String {
         switch self {
@@ -693,6 +698,8 @@ enum EngineControlAction: Equatable {
             return "pause"
         case .emergencyStop:
             return "emergency_stop"
+        case .clearEmergencyStop:
+            return "clear_emergency_stop"
         }
     }
 
@@ -704,6 +711,8 @@ enum EngineControlAction: Equatable {
             return "일시정지"
         case .emergencyStop:
             return "긴급 정지"
+        case .clearEmergencyStop:
+            return "해제"
         }
     }
 }

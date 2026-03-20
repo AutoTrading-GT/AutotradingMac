@@ -34,6 +34,10 @@ enum AppConfig {
         backendBaseURL.appendingPathComponent("api/engine/emergency-stop")
     }
 
+    static var engineClearEmergencyStopURL: URL {
+        backendBaseURL.appendingPathComponent("api/engine/clear-emergency-stop")
+    }
+
     static var webSocketURL: URL {
         let env = ProcessInfo.processInfo.environment[websocketEnvKey]
         let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)

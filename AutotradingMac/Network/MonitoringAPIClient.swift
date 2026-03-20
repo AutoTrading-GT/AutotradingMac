@@ -10,6 +10,7 @@ protocol MonitoringAPIClientProtocol {
     func startEngine() async throws -> EngineControlCommandResponse
     func pauseEngine() async throws -> EngineControlCommandResponse
     func emergencyStopEngine() async throws -> EngineControlCommandResponse
+    func clearEmergencyStop() async throws -> EngineControlCommandResponse
 }
 
 enum MonitoringAPIError: LocalizedError {
@@ -35,19 +36,22 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     private let engineStartURL: URL
     private let enginePauseURL: URL
     private let engineEmergencyStopURL: URL
+    private let engineClearEmergencyStopURL: URL
 
     init(
         session: URLSession = .shared,
         snapshotURL: URL = AppConfig.snapshotURL,
         engineStartURL: URL = AppConfig.engineStartURL,
         enginePauseURL: URL = AppConfig.enginePauseURL,
-        engineEmergencyStopURL: URL = AppConfig.engineEmergencyStopURL
+        engineEmergencyStopURL: URL = AppConfig.engineEmergencyStopURL,
+        engineClearEmergencyStopURL: URL = AppConfig.engineClearEmergencyStopURL
     ) {
         self.session = session
         self.snapshotURL = snapshotURL
         self.engineStartURL = engineStartURL
         self.enginePauseURL = enginePauseURL
         self.engineEmergencyStopURL = engineEmergencyStopURL
+        self.engineClearEmergencyStopURL = engineClearEmergencyStopURL
     }
 
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
@@ -75,6 +79,10 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
 
     func emergencyStopEngine() async throws -> EngineControlCommandResponse {
         try await sendEngineCommand(to: engineEmergencyStopURL)
+    }
+
+    func clearEmergencyStop() async throws -> EngineControlCommandResponse {
+        try await sendEngineCommand(to: engineClearEmergencyStopURL)
     }
 
     private func sendEngineCommand(to url: URL) async throws -> EngineControlCommandResponse {
