@@ -580,7 +580,7 @@ private struct StrategyActionButtonStyle: ButtonStyle {
             .font(.caption.weight(primary ? .semibold : .regular))
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .foregroundStyle(primary ? Color.white : DesignTokens.Colors.textSecondary)
+            .foregroundStyle(primary ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(primary ? DesignTokens.Colors.accent : DesignTokens.Colors.surface1)

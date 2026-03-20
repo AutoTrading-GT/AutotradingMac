@@ -15,6 +15,8 @@ struct AutotradingMacApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(store)
+                .preferredColorScheme(.dark)
+                .tint(DesignTokens.Colors.accent)
                 .onDisappear {
                     store.stop()
                 }

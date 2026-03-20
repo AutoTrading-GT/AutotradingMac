@@ -46,7 +46,7 @@ struct PositionsPnLView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
             HStack {
                 Text(value)
                     .font(.headline)
@@ -56,7 +56,7 @@ struct PositionsPnLView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .appPanelStyle()
     }
 
     private var openPositionsTable: some View {
@@ -65,7 +65,7 @@ struct PositionsPnLView: View {
                 .font(.headline)
             if store.currentPositions.isEmpty {
                 Text("No open positions.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             } else {
                 Table(store.currentPositions) {
                     TableColumn("Code", value: \.code)
@@ -104,7 +104,7 @@ struct PositionsPnLView: View {
                 .font(.headline)
             if store.recentClosedPositions.isEmpty {
                 Text("No closed positions.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             } else {
                 Table(store.recentClosedPositions) {
                     TableColumn("Time") { row in
@@ -143,9 +143,9 @@ struct PositionsPnLView: View {
     }
 
     private func colorForPnL(_ value: Double?) -> Color {
-        guard let value else { return .secondary }
-        if value > 0 { return .green }
-        if value < 0 { return .red }
-        return .secondary
+        guard let value else { return DesignTokens.Colors.textSecondary }
+        if value > 0 { return DesignTokens.Colors.success }
+        if value < 0 { return DesignTokens.Colors.danger }
+        return DesignTokens.Colors.textSecondary
     }
 }

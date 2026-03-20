@@ -26,7 +26,7 @@ struct OrdersFillsView: View {
                 .font(.headline)
             if store.recentOrders.isEmpty {
                 Text("No orders yet.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             } else {
                 Table(store.recentOrders) {
                     TableColumn("ID") { row in
@@ -61,7 +61,7 @@ struct OrdersFillsView: View {
                 .font(.headline)
             if store.recentFills.isEmpty {
                 Text("No fills yet.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             } else {
                 Table(store.recentFills) {
                     TableColumn("Fill ID") { row in

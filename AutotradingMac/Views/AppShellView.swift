@@ -13,9 +13,13 @@ struct AppShellView: View {
         NavigationSplitView {
             List(ConsoleSection.allCases, selection: $selectedSection) { section in
                 Label(section.title, systemImage: section.icon)
+                    .font(DesignTokens.Typography.bodyStrong)
                     .tag(section)
+                    .listRowBackground(Color.clear)
             }
             .navigationTitle("Autotrading Console")
+            .scrollContentBackground(.hidden)
+            .background(AppTheme.sidebarBackground)
         } detail: {
             VStack(alignment: .leading, spacing: 12) {
                 GlobalTopBarView()
@@ -40,14 +44,16 @@ struct AppShellView: View {
             }
             .padding([.top, .horizontal], 12)
             .padding(.bottom, 8)
+            .background(AppTheme.contentBackground)
             .overlay {
                 if store.isLoadingSnapshot && !store.snapshotLoaded {
                     ProgressView("Loading snapshot...")
                         .padding()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .appPanelStyle()
                 }
             }
         }
+        .background(AppTheme.windowBackground)
     }
 
     private var currentSection: ConsoleSection {

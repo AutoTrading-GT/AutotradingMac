@@ -60,11 +60,11 @@ struct DevWorkspaceView: View {
                 }
                 Text("마지막 갱신: \(DisplayFormatters.dateTime(store.lastUpdatedAt))")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
         }
         .padding()
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .appPanelStyle()
     }
 }
 

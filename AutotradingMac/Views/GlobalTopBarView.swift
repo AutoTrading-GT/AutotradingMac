@@ -18,14 +18,22 @@ struct GlobalTopBarView: View {
                 actionButtons
             }
             .padding()
-            .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+            .background(AppTheme.surfaceBackground, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+            )
 
             VStack(alignment: .leading, spacing: 10) {
                 statusCluster
                 actionButtons
             }
             .padding()
-            .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+            .background(AppTheme.surfaceBackground, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+            )
         }
     }
 
@@ -33,16 +41,16 @@ struct GlobalTopBarView: View {
         TimelineView(.periodic(from: Date(), by: 30)) { _ in
             HStack(alignment: .center, spacing: 10) {
                 Label("자동매매", systemImage: "bolt.horizontal.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
                 StatusBadge(text: automationStatusText, tone: automationStatusTone)
 
                 Divider()
                     .frame(height: 16)
 
                 Label("장 상태", systemImage: "clock")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
                 StatusBadge(text: marketStatusText, tone: marketStatusTone)
 
                 Divider()
@@ -50,11 +58,11 @@ struct GlobalTopBarView: View {
 
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text(lastUpdatedRelativeText)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
-                .font(.caption)
+                .font(DesignTokens.Typography.caption)
             }
             .fixedSize(horizontal: false, vertical: true)
         }

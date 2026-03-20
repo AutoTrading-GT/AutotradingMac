@@ -15,30 +15,30 @@ enum StatusTone {
     var foreground: Color {
         switch self {
         case .neutral:
-            return .primary
+            return DesignTokens.Colors.textSecondary
         case .info:
-            return .blue
+            return DesignTokens.Colors.info
         case .success:
-            return .green
+            return DesignTokens.Colors.success
         case .warning:
-            return .orange
+            return DesignTokens.Colors.warning
         case .danger:
-            return .red
+            return DesignTokens.Colors.danger
         }
     }
 
     var background: Color {
         switch self {
         case .neutral:
-            return Color.secondary.opacity(0.15)
+            return DesignTokens.Colors.surface2
         case .info:
-            return Color.blue.opacity(0.18)
+            return DesignTokens.Colors.infoBackground
         case .success:
-            return Color.green.opacity(0.18)
+            return DesignTokens.Colors.successBackground
         case .warning:
-            return Color.orange.opacity(0.18)
+            return DesignTokens.Colors.warningBackground
         case .danger:
-            return Color.red.opacity(0.18)
+            return DesignTokens.Colors.dangerBackground
         }
     }
 

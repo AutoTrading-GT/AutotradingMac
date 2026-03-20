@@ -85,6 +85,13 @@ enum DesignTokens {
         static let baseSize: CGFloat = 16
         static let weightNormal: Font.Weight = .regular
         static let weightMedium: Font.Weight = .medium
+
+        static let title = Font.system(size: 20, weight: .semibold)
+        static let sectionTitle = Font.system(size: 16, weight: .semibold)
+        static let body = Font.system(size: 14, weight: .regular)
+        static let bodyStrong = Font.system(size: 14, weight: .medium)
+        static let caption = Font.system(size: 12, weight: .medium)
+        static let caption2 = Font.system(size: 11, weight: .regular)
     }
 
     enum Shadows {

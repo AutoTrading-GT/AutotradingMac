@@ -13,6 +13,9 @@ struct ContentView: View {
     var body: some View {
         AppShellView()
             .frame(width: 1360, height: 830)
+            .background(AppTheme.windowBackground)
+            .foregroundStyle(DesignTokens.Colors.textPrimary)
+            .font(DesignTokens.Typography.body)
             .task {
                 await store.start()
             }

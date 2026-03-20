@@ -21,7 +21,8 @@
 - 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
 - 스타일 토큰 매핑 파일: `AutotradingMac/Core/DesignTokens.swift`
   - 출처: `design_ref/figma_web_export/src/styles/theme.css` (.dark 토큰)
-  - 현재 단계: 토큰 정의만 추가(화면 일괄 적용은 후속)
+  - 적용 범위: 전역 다크 테마(`preferredColorScheme(.dark)`), accent/tint, panel/surface 공통 스타일, 상태 배지/상태톤 색상, 주요 화면 텍스트/배경 토큰 적용
+  - 타이포 기준: macOS 시스템 폰트(SF Pro 계열) + `DesignTokens.Typography` 크기 비율(`title/section/body/caption`) 사용
 - 역할 분리
   - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
   - 개발/디버깅: Dev 하위 화면

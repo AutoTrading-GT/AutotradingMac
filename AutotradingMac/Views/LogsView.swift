@@ -12,7 +12,7 @@ struct LogsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("좌측에서 최근 이벤트를 선택하고, 우측 패널에서 상세 정보를 확인합니다.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
 
             if logEntries.isEmpty {
                 ContentUnavailableView("No recent events", systemImage: "tray")
@@ -21,11 +21,12 @@ struct LogsView: View {
                     listPane
 
                     Divider()
+                        .overlay(DesignTokens.Colors.borderSubtle)
 
                     detailPane
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                .appPanelStyle()
             }
         }
         .padding()
@@ -50,7 +51,7 @@ struct LogsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color.black.opacity(0.08))
+        .background(DesignTokens.Colors.surface1)
         .frame(minWidth: 440, maxWidth: 520, maxHeight: .infinity)
     }
 
@@ -536,7 +537,7 @@ private struct LogFeedRow: View {
             HStack(alignment: .center, spacing: 10) {
                 Text(displayTime(entry.timestamp))
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
                     .frame(width: 78, alignment: .leading)
 
                 Image(systemName: entry.iconName)
@@ -554,13 +555,13 @@ private struct LogFeedRow: View {
             .padding(.vertical, 10)
             .background(
                 isSelected
-                    ? Color.accentColor.opacity(0.26)
-                    : Color.white.opacity(0.01),
+                    ? DesignTokens.Colors.accentMuted
+                    : DesignTokens.Colors.surface1.opacity(0.55),
                 in: RoundedRectangle(cornerRadius: 8)
             )
 
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(DesignTokens.Colors.borderSubtle)
                 .frame(height: 1)
                 .padding(.leading, 8)
                 .padding(.trailing, 4)
@@ -581,7 +582,7 @@ private struct LogDetailPanel: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Image(systemName: entry.iconName)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text("Log Detail")
                         .font(.title3.bold())
                     Spacer()
@@ -621,7 +622,7 @@ private struct LogDetailPanel: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
             Text(value)
                 .font(multiline ? .system(.body, design: .monospaced) : .body)
                 .lineLimit(multiline ? nil : 1)

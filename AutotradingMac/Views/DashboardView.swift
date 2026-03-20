@@ -63,7 +63,7 @@ struct DashboardView: View {
                 if let iconSystemName {
                     Image(systemName: iconSystemName)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
                 }
             }
 
@@ -289,7 +289,7 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(DesignTokens.Typography.sectionTitle)
                 Spacer()
                 if let subtitle {
                     Text(subtitle)
@@ -321,13 +321,15 @@ struct DashboardView: View {
             content()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-            Divider().opacity(0.22)
+            Divider()
+                .overlay(DesignTokens.Colors.borderSubtle)
+                .opacity(0.8)
         }
     }
 
     private func panelEmptyState(_ text: String) -> some View {
         Text(text)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(DesignTokens.Colors.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 12)

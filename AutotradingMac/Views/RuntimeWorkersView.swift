@@ -13,28 +13,28 @@ struct RuntimeWorkersView: View {
             Text("Runtime / Workers")
                 .font(.title3.bold())
             Text("개발/디버깅용 런타임 상태 페이지")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
 
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                 GridRow {
-                    Text("App Status").foregroundStyle(.secondary)
+                    Text("App Status").foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text(store.runtime?.appStatus ?? "-")
                 }
                 GridRow {
-                    Text("Readiness").foregroundStyle(.secondary)
+                    Text("Readiness").foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text(store.runtime?.readinessStatus ?? "-")
                 }
                 GridRow {
-                    Text("Database").foregroundStyle(.secondary)
+                    Text("Database").foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text(store.runtime?.databaseStatus ?? "-")
                 }
                 GridRow {
-                    Text("Execution Mode").foregroundStyle(.secondary)
+                    Text("Execution Mode").foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text(store.runtime?.executionMode ?? "-")
                 }
             }
             .padding()
-            .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+            .appPanelStyle()
 
             if store.workerRows.isEmpty {
                 ContentUnavailableView("No worker rows", systemImage: "server.rack")
@@ -49,7 +49,7 @@ struct RuntimeWorkersView: View {
                     }
                     TableColumn("Error") { row in
                         Text(row.error ?? "-")
-                            .foregroundStyle((row.error == nil) ? Color.secondary : Color.red)
+                            .foregroundStyle((row.error == nil) ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.danger)
                     }
                 }
             }

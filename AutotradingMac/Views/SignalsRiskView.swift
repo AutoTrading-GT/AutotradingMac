@@ -26,7 +26,7 @@ struct SignalsRiskView: View {
                 .font(.headline)
             if store.recentSignals.isEmpty {
                 Text("No signal.generated events yet.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             } else {
                 Table(store.recentSignals) {
                     TableColumn("Time") { row in
@@ -52,7 +52,7 @@ struct SignalsRiskView: View {
                 .font(.headline)
             if store.recentRiskDecisions.isEmpty {
                 Text("No risk decisions yet.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             } else {
                 Table(store.recentRiskDecisions) {
                     TableColumn("Time") { row in

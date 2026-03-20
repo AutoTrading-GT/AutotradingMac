@@ -11,7 +11,7 @@ struct StatusBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.caption.weight(.semibold))
+            .font(DesignTokens.Typography.caption.weight(.semibold))
             .foregroundStyle(tone.foreground)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)

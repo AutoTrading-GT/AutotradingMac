@@ -74,25 +74,25 @@ struct MarketView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("종목 스캔")
-                    .font(.title3.weight(.semibold))
+                    .font(DesignTokens.Typography.title)
 
                 HStack(spacing: 14) {
                     HStack(spacing: 6) {
                         Image(systemName: "dot.radiowaves.left.and.right")
                             .font(.caption2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DesignTokens.Colors.success)
                         Text("자동 갱신")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(DesignTokens.Typography.caption)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                     }
 
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.clockwise")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                         Text("최근 스캔: \(lastScanRelativeText)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(DesignTokens.Typography.caption)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                     }
                 }
             }
@@ -113,18 +113,18 @@ struct MarketView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("스캔 후보")
-                    .font(.headline)
+                    .font(DesignTokens.Typography.sectionTitle)
                 Spacer()
                 Text(scanMode.shortDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
 
             VStack(spacing: 0) {
                 scannerTableHeader
                     .padding(.horizontal, 8)
                     .padding(.vertical, 8)
-                    .background(.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                    .background(DesignTokens.Colors.surface1, in: RoundedRectangle(cornerRadius: 8))
 
                 ScrollView {
                     LazyVStack(spacing: ScannerLayout.rowSpacing) {
@@ -151,7 +151,7 @@ struct MarketView: View {
         }
         .padding()
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .appPanelStyle()
     }
 
     private var scannerDetailPane: some View {
@@ -170,7 +170,7 @@ struct MarketView: View {
         }
         .padding()
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .appPanelStyle()
     }
 
     private func detailPanel(for candidate: ScannerCandidate) -> some View {
@@ -187,16 +187,16 @@ struct MarketView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(candidate.displayName)
-                            .font(.title3.weight(.semibold))
+                            .font(DesignTokens.Typography.title)
                         Text(candidate.code)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(DesignTokens.Typography.caption)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("스캔 점수")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                         Text("\(score)")
                             .font(.title3.monospacedDigit().weight(.semibold))
                             .foregroundStyle(scoreTone.foreground)
@@ -222,7 +222,7 @@ struct MarketView: View {
                     .padding(.vertical, 5)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(trend == .up ? Color.red.opacity(0.15) : (trend == .down ? Color.blue.opacity(0.15) : Color.secondary.opacity(0.15)))
+                            .fill(trend == .up ? DesignTokens.Colors.profit.opacity(0.15) : (trend == .down ? DesignTokens.Colors.loss.opacity(0.15) : DesignTokens.Colors.surface2))
                     )
                 }
 
@@ -239,8 +239,8 @@ struct MarketView: View {
 
             HStack {
                 Text("차트")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
                 HStack {
                     Picker("", selection: $chartTimeframe) {
@@ -267,20 +267,20 @@ struct MarketView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
         }
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .appSurfaceStyle()
     }
 
     private func chartSupportInfoRow(metrics: ScannerChartMetrics) -> some View {
         HStack(spacing: 0) {
-            chartSupportInfoItem(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: .primary)
+            chartSupportInfoItem(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: DesignTokens.Colors.textPrimary)
             Divider()
-            chartSupportInfoItem(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: .red.opacity(0.9))
+            chartSupportInfoItem(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: DesignTokens.Colors.profit.opacity(0.92))
             Divider()
-            chartSupportInfoItem(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: .blue.opacity(0.9))
+            chartSupportInfoItem(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: DesignTokens.Colors.loss.opacity(0.92))
             Divider()
-            chartSupportInfoItem(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: .primary)
+            chartSupportInfoItem(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: DesignTokens.Colors.textPrimary)
             Divider()
-            chartSupportInfoItem(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: .secondary)
+            chartSupportInfoItem(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: DesignTokens.Colors.textSecondary)
         }
         .padding(.vertical, 4)
     }
@@ -289,7 +289,7 @@ struct MarketView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
             Text(value)
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(valueColor)
@@ -361,7 +361,7 @@ struct MarketView: View {
                 .font(.caption.weight(.semibold))
                 .frame(width: ScannerLayout.metricColumnWidth, alignment: .trailing)
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(DesignTokens.Colors.textSecondary)
     }
 
     private var candidateCodes: [String] {
@@ -633,11 +633,11 @@ private struct ScannerCandidateRowView: View {
         .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentColor.opacity(0.20) : Color.black.opacity(0.10))
+                .fill(isSelected ? DesignTokens.Colors.accentMuted : DesignTokens.Colors.surface1)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? Color.accentColor.opacity(0.85) : Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(isSelected ? DesignTokens.Colors.accent : DesignTokens.Colors.borderSubtle, lineWidth: 1)
         )
     }
 
@@ -657,22 +657,22 @@ private struct ScannerCandidateRowView: View {
     private var rankBackgroundColor: Color {
         switch candidate.displayRank {
         case 1:
-            return Color.blue.opacity(0.34)
+            return DesignTokens.Colors.accent.opacity(0.34)
         case 2:
-            return Color.blue.opacity(0.26)
+            return DesignTokens.Colors.accent.opacity(0.26)
         case 3:
-            return Color.blue.opacity(0.18)
+            return DesignTokens.Colors.accent.opacity(0.18)
         default:
-            return Color.black.opacity(0.20)
+            return DesignTokens.Colors.surface2
         }
     }
 
     private var rankBorderColor: Color {
         switch candidate.displayRank {
         case 1...3:
-            return Color.blue.opacity(0.50)
+            return DesignTokens.Colors.accent.opacity(0.50)
         default:
-            return Color.white.opacity(0.14)
+            return DesignTokens.Colors.borderMedium
         }
     }
 }
@@ -690,7 +690,7 @@ private struct ScannerLineChartView: View {
 
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(.black.opacity(0.16))
+                    .fill(DesignTokens.Colors.surface1)
 
                 Path { path in
                     for index in 1...4 {
@@ -699,7 +699,7 @@ private struct ScannerLineChartView: View {
                         path.addLine(to: CGPoint(x: size.width, y: y))
                     }
                 }
-                .stroke(.white.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .stroke(DesignTokens.Colors.borderMedium, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                 if points.count > 1 {
                     areaPath(size: size, minValue: minValue, range: range)
@@ -771,13 +771,13 @@ private enum TrendDirection {
     var color: Color {
         switch self {
         case .up:
-            return .red
+            return DesignTokens.Colors.profit
         case .down:
-            return .blue
+            return DesignTokens.Colors.loss
         case .flat:
-            return .secondary
+            return DesignTokens.Colors.textSecondary
         case .unknown:
-            return .secondary
+            return DesignTokens.Colors.textSecondary
         }
     }
 }
