@@ -77,12 +77,12 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "AUTOTRADING_BACKEND_BASE_URL"
-            value = "http://127.0.0.1:8008"
+            value = "http://100.82.44.83:8008"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "AUTOTRADING_BACKEND_WS_URL"
-            value = "ws://127.0.0.1:8008/ws/events"
+            value = "ws://100.82.44.83:8008/ws/events"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
