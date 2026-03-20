@@ -104,8 +104,8 @@ struct SettingsView: View {
             settingsRow(icon: "wifi", title: "연결 상태", value: connectionHealthText, tone: connectionStatusTone)
             settingsRow(
                 icon: "person.text.rectangle",
-                title: "계좌번호(마스킹)",
-                value: maskedAccountText,
+                title: "계좌번호",
+                value: accountNumberText,
                 tone: accountStatusTone,
                 mono: true
             )
@@ -497,7 +497,11 @@ struct SettingsView: View {
         return accountSummary.available ? .success : .warning
     }
 
-    private var maskedAccountText: String {
+    private var accountNumberText: String {
+        if let accountNumber = store.runtime?.accountSummary?.accountNumber,
+           !accountNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return accountNumber
+        }
         if let masked = store.runtime?.accountSummary?.maskedAccount,
            !masked.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return masked

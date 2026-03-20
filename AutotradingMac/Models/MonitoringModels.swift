@@ -50,6 +50,7 @@ struct AccountSummarySnapshot: Decodable {
     let available: Bool
     let unavailableReason: String?
     let accountLabel: String?
+    let accountNumber: String?
     let maskedAccount: String?
     let totalAccountValue: Double?
     let cashBalance: Double?
