@@ -35,6 +35,10 @@
   - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
   - 로그 미선택 시 우측 empty state 표시
+- Settings 페이지(운영형 2x2 패널)
+  - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
+  - `design_ref/figma_web_export/src/app/pages/SettingsPage.tsx` 정보구조를 SwiftUI로 반영
+  - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
 - Scanner 페이지(운영형 2-pane)
   - 상단 헤더: `종목 스캔` + `자동 갱신` + `최근 스캔` 상태, 우측에 스캔 기준 토글 배치
   - 좌측: 후보 리스트(순위/종목명/현재가/등락률/거래대금) 테이블형 정렬
