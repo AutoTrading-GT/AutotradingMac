@@ -9,77 +9,151 @@ struct GlobalTopBarView: View {
     @EnvironmentObject private var store: MonitoringStore
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
-                statusCluster
+        HStack(alignment: .center, spacing: 14) {
+            statusCluster
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 12)
-
-                actionButtons
-            }
-            .padding()
-            .background(AppTheme.surfaceBackground, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-            )
-
-            VStack(alignment: .leading, spacing: 10) {
-                statusCluster
-                actionButtons
-            }
-            .padding()
-            .background(AppTheme.surfaceBackground, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-            )
+            actionButtons
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.95),
+                            DesignTokens.Colors.surface1.opacity(0.90)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(DesignTokens.Colors.borderMedium.opacity(0.55), lineWidth: 0.5)
+                .padding(0.5)
+        )
+        .shadow(color: DesignTokens.Shadows.cardBase.opacity(0.55), radius: 8, y: 3)
+        .shadow(color: DesignTokens.Shadows.cardEmphasis.opacity(0.32), radius: 18, y: 8)
     }
 
     private var statusCluster: some View {
         TimelineView(.periodic(from: Date(), by: 30)) { _ in
-            HStack(alignment: .center, spacing: 10) {
-                Label("자동매매", systemImage: "bolt.horizontal.circle")
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                StatusBadge(text: automationStatusText, tone: automationStatusTone)
+            HStack(alignment: .center, spacing: 8) {
+                toolbarInfoPill(
+                    icon: "bolt.horizontal.circle.fill",
+                    title: "자동매매",
+                    value: automationStatusText,
+                    tone: automationStatusTone
+                )
 
-                Divider()
-                    .frame(height: 16)
+                separatorPill
 
-                Label("장 상태", systemImage: "clock")
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                StatusBadge(text: marketStatusText, tone: marketStatusTone)
+                toolbarInfoPill(
+                    icon: "clock.fill",
+                    title: "장 상태",
+                    value: marketStatusText,
+                    tone: marketStatusTone
+                )
 
-                Divider()
-                    .frame(height: 16)
+                separatorPill
 
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise")
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .font(.system(size: 11, weight: .semibold))
                     Text(lastUpdatedRelativeText)
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .lineLimit(1)
                 }
                 .font(DesignTokens.Typography.caption)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(DesignTokens.Colors.surface1)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                )
             }
             .fixedSize(horizontal: false, vertical: true)
         }
     }
 
+    private var separatorPill: some View {
+        RoundedRectangle(cornerRadius: 999, style: .continuous)
+            .fill(DesignTokens.Colors.borderSubtle)
+            .frame(width: 1, height: 18)
+            .padding(.horizontal, 2)
+    }
+
+    private func toolbarInfoPill(icon: String, title: String, value: String, tone: StatusTone) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(tone.foreground)
+            Text(title)
+                .font(DesignTokens.Typography.caption)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            Text(value)
+                .font(DesignTokens.Typography.caption.weight(.semibold))
+                .foregroundStyle(DesignTokens.Colors.textPrimary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            Capsule(style: .continuous)
+                .fill(DesignTokens.Colors.surface1)
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+        )
+    }
+
     private var actionButtons: some View {
         HStack(spacing: 8) {
-            Button("시작") {}
-                .buttonStyle(.borderedProminent)
-                .disabled(true)
-            Button("일시정지") {}
-                .buttonStyle(.bordered)
-                .disabled(true)
-            Button("긴급 정지", role: .destructive) {}
-                .buttonStyle(.bordered)
+            Button {
+            } label: {
+                topActionLabel("시작", icon: "play.fill")
+            }
+            .buttonStyle(TopBarActionButtonStyle(tone: .start))
+            .disabled(true)
+
+            Button {
+            } label: {
+                topActionLabel("일시정지", icon: "pause.fill")
+            }
+            .buttonStyle(TopBarActionButtonStyle(tone: .pause))
+            .disabled(true)
+
+            Button(role: .destructive) {
+            } label: {
+                topActionLabel("긴급 정지", icon: "stop.fill")
+            }
+            .buttonStyle(TopBarActionButtonStyle(tone: .emergency))
                 .disabled(true)
         }
+    }
+
+    private func topActionLabel(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(title)
+                .font(DesignTokens.Typography.caption.weight(.semibold))
+        }
+        .frame(minWidth: 78)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
     }
 
     private var automationStatusText: String {
@@ -159,5 +233,104 @@ struct GlobalTopBarView: View {
         if delta < 60 { return "\(delta)초 전" }
         if delta < 3600 { return "\(delta / 60)분 전" }
         return "\(delta / 3600)시간 전"
+    }
+}
+
+private enum TopBarActionTone {
+    case start
+    case pause
+    case emergency
+}
+
+private struct TopBarActionButtonStyle: ButtonStyle {
+    let tone: TopBarActionTone
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(foregroundColor(configuration: configuration))
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(backgroundFill(configuration: configuration))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(borderColor(configuration: configuration), lineWidth: 1)
+            )
+            .shadow(color: shadowColor(configuration: configuration), radius: 4, y: 2)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1.0)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+    }
+
+    private func foregroundColor(configuration: Configuration) -> Color {
+        if !configuration.isPressed {
+            switch tone {
+            case .start:
+                return DesignTokens.Colors.successMuted
+            case .pause:
+                return DesignTokens.Colors.warningMuted
+            case .emergency:
+                return DesignTokens.Colors.dangerMuted
+            }
+        }
+
+        return DesignTokens.Colors.textPrimary.opacity(0.9)
+    }
+
+    private func backgroundFill(configuration: Configuration) -> LinearGradient {
+        let pressedOpacity: Double = configuration.isPressed ? 0.85 : 1.0
+        switch tone {
+        case .start:
+            return LinearGradient(
+                colors: [
+                    DesignTokens.Colors.successBackground.opacity(0.95 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        case .pause:
+            return LinearGradient(
+                colors: [
+                    DesignTokens.Colors.warningBackground.opacity(0.95 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        case .emergency:
+            return LinearGradient(
+                colors: [
+                    DesignTokens.Colors.dangerBackground.opacity(0.95 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+
+    private func borderColor(configuration: Configuration) -> Color {
+        switch tone {
+        case .start:
+            return DesignTokens.Colors.successBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+        case .pause:
+            return DesignTokens.Colors.warningBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+        case .emergency:
+            return DesignTokens.Colors.dangerBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+        }
+    }
+
+    private func shadowColor(configuration: Configuration) -> Color {
+        if configuration.isPressed {
+            return .clear
+        }
+        switch tone {
+        case .start:
+            return DesignTokens.Colors.successBackground.opacity(0.35)
+        case .pause:
+            return DesignTokens.Colors.warningBackground.opacity(0.30)
+        case .emergency:
+            return DesignTokens.Colors.dangerBackground.opacity(0.32)
+        }
     }
 }

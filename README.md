@@ -25,10 +25,11 @@
   - 적용 범위: 전역 다크 테마(`preferredColorScheme(.dark)`), accent/tint, panel/surface 공통 스타일, 상태 배지/상태톤 색상, 주요 화면 텍스트/배경 토큰 적용
   - 타이포 기준: macOS 시스템 폰트(SF Pro 계열) + `DesignTokens.Typography` 크기 비율(`title/section/body/caption`) 사용
 - 역할 분리
-  - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
+  - 운영 메인: Dashboard/Scanner/Chart/Stategy/Logs/Settings
   - 개발/디버깅: Dev 하위 화면
 - 상단 정보 계층 분리
   - Global top bar(운영): 자동매매 상태, 장 상태, 마지막 갱신, `시작/일시정지/긴급 정지`(placeholder)
+  - toolbar 스타일: 다층 패널(그라데이션/이중 보더/섀도우) + 데스크톱 리듬 중심 간격 + 세미-톤 액션 버튼 스타일 적용
   - 페이지 제목은 top bar에서 노출하지 않고, 사이드바 선택 상태로 현재 페이지를 파악
   - 본문에서도 페이지 제목 헤더를 반복 노출하지 않고, 화면별 콘텐츠 영역에 집중
   - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
