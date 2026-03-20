@@ -795,7 +795,7 @@ private struct MarketViewPreviewContainer: View {
                 guard !store.snapshotLoaded, !store.isLoadingSnapshot else { return }
                 await store.reloadSnapshot()
             }
-            .background(DesignTokens.Colors.background)
+            .background(DesignTokens.Colors.bgBase)
     }
 }
 
@@ -949,10 +949,3 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
     MarketViewPreviewContainer()
 }
 #endif
-=======
-#Preview("Scanner") {
-    MarketView()
-        .environmentObject(MonitoringStore())  // 스토어 주입
-        .previewLayout(.fixed(width: 1200, height: 800))  // macOS 크기
-}
-
