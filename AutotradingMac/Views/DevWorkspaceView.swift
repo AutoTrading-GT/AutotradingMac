@@ -11,7 +11,7 @@ struct DevWorkspaceView: View {
     @State private var showOrderLiveConfirmation = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
             devConnectionTools
             modeControls
 
@@ -20,6 +20,7 @@ struct DevWorkspaceView: View {
                     Label(section.title, systemImage: section.icon)
                         .tag(section)
                 }
+                .listStyle(.sidebar)
                 .frame(minWidth: 220, maxWidth: 260)
 
                 Divider()

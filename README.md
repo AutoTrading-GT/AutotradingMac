@@ -32,6 +32,8 @@
   - 출처: `design_ref/figma_web_export/src/styles/theme.css` (.dark 토큰)
   - 적용 범위: 전역 다크 테마(`preferredColorScheme(.dark)`), accent/tint, panel/surface 공통 스타일, 상태 배지/상태톤 색상, 주요 화면 텍스트/배경 토큰 적용
   - 타이포 기준: macOS 시스템 폰트(SF Pro 계열) + `DesignTokens.Typography` 크기 비율(`title/section/body/caption`) 사용
+  - 2026-03-20 시각 폴리시: `DesignTokens.Layout`(page/section/panel/row spacing) + 저대비 surface 톤 재정의
+  - 공통 스타일: `AppTheme.appPanelStyle/appSurfaceStyle/appToolbarChrome`로 패널/툴바 소재감을 통일
 - 역할 분리
   - 운영 메인: Dashboard/Scanner/Chart/Stategy/Logs/Settings
   - 개발/디버깅: Dev 하위 화면
@@ -44,7 +46,7 @@
   - 모드 전환/제어 실패 사유(`409 detail`)는 Dev 화면에서 확인
   - Dev 오류는 `주문 모드 전환 실패`와 `계좌정보 조회 실패`로 분리 표시
   - `emergency_stopped` 상태에서는 `해제` 버튼이 추가 노출되고, 해제 전 `시작`은 비활성 유지
-  - toolbar 스타일: 다층 패널(그라데이션/이중 보더/섀도우) + 데스크톱 리듬 중심 간격 + 세미-톤 액션 버튼 스타일 적용
+  - toolbar 스타일: 절제된 대비의 단일 크롬 레이어 + pill 리듬 + 저채도 액션 버튼 스타일로 정리
   - 페이지 제목은 top bar에서 노출하지 않고, 사이드바 선택 상태로 현재 페이지를 파악
   - 본문에서도 페이지 제목 헤더를 반복 노출하지 않고, 화면별 콘텐츠 영역에 집중
   - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
@@ -53,6 +55,7 @@
   - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
   - 로그 미선택 시 우측 empty state 표시
+  - 리스트 행은 저대비 선택 강조 + 얇은 보더 중심으로 정리해 과한 웹 카드 느낌을 축소
 - Settings 페이지(운영형 2x2 패널)
   - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
   - `API 연결` 패널에 마스킹 계좌 식별자 표시(`runtime.account_summary.masked_account` 우선)

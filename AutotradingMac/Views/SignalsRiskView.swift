@@ -10,13 +10,13 @@ struct SignalsRiskView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 Text("Signals / Risk")
                     .font(.title3.bold())
                 signalTable
                 riskTable
             }
-            .padding()
+            .padding(DesignTokens.Layout.pagePadding)
         }
     }
 

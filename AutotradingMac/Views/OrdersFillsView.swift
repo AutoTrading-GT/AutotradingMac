@@ -10,13 +10,13 @@ struct OrdersFillsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 Text("Orders / Fills")
                     .font(.title3.bold())
                 ordersTable
                 fillsTable
             }
-            .padding()
+            .padding(DesignTokens.Layout.pagePadding)
         }
     }
 

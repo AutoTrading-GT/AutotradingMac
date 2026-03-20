@@ -11,7 +11,7 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 pageHeader
                 switch mode {
                 case .settings:
@@ -20,7 +20,7 @@ struct SettingsView: View {
                     strategyContent
                 }
             }
-            .padding(16)
+            .padding(DesignTokens.Layout.pagePadding)
         }
     }
 
@@ -53,12 +53,12 @@ struct SettingsView: View {
     }
 
     private var generalGrid: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
+        VStack(spacing: DesignTokens.Layout.sectionGap) {
+            HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
                 apiConnectionPanel
                 notificationPanel
             }
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
                 dataManagementPanel
                 aboutPanel
             }
@@ -66,14 +66,14 @@ struct SettingsView: View {
     }
 
     private var strategyContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
             currentStrategyOverview
 
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
                 buyConditionsPanel
                 sellConditionsPanel
             }
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
                 strategySelectionPanel
                 riskManagementPanel
             }

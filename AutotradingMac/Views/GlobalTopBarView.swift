@@ -10,38 +10,15 @@ struct GlobalTopBarView: View {
     @State private var showEmergencyConfirmation = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             statusCluster
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             actionButtons
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            DesignTokens.Colors.surface2.opacity(0.95),
-                            DesignTokens.Colors.surface1.opacity(0.90)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(DesignTokens.Colors.borderMedium.opacity(0.55), lineWidth: 0.5)
-                .padding(0.5)
-        )
-        .shadow(color: DesignTokens.Shadows.cardBase.opacity(0.55), radius: 8, y: 3)
-        .shadow(color: DesignTokens.Shadows.cardEmphasis.opacity(0.32), radius: 18, y: 8)
+        .padding(.horizontal, DesignTokens.Layout.panelInnerPadding)
+        .padding(.vertical, 10)
+        .appToolbarChrome()
         .confirmationDialog(
             "긴급 정지를 실행할까요?",
             isPresented: $showEmergencyConfirmation,
@@ -58,7 +35,7 @@ struct GlobalTopBarView: View {
 
     private var statusCluster: some View {
         TimelineView(.periodic(from: Date(), by: 30)) { _ in
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: 7) {
                 toolbarInfoPill(
                     icon: "bolt.horizontal.circle.fill",
                     title: "자동매매",
@@ -162,14 +139,14 @@ struct GlobalTopBarView: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.vertical, 6)
         .background(
             Capsule(style: .continuous)
-                .fill(DesignTokens.Colors.surface1)
+                .fill(DesignTokens.Colors.surface1.opacity(0.9))
         )
         .overlay(
             Capsule(style: .continuous)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.75), lineWidth: 0.9)
         )
     }
 
@@ -383,9 +360,9 @@ private struct TopBarActionButtonStyle: ButtonStyle {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(borderColor(configuration: configuration), lineWidth: 1)
+                    .stroke(borderColor(configuration: configuration), lineWidth: 0.9)
             )
-            .shadow(color: shadowColor(configuration: configuration), radius: 4, y: 2)
+            .shadow(color: shadowColor(configuration: configuration), radius: 2, y: 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1.0)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
@@ -408,13 +385,13 @@ private struct TopBarActionButtonStyle: ButtonStyle {
     }
 
     private func backgroundFill(configuration: Configuration) -> LinearGradient {
-        let pressedOpacity: Double = configuration.isPressed ? 0.85 : 1.0
+        let pressedOpacity: Double = configuration.isPressed ? 0.88 : 1.0
         switch tone {
         case .start:
             return LinearGradient(
                 colors: [
-                    DesignTokens.Colors.successBackground.opacity(0.95 * pressedOpacity),
-                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                    DesignTokens.Colors.successBackground.opacity(0.75 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.92 * pressedOpacity)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -422,8 +399,8 @@ private struct TopBarActionButtonStyle: ButtonStyle {
         case .pause:
             return LinearGradient(
                 colors: [
-                    DesignTokens.Colors.warningBackground.opacity(0.95 * pressedOpacity),
-                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                    DesignTokens.Colors.warningBackground.opacity(0.72 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.92 * pressedOpacity)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -431,8 +408,8 @@ private struct TopBarActionButtonStyle: ButtonStyle {
         case .emergency:
             return LinearGradient(
                 colors: [
-                    DesignTokens.Colors.dangerBackground.opacity(0.95 * pressedOpacity),
-                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                    DesignTokens.Colors.dangerBackground.opacity(0.76 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.92 * pressedOpacity)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -440,8 +417,8 @@ private struct TopBarActionButtonStyle: ButtonStyle {
         case .clear:
             return LinearGradient(
                 colors: [
-                    DesignTokens.Colors.infoBackground.opacity(0.95 * pressedOpacity),
-                    DesignTokens.Colors.surface1.opacity(0.9 * pressedOpacity)
+                    DesignTokens.Colors.infoBackground.opacity(0.70 * pressedOpacity),
+                    DesignTokens.Colors.surface1.opacity(0.92 * pressedOpacity)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -452,13 +429,13 @@ private struct TopBarActionButtonStyle: ButtonStyle {
     private func borderColor(configuration: Configuration) -> Color {
         switch tone {
         case .start:
-            return DesignTokens.Colors.successBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+            return DesignTokens.Colors.successBackground.opacity(configuration.isPressed ? 0.78 : 0.6)
         case .pause:
-            return DesignTokens.Colors.warningBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+            return DesignTokens.Colors.warningBackground.opacity(configuration.isPressed ? 0.78 : 0.6)
         case .emergency:
-            return DesignTokens.Colors.dangerBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+            return DesignTokens.Colors.dangerBackground.opacity(configuration.isPressed ? 0.78 : 0.6)
         case .clear:
-            return DesignTokens.Colors.infoBackground.opacity(configuration.isPressed ? 0.9 : 0.75)
+            return DesignTokens.Colors.infoBackground.opacity(configuration.isPressed ? 0.78 : 0.6)
         }
     }
 
@@ -466,16 +443,7 @@ private struct TopBarActionButtonStyle: ButtonStyle {
         if configuration.isPressed {
             return .clear
         }
-        switch tone {
-        case .start:
-            return DesignTokens.Colors.successBackground.opacity(0.35)
-        case .pause:
-            return DesignTokens.Colors.warningBackground.opacity(0.30)
-        case .emergency:
-            return DesignTokens.Colors.dangerBackground.opacity(0.32)
-        case .clear:
-            return DesignTokens.Colors.infoBackground.opacity(0.32)
-        }
+        return Color.black.opacity(0.14)
     }
 }
 

@@ -10,14 +10,14 @@ struct PositionsPnLView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 Text("Positions / PnL")
                     .font(.title3.bold())
                 pnlSummaryCards
                 openPositionsTable
                 closedPositionsTable
             }
-            .padding()
+            .padding(DesignTokens.Layout.pagePadding)
         }
     }
 

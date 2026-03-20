@@ -10,8 +10,9 @@ struct LogsView: View {
     @State private var selectedLogID: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
             Text("좌측에서 최근 이벤트를 선택하고, 우측 패널에서 상세 정보를 확인합니다.")
+                .font(DesignTokens.Typography.caption)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
 
             if logEntries.isEmpty {
@@ -51,8 +52,8 @@ struct LogsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(DesignTokens.Colors.surface1)
-        .frame(minWidth: 440, maxWidth: 520, maxHeight: .infinity)
+        .background(DesignTokens.Colors.surface1.opacity(0.7))
+        .frame(minWidth: 430, maxWidth: 510, maxHeight: .infinity)
     }
 
     private var detailPane: some View {
@@ -68,7 +69,8 @@ struct LogsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding()
+        .padding(DesignTokens.Layout.panelInnerPadding)
+        .background(DesignTokens.Colors.surface1.opacity(0.52))
     }
 
     private var selectedEntry: LogEntry? {
@@ -533,39 +535,42 @@ private struct LogFeedRow: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 10) {
-                Text(displayTime(entry.timestamp))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                    .frame(width: 78, alignment: .leading)
+        HStack(alignment: .center, spacing: 10) {
+            Text(displayTime(entry.timestamp))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .frame(width: 76, alignment: .leading)
 
-                Image(systemName: entry.iconName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(entry.iconTone.foreground)
-                    .frame(width: 18)
+            Image(systemName: entry.iconName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(entry.iconTone.foreground)
+                .frame(width: 16)
 
-                Text(entry.feedMessage)
-                    .font(.callout)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
-            .background(
-                isSelected
-                    ? DesignTokens.Colors.accentMuted
-                    : DesignTokens.Colors.surface1.opacity(0.55),
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-
-            Rectangle()
-                .fill(DesignTokens.Colors.borderSubtle)
-                .frame(height: 1)
-                .padding(.leading, 8)
-                .padding(.trailing, 4)
+            Text(entry.feedMessage)
+                .font(.callout)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(
+                    isSelected
+                    ? DesignTokens.Colors.accentMuted.opacity(0.95)
+                    : DesignTokens.Colors.surface1.opacity(0.40)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(
+                    isSelected
+                    ? DesignTokens.Colors.accent.opacity(0.55)
+                    : DesignTokens.Colors.borderSubtle.opacity(0.35),
+                    lineWidth: 0.8
+                )
+        )
     }
 
     private func displayTime(_ value: Date) -> String {

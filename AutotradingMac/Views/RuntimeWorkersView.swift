@@ -9,7 +9,7 @@ struct RuntimeWorkersView: View {
     @EnvironmentObject private var store: MonitoringStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
             Text("Runtime / Workers")
                 .font(.title3.bold())
             Text("개발/디버깅용 런타임 상태 페이지")
@@ -58,7 +58,7 @@ struct RuntimeWorkersView: View {
                 }
             }
         }
-        .padding()
+        .padding(DesignTokens.Layout.pagePadding)
     }
 }
 

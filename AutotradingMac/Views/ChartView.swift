@@ -7,7 +7,7 @@ import SwiftUI
 
 struct ChartView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
             Text("종목 선택 후 차트/상세 정보가 들어올 자리입니다.")
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
             RoundedRectangle(cornerRadius: 12)
@@ -27,7 +27,7 @@ struct ChartView: View {
                     }
                 )
         }
-        .padding()
+        .padding(DesignTokens.Layout.pagePadding)
     }
 }
 

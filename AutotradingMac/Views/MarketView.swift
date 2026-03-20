@@ -31,7 +31,7 @@ struct MarketView: View {
     @State private var chartTimeframe: ChartTimeframe = .minute1
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
             scannerHeader
 
             if candidates.isEmpty {
@@ -108,24 +108,24 @@ struct MarketView: View {
             .pickerStyle(.segmented)
             .frame(width: 236)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            DesignTokens.Colors.surface2.opacity(0.72),
-                            DesignTokens.Colors.surface1.opacity(0.48),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            .padding(.horizontal, DesignTokens.Layout.panelInnerPadding)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                            DesignTokens.Colors.surface2.opacity(0.62),
+                            DesignTokens.Colors.surface1.opacity(0.40),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                     )
                 )
         )
         .overlay(
             RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.85), lineWidth: 0.9)
         )
     }
 
@@ -169,7 +169,7 @@ struct MarketView: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .padding()
+        .padding(DesignTokens.Layout.panelInnerPadding)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .scannerPaneStyle()
     }
@@ -188,7 +188,7 @@ struct MarketView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(10)
+        .padding(DesignTokens.Layout.panelInnerPadding)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .scannerPaneStyle()
     }
@@ -530,8 +530,8 @@ private extension View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                DesignTokens.Colors.bgPanel.opacity(0.96),
-                                DesignTokens.Colors.bgElevated.opacity(0.9),
+                                DesignTokens.Colors.bgPanel.opacity(0.94),
+                                DesignTokens.Colors.bgElevated.opacity(0.88),
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -540,23 +540,23 @@ private extension View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
-                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.92), lineWidth: 1)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.82), lineWidth: 0.9)
             )
             .overlay(alignment: .top) {
                 RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.06), Color.clear],
+                            colors: [Color.white.opacity(0.04), Color.clear],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
-                    .frame(height: 42)
+                    .frame(height: 34)
                     .clipShape(
                         RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
                     )
             }
-            .shadow(color: DesignTokens.Shadows.cardBase.opacity(0.36), radius: 14, x: 0, y: 9)
+            .shadow(color: DesignTokens.Shadows.cardBase.opacity(0.22), radius: 6, x: 0, y: 2)
     }
 }
 

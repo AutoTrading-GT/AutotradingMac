@@ -17,12 +17,15 @@ struct AppShellView: View {
                     .tag(section)
                     .listRowBackground(Color.clear)
             }
+            .listStyle(.sidebar)
+            .listRowSpacing(6)
             .navigationTitle("Autotrading Console")
             .scrollContentBackground(.hidden)
             .background(AppTheme.sidebarBackground)
             .navigationSplitViewColumnWidth(min: 196, ideal: 208, max: 220)
+            .padding(.top, 2)
         } detail: {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.x3) {
                 GlobalTopBarView()
 
                 Group {
@@ -45,7 +48,8 @@ struct AppShellView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .padding([.top, .horizontal], 12)
+            .padding(.horizontal, DesignTokens.Layout.pagePadding)
+            .padding(.top, 10)
             .padding(.bottom, 10)
             .background(AppTheme.contentBackground)
             .overlay {

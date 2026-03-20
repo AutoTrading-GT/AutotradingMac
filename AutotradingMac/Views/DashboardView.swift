@@ -10,17 +10,17 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 metricsRow
                 accountStatusRow
                 contentColumns
             }
-            .padding(16)
+            .padding(DesignTokens.Layout.pagePadding)
         }
     }
 
     private var metricsRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             dashboardMetricCard(
                 label: "총 평가금액",
                 value: totalEvaluationText,
@@ -85,24 +85,20 @@ struct DashboardView: View {
                     .font(.caption)
             }
         }
-        .padding(12)
+        .padding(DesignTokens.Layout.panelInnerPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DesignTokens.Colors.bgPanel, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-        )
+        .appPanelStyle()
     }
 
     private var contentColumns: some View {
-        HStack(alignment: .top, spacing: 18) {
-            VStack(alignment: .leading, spacing: 18) {
+        HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 scannerPanel
                 holdingsPanel
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
 
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 signalsPanel
                 openOrdersPanel
                 recentLogsPanel
@@ -328,33 +324,29 @@ struct DashboardView: View {
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
+            .padding(.horizontal, DesignTokens.Layout.panelInnerPadding)
+            .padding(.top, 11)
+            .padding(.bottom, 9)
 
-            Divider().opacity(0.35)
+            Divider().opacity(0.3)
 
             if noPadding {
                 content()
             } else {
-                content().padding(12)
+                content().padding(DesignTokens.Layout.panelInnerPadding)
             }
         }
-        .background(DesignTokens.Colors.bgPanel, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-        )
+        .appPanelStyle()
     }
 
     private func dashboardRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0) {
             content()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, DesignTokens.Layout.rowHorizontalPadding)
+                .padding(.vertical, DesignTokens.Layout.rowVerticalPadding)
             Divider()
                 .overlay(DesignTokens.Colors.borderSubtle)
-                .opacity(0.8)
+                .opacity(0.55)
         }
     }
 
@@ -362,8 +354,8 @@ struct DashboardView: View {
         Text(text)
             .foregroundStyle(DesignTokens.Colors.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DesignTokens.Layout.rowHorizontalPadding)
+            .padding(.vertical, 11)
     }
 
     private func scoreBadge(_ value: Int) -> some View {
@@ -373,7 +365,11 @@ struct DashboardView: View {
             .frame(width: 30, height: 30)
             .background(
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(value >= 85 ? DesignTokens.Colors.successBackground : DesignTokens.Colors.infoBackground)
+                    .fill(value >= 85 ? DesignTokens.Colors.successBackground.opacity(0.85) : DesignTokens.Colors.infoBackground.opacity(0.82))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.6), lineWidth: 0.8)
             )
     }
 
@@ -385,7 +381,11 @@ struct DashboardView: View {
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(tone.background.opacity(0.9))
+                    .fill(tone.background.opacity(0.78))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.58), lineWidth: 0.8)
             )
     }
 

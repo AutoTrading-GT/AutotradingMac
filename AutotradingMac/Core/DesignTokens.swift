@@ -11,17 +11,17 @@ import SwiftUI
 enum DesignTokens {
     enum Colors {
         // Base surfaces
-        static let bgBase = Color(rgb: 0x1A1A1E)
-        static let bgElevated = Color(rgb: 0x212126)
-        static let bgSidebar = Color(rgb: 0x19191D)
+        static let bgBase = Color(rgb: 0x191A1F)
+        static let bgElevated = Color(rgb: 0x1F2026)
+        static let bgSidebar = Color(rgb: 0x17181C)
         static let bgToolbar = Color(rgb: 0x1A1A1E, opacity: 0.85)
 
         // Panel/surfaces with alpha
-        static let bgPanel = Color(rgb: 0x23232A, opacity: 0.92)
-        static let bgPanelHover = Color(rgb: 0x2A2A32, opacity: 0.95)
-        static let surface1 = Color.white.opacity(0.03)
-        static let surface2 = Color.white.opacity(0.05)
-        static let surface3 = Color.white.opacity(0.08)
+        static let bgPanel = Color(rgb: 0x24252C, opacity: 0.90)
+        static let bgPanelHover = Color(rgb: 0x2B2D36, opacity: 0.93)
+        static let surface1 = Color.white.opacity(0.028)
+        static let surface2 = Color.white.opacity(0.045)
+        static let surface3 = Color.white.opacity(0.070)
 
         // Text
         static let textPrimary = Color.white.opacity(0.95)
@@ -73,12 +73,21 @@ enum DesignTokens {
         static let x16: CGFloat = 64
     }
 
+    enum Layout {
+        static let pagePadding: CGFloat = 14
+        static let sectionGap: CGFloat = 16
+        static let panelInnerPadding: CGFloat = 12
+        static let rowHorizontalPadding: CGFloat = 12
+        static let rowVerticalPadding: CGFloat = 8
+    }
+
     enum Radius {
         static let xs: CGFloat = 4
         static let sm: CGFloat = 6
         static let md: CGFloat = 8
         static let lg: CGFloat = 10
         static let xl: CGFloat = 12
+        static let xxl: CGFloat = 14
     }
 
     enum Typography {
