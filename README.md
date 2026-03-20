@@ -90,6 +90,13 @@
   - Scanner와 동일한 `selectedScannerCode`/`selectedChartTimeframe` 상태를 공유
   - 동일 `/api/chart/{symbol}` 응답으로 라인 차트 + 시가/고가/저가/전일종가/변동성 표시
   - 로딩/빈데이터/에러 상태를 별도 표현
+  - 차트 요청 안정화:
+    - 선택/타임프레임 변경 시 debounce(300ms) 적용
+    - 이전 선택의 stale request는 cancel
+    - 동일 key in-flight 요청은 중복 생성하지 않음
+  - 에러 문구 분리:
+    - `KIS 토큰 획득 실패`
+    - `차트 데이터 조회 실패`
 
 ## Dashboard 레이아웃(현재)
 - 상단 KPI 4카드

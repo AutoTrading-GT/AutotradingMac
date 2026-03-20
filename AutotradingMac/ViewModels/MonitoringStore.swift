@@ -46,9 +46,11 @@ final class MonitoringStore: ObservableObject {
     private let maxRecentItems = 100
     private var runtimeRefreshTask: Task<Void, Never>?
     private var snapshotRetryTask: Task<Void, Never>?
+    private var chartFetchDebounceTask: Task<Void, Never>?
     private var chartFetchTasks: [String: Task<Void, Never>] = [:]
     private var lastRuntimeRefreshedAt: Date?
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
+    private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -82,6 +84,8 @@ final class MonitoringStore: ObservableObject {
         runtimeRefreshTask = nil
         snapshotRetryTask?.cancel()
         snapshotRetryTask = nil
+        chartFetchDebounceTask?.cancel()
+        chartFetchDebounceTask = nil
         for task in chartFetchTasks.values {
             task.cancel()
         }
@@ -851,14 +855,25 @@ final class MonitoringStore: ObservableObject {
         guard let symbol = selectedScannerCode else { return }
         let timeframe = selectedChartTimeframe
         let key = chartCacheKey(symbol: symbol, timeframe: timeframe)
-        if chartFetchTasks[key] != nil {
-            return
-        }
-        let task = Task { @MainActor [weak self] in
+        chartFetchDebounceTask?.cancel()
+        cancelStaleChartFetchTasks(except: key)
+
+        chartFetchDebounceTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.fetchChartSeries(symbol: symbol, timeframe: timeframe, force: force)
+            if self.chartFetchDebounceNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: self.chartFetchDebounceNanoseconds)
+            }
+            guard !Task.isCancelled else { return }
+            guard self.selectedScannerCode == symbol, self.selectedChartTimeframe == timeframe else { return }
+            if self.chartFetchTasks[key] != nil {
+                return
+            }
+            let task = Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.fetchChartSeries(symbol: symbol, timeframe: timeframe, force: force)
+            }
+            self.chartFetchTasks[key] = task
         }
-        chartFetchTasks[key] = task
     }
 
     private func fetchChartSeries(
@@ -878,9 +893,13 @@ final class MonitoringStore: ObservableObject {
         chartErrorMessages[key] = nil
         do {
             let response = try await apiClient.fetchChartSeries(symbol: symbol, timeframe: timeframe, limit: 240)
-            chartSeriesCache[key] = response
+            if !Task.isCancelled {
+                chartSeriesCache[key] = response
+                chartErrorMessages[key] = nil
+                lastUpdatedAt = Date()
+            }
+        } catch is CancellationError {
             chartErrorMessages[key] = nil
-            lastUpdatedAt = Date()
         } catch {
             let detail: String
             if let apiError = error as? MonitoringAPIError,
@@ -891,9 +910,26 @@ final class MonitoringStore: ObservableObject {
             } else {
                 detail = error.localizedDescription
             }
-            chartErrorMessages[key] = "차트 조회 실패: \(detail)"
+            chartErrorMessages[key] = chartUserErrorMessage(from: detail)
         }
         chartLoadingKeys.remove(key)
+    }
+
+    private func cancelStaleChartFetchTasks(except keepKey: String) {
+        let staleKeys = chartFetchTasks.keys.filter { $0 != keepKey }
+        for staleKey in staleKeys {
+            chartFetchTasks[staleKey]?.cancel()
+            chartFetchTasks[staleKey] = nil
+            chartLoadingKeys.remove(staleKey)
+        }
+    }
+
+    private func chartUserErrorMessage(from detail: String) -> String {
+        let normalized = detail.lowercased()
+        if normalized.contains("chart token error") || normalized.contains("token fetch") || normalized.contains("oauth2/tokenp") {
+            return "KIS 토큰 획득 실패: \(detail)"
+        }
+        return "차트 데이터 조회 실패: \(detail)"
     }
 
     private func parseISODate(_ raw: String) -> Date? {
