@@ -29,6 +29,8 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var connectionState: WebSocketConnectionState = .disconnected
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var lastOrderModeErrorMessage: String?
+    @Published private(set) var lastAccountSummaryErrorMessage: String?
     @Published private(set) var engineActionInFlight: EngineControlAction?
     @Published private(set) var engineActionResultMessage: String?
     @Published private(set) var modeSwitchInFlight: RuntimeModeSwitchTarget?
@@ -88,6 +90,7 @@ final class MonitoringStore: ObservableObject {
             apply(snapshot: snapshot)
             snapshotLoaded = true
             lastErrorMessage = nil
+            updateAccountSummaryDiagnostics(from: runtime)
             lastUpdatedAt = Date()
             lastRuntimeRefreshedAt = Date()
             snapshotRetryTask?.cancel()
@@ -149,13 +152,16 @@ final class MonitoringStore: ObservableObject {
             applyEngineControlSnapshot(result.engine)
             engineActionResultMessage = result.message
             lastErrorMessage = nil
+            lastOrderModeErrorMessage = nil
             lastUpdatedAt = Date()
             await reloadSnapshot()
         } catch {
-            lastErrorMessage = modeSwitchErrorMessage(
+            let detail = modeSwitchErrorMessage(
                 prefix: "주문 모드 변경 실패",
                 error: error
             )
+            lastOrderModeErrorMessage = detail
+            lastErrorMessage = detail
         }
     }
 
@@ -169,13 +175,16 @@ final class MonitoringStore: ObservableObject {
             applyEngineControlSnapshot(result.engine)
             engineActionResultMessage = result.message
             lastErrorMessage = nil
+            lastAccountSummaryErrorMessage = nil
             lastUpdatedAt = Date()
             await reloadSnapshot()
         } catch {
-            lastErrorMessage = modeSwitchErrorMessage(
+            let detail = modeSwitchErrorMessage(
                 prefix: "계좌 모드 변경 실패",
                 error: error
             )
+            lastAccountSummaryErrorMessage = detail
+            lastErrorMessage = detail
         }
     }
 
@@ -341,6 +350,7 @@ final class MonitoringStore: ObservableObject {
 
     private func apply(snapshot: MonitoringSnapshotResponse) {
         runtime = snapshot.runtime
+        updateAccountSummaryDiagnostics(from: runtime)
         marketTopRanks = snapshot.marketTopRanks
         recentSignals = snapshot.recentSignals
         recentRiskDecisions = snapshot.recentRiskDecisions
@@ -772,6 +782,18 @@ final class MonitoringStore: ObservableObject {
             return detail
         }
         return "\(prefix): \(error.localizedDescription)"
+    }
+
+    private func updateAccountSummaryDiagnostics(from runtime: RuntimeStatusSnapshot?) {
+        guard let summary = runtime?.accountSummary else {
+            lastAccountSummaryErrorMessage = nil
+            return
+        }
+        if let reason = summary.unavailableReason, !reason.isEmpty {
+            lastAccountSummaryErrorMessage = reason
+            return
+        }
+        lastAccountSummaryErrorMessage = nil
     }
 
     private func parseISODate(_ raw: String) -> Date? {

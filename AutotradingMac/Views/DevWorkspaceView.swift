@@ -79,15 +79,28 @@ struct DevWorkspaceView: View {
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
 
-            if let errorMessage = store.lastErrorMessage, !errorMessage.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                    Text(errorMessage)
-                        .font(.caption)
-                        .textSelection(.enabled)
-                }
-                .foregroundStyle(DesignTokens.Colors.warningMuted)
+            if let orderError = store.lastOrderModeErrorMessage, !orderError.isEmpty {
+                diagnosticErrorLine(
+                    title: "주문 모드 전환 실패",
+                    message: orderError
+                )
+            }
+
+            if let accountError = store.lastAccountSummaryErrorMessage, !accountError.isEmpty {
+                diagnosticErrorLine(
+                    title: "계좌정보 조회 실패",
+                    message: accountError
+                )
+            }
+
+            if let genericError = store.lastErrorMessage,
+               !genericError.isEmpty,
+               genericError != store.lastOrderModeErrorMessage,
+               genericError != store.lastAccountSummaryErrorMessage {
+                diagnosticErrorLine(
+                    title: "일반 오류",
+                    message: genericError
+                )
             }
         }
         .padding()
@@ -164,6 +177,21 @@ struct DevWorkspaceView: View {
         }
         .buttonStyle(.plain)
         .disabled(store.modeSwitchInFlight != nil)
+    }
+
+    private func diagnosticErrorLine(title: String, message: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                Text(message)
+                    .font(.caption)
+                    .textSelection(.enabled)
+            }
+        }
+        .foregroundStyle(DesignTokens.Colors.warningMuted)
     }
 }
 
