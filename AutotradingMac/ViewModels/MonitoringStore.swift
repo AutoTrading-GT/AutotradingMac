@@ -39,6 +39,7 @@ final class MonitoringStore: ObservableObject {
     private var started = false
     private let maxRecentItems = 100
     private var runtimeRefreshTask: Task<Void, Never>?
+    private var snapshotRetryTask: Task<Void, Never>?
     private var lastRuntimeRefreshedAt: Date?
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
     private static let iso8601WithFractional: ISO8601DateFormatter = {
@@ -65,12 +66,15 @@ final class MonitoringStore: ObservableObject {
         guard !started else { return }
         started = true
         await reloadSnapshot()
+        scheduleSnapshotRetryIfNeeded()
         webSocketClient.connect()
     }
 
     func stop() {
         runtimeRefreshTask?.cancel()
         runtimeRefreshTask = nil
+        snapshotRetryTask?.cancel()
+        snapshotRetryTask = nil
         webSocketClient.disconnect()
         started = false
     }
@@ -86,6 +90,8 @@ final class MonitoringStore: ObservableObject {
             lastErrorMessage = nil
             lastUpdatedAt = Date()
             lastRuntimeRefreshedAt = Date()
+            snapshotRetryTask?.cancel()
+            snapshotRetryTask = nil
         } catch {
             if let decodingError = error as? DecodingError {
                 lastErrorMessage = "Snapshot decode failed: \(decodingErrorDescription(decodingError))"
@@ -93,6 +99,7 @@ final class MonitoringStore: ObservableObject {
                 lastErrorMessage = "Snapshot load failed: \(error.localizedDescription)"
             }
             snapshotLoaded = false
+            scheduleSnapshotRetryIfNeeded()
         }
     }
 
@@ -308,6 +315,9 @@ final class MonitoringStore: ObservableObject {
         webSocketClient.onStateChange = { [weak self] state in
             Task { @MainActor in
                 self?.connectionState = state
+                if state == .connected, self?.snapshotLoaded == false {
+                    await self?.reloadSnapshot()
+                }
             }
         }
 
@@ -776,6 +786,23 @@ final class MonitoringStore: ObservableObject {
             lastUpdatedAt = now
         } catch {
             lastErrorMessage = "Runtime refresh failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func scheduleSnapshotRetryIfNeeded() {
+        guard started else { return }
+        guard snapshotLoaded == false else { return }
+        guard snapshotRetryTask == nil else { return }
+
+        snapshotRetryTask = Task { @MainActor [weak self] in
+            while let self, self.started, self.snapshotLoaded == false, !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled, self.started, self.snapshotLoaded == false else {
+                    break
+                }
+                await self.reloadSnapshot()
+            }
+            self?.snapshotRetryTask = nil
         }
     }
 }

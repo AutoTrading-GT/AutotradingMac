@@ -16,6 +16,46 @@ struct MonitoringSnapshotResponse: Decodable {
     let recentClosedPositions: [ClosedPositionSnapshotItem]
     let pnlSummary: PnLSummarySnapshot
     let limits: [String: Int]
+
+    enum CodingKeys: String, CodingKey {
+        case runtime
+        case marketTopRanks
+        case recentSignals
+        case recentRiskDecisions
+        case recentOrders
+        case recentFills
+        case currentPositions
+        case recentClosedPositions
+        case pnlSummary
+        case limits
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        runtime = (try? container.decode(RuntimeStatusSnapshot.self, forKey: .runtime))
+            ?? RuntimeStatusSnapshot.fallback
+        marketTopRanks = Self.decodeLossyArray(MarketRankSnapshotItem.self, from: container, forKey: .marketTopRanks)
+        recentSignals = Self.decodeLossyArray(SignalSnapshotItem.self, from: container, forKey: .recentSignals)
+        recentRiskDecisions = Self.decodeLossyArray(RiskDecisionSnapshotItem.self, from: container, forKey: .recentRiskDecisions)
+        recentOrders = Self.decodeLossyArray(OrderSnapshotItem.self, from: container, forKey: .recentOrders)
+        recentFills = Self.decodeLossyArray(FillSnapshotItem.self, from: container, forKey: .recentFills)
+        currentPositions = Self.decodeLossyArray(PositionSnapshotItem.self, from: container, forKey: .currentPositions)
+        recentClosedPositions = Self.decodeLossyArray(ClosedPositionSnapshotItem.self, from: container, forKey: .recentClosedPositions)
+        pnlSummary = (try? container.decode(PnLSummarySnapshot.self, forKey: .pnlSummary))
+            ?? PnLSummarySnapshot(openPositions: 0, unrealizedPnlTotal: nil, realizedPnlRecentTotal: nil, recentClosedCount: 0)
+        limits = (try? container.decode([String: Int].self, forKey: .limits)) ?? [:]
+    }
+
+    private static func decodeLossyArray<T: Decodable>(
+        _ type: T.Type,
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> [T] {
+        guard let wrapped = try? container.decode([LossyDecodable<T>].self, forKey: key) else {
+            return []
+        }
+        return wrapped.compactMap(\.value)
+    }
 }
 
 struct RuntimeStatusSnapshot: Decodable {
@@ -44,6 +84,34 @@ struct RuntimeStatusSnapshot: Decodable {
     var activeWsClients: Int
     var accountSummary: AccountSummarySnapshot?
     var workers: WorkersSnapshot
+
+    static let fallback = RuntimeStatusSnapshot(
+        timestamp: Date(),
+        appName: "autotrading-core",
+        appVersion: "-",
+        env: "unknown",
+        appStatus: "degraded",
+        orderMode: "paper",
+        accountMode: "paper",
+        executionMode: "paper",
+        engineState: nil,
+        engineAvailableActions: [],
+        engineTransitioningAction: nil,
+        engineLastAction: nil,
+        engineLastError: nil,
+        engineMessage: nil,
+        engineEmergencyLatched: nil,
+        engineUpdatedAt: nil,
+        databaseStatus: "unknown",
+        databaseConnected: false,
+        readinessStatus: "not_ready",
+        startupOk: false,
+        startupStatus: "unknown",
+        startupError: nil,
+        activeWsClients: 0,
+        accountSummary: nil,
+        workers: WorkersSnapshot.fallback
+    )
 
     enum CodingKeys: String, CodingKey {
         case timestamp
@@ -75,31 +143,34 @@ struct RuntimeStatusSnapshot: Decodable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        timestamp = try container.decode(Date.self, forKey: .timestamp)
-        appName = try container.decode(String.self, forKey: .appName)
-        appVersion = try container.decode(String.self, forKey: .appVersion)
-        env = try container.decode(String.self, forKey: .env)
-        appStatus = try container.decode(String.self, forKey: .appStatus)
-        orderMode = try container.decode(String.self, forKey: .orderMode)
-        accountMode = try container.decode(String.self, forKey: .accountMode)
-        executionMode = try container.decodeIfPresent(String.self, forKey: .executionMode)
-        engineState = try container.decodeIfPresent(String.self, forKey: .engineState)
+        timestamp = (try? container.decode(Date.self, forKey: .timestamp)) ?? Date()
+        appName = container.decodeStringFlexible(forKey: .appName) ?? "autotrading-core"
+        appVersion = container.decodeStringFlexible(forKey: .appVersion) ?? "-"
+        env = container.decodeStringFlexible(forKey: .env) ?? "unknown"
+        appStatus = container.decodeStringFlexible(forKey: .appStatus) ?? "degraded"
+        executionMode = container.decodeStringFlexible(forKey: .executionMode)
+        orderMode = container.decodeStringFlexible(forKey: .orderMode)
+            ?? executionMode
+            ?? "paper"
+        accountMode = container.decodeStringFlexible(forKey: .accountMode)
+            ?? "paper"
+        engineState = container.decodeStringFlexible(forKey: .engineState)
         engineAvailableActions = try container.decodeIfPresent([String].self, forKey: .engineAvailableActions)
-        engineTransitioningAction = try container.decodeIfPresent(String.self, forKey: .engineTransitioningAction)
-        engineLastAction = try container.decodeIfPresent(String.self, forKey: .engineLastAction)
-        engineLastError = try container.decodeIfPresent(String.self, forKey: .engineLastError)
-        engineMessage = try container.decodeIfPresent(String.self, forKey: .engineMessage)
-        engineEmergencyLatched = try container.decodeIfPresent(Bool.self, forKey: .engineEmergencyLatched)
+        engineTransitioningAction = container.decodeStringFlexible(forKey: .engineTransitioningAction)
+        engineLastAction = container.decodeStringFlexible(forKey: .engineLastAction)
+        engineLastError = container.decodeStringFlexible(forKey: .engineLastError)
+        engineMessage = container.decodeStringFlexible(forKey: .engineMessage)
+        engineEmergencyLatched = container.decodeBoolFlexible(forKey: .engineEmergencyLatched)
         engineUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .engineUpdatedAt)
-        databaseStatus = try container.decode(String.self, forKey: .databaseStatus)
-        databaseConnected = try container.decode(Bool.self, forKey: .databaseConnected)
-        readinessStatus = try container.decode(String.self, forKey: .readinessStatus)
-        startupOk = try container.decode(Bool.self, forKey: .startupOk)
-        startupStatus = try container.decode(String.self, forKey: .startupStatus)
-        startupError = try container.decodeIfPresent(String.self, forKey: .startupError)
-        activeWsClients = try container.decode(Int.self, forKey: .activeWsClients)
-        accountSummary = try container.decodeIfPresent(AccountSummarySnapshot.self, forKey: .accountSummary)
-        workers = try container.decodeIfPresent(WorkersSnapshot.self, forKey: .workers) ?? WorkersSnapshot.fallback
+        databaseStatus = container.decodeStringFlexible(forKey: .databaseStatus) ?? "unknown"
+        databaseConnected = container.decodeBoolFlexible(forKey: .databaseConnected) ?? false
+        readinessStatus = container.decodeStringFlexible(forKey: .readinessStatus) ?? "not_ready"
+        startupOk = container.decodeBoolFlexible(forKey: .startupOk) ?? false
+        startupStatus = container.decodeStringFlexible(forKey: .startupStatus) ?? "unknown"
+        startupError = container.decodeStringFlexible(forKey: .startupError)
+        activeWsClients = container.decodeIntFlexible(forKey: .activeWsClients) ?? 0
+        accountSummary = try? container.decodeIfPresent(AccountSummarySnapshot.self, forKey: .accountSummary)
+        workers = (try? container.decode(WorkersSnapshot.self, forKey: .workers)) ?? WorkersSnapshot.fallback
     }
 }
 
@@ -130,16 +201,16 @@ struct AccountSummarySnapshot: Decodable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        mode = try container.decode(String.self, forKey: .mode)
-        source = try container.decode(String.self, forKey: .source)
-        available = try container.decode(Bool.self, forKey: .available)
-        unavailableReason = try container.decodeIfPresent(String.self, forKey: .unavailableReason)
-        accountLabel = try container.decodeIfPresent(String.self, forKey: .accountLabel)
-        accountNumber = try container.decodeIfPresent(String.self, forKey: .accountNumber)
-        maskedAccount = try container.decodeIfPresent(String.self, forKey: .maskedAccount)
-        totalAccountValue = try container.decodeIfPresent(Double.self, forKey: .totalAccountValue)
-        cashBalance = try container.decodeIfPresent(Double.self, forKey: .cashBalance)
-        unrealizedPnlTotal = try container.decodeIfPresent(Double.self, forKey: .unrealizedPnlTotal)
+        mode = container.decodeStringFlexible(forKey: .mode) ?? "paper"
+        source = container.decodeStringFlexible(forKey: .source) ?? "unknown"
+        available = container.decodeBoolFlexible(forKey: .available) ?? false
+        unavailableReason = container.decodeStringFlexible(forKey: .unavailableReason)
+        accountLabel = container.decodeStringFlexible(forKey: .accountLabel)
+        accountNumber = container.decodeStringFlexible(forKey: .accountNumber)
+        maskedAccount = container.decodeStringFlexible(forKey: .maskedAccount)
+        totalAccountValue = container.decodeDoubleFlexible(forKey: .totalAccountValue)
+        cashBalance = container.decodeDoubleFlexible(forKey: .cashBalance)
+        unrealizedPnlTotal = container.decodeDoubleFlexible(forKey: .unrealizedPnlTotal)
     }
 }
 
@@ -164,6 +235,34 @@ struct WorkersSnapshot: Decodable {
         summary: WorkerSummarySnapshot(count: 0, running: 0, error: 0, stopping: 0, starting: 0, stopped: 0),
         workers: [:]
     )
+
+    enum CodingKeys: String, CodingKey {
+        case summary
+        case workers
+    }
+
+    init(summary: WorkerSummarySnapshot, workers: [String: [String: JSONValue]]) {
+        self.summary = summary
+        self.workers = workers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        summary = (try? container.decode(WorkerSummarySnapshot.self, forKey: .summary))
+            ?? WorkersSnapshot.fallback.summary
+
+        guard let rawWorkers = try? container.decode([String: JSONValue].self, forKey: .workers) else {
+            workers = [:]
+            return
+        }
+        var parsed: [String: [String: JSONValue]] = [:]
+        for (name, value) in rawWorkers {
+            if let object = value.objectValue {
+                parsed[name] = object
+            }
+        }
+        workers = parsed
+    }
 }
 
 struct MarketRankSnapshotItem: Decodable, Identifiable {
@@ -334,4 +433,81 @@ struct EngineModeCommandResponse: Decodable {
     let mode: String
     let message: String
     let engine: EngineControlSnapshot
+}
+
+private struct LossyDecodable<T: Decodable>: Decodable {
+    let value: T?
+
+    init(from decoder: Decoder) throws {
+        value = try? T(from: decoder)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeStringFlexible(forKey key: Key) -> String? {
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            return value
+        }
+        if let value = try? decodeIfPresent(Int.self, forKey: key) {
+            return String(value)
+        }
+        if let value = try? decodeIfPresent(Double.self, forKey: key) {
+            return String(value)
+        }
+        if let value = try? decodeIfPresent(Bool.self, forKey: key) {
+            return String(value)
+        }
+        return nil
+    }
+
+    func decodeDoubleFlexible(forKey key: Key) -> Double? {
+        if let value = try? decodeIfPresent(Double.self, forKey: key) {
+            return value
+        }
+        if let value = try? decodeIfPresent(Int.self, forKey: key) {
+            return Double(value)
+        }
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            return Double(value.replacingOccurrences(of: ",", with: ""))
+        }
+        return nil
+    }
+
+    func decodeIntFlexible(forKey key: Key) -> Int? {
+        if let value = try? decodeIfPresent(Int.self, forKey: key) {
+            return value
+        }
+        if let value = try? decodeIfPresent(Double.self, forKey: key) {
+            return Int(value)
+        }
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            if let intValue = Int(value) {
+                return intValue
+            }
+            if let doubleValue = Double(value) {
+                return Int(doubleValue)
+            }
+        }
+        return nil
+    }
+
+    func decodeBoolFlexible(forKey key: Key) -> Bool? {
+        if let value = try? decodeIfPresent(Bool.self, forKey: key) {
+            return value
+        }
+        if let value = try? decodeIfPresent(Int.self, forKey: key) {
+            return value != 0
+        }
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "1", "yes", "y":
+                return true
+            case "false", "0", "no", "n":
+                return false
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
 }
