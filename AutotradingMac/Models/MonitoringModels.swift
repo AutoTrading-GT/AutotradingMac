@@ -44,6 +44,63 @@ struct RuntimeStatusSnapshot: Decodable {
     var activeWsClients: Int
     var accountSummary: AccountSummarySnapshot?
     var workers: WorkersSnapshot
+
+    enum CodingKeys: String, CodingKey {
+        case timestamp
+        case appName
+        case appVersion
+        case env
+        case appStatus
+        case orderMode
+        case accountMode
+        case executionMode
+        case engineState
+        case engineAvailableActions
+        case engineTransitioningAction
+        case engineLastAction
+        case engineLastError
+        case engineMessage
+        case engineEmergencyLatched
+        case engineUpdatedAt
+        case databaseStatus
+        case databaseConnected
+        case readinessStatus
+        case startupOk
+        case startupStatus
+        case startupError
+        case activeWsClients
+        case accountSummary
+        case workers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        appName = try container.decode(String.self, forKey: .appName)
+        appVersion = try container.decode(String.self, forKey: .appVersion)
+        env = try container.decode(String.self, forKey: .env)
+        appStatus = try container.decode(String.self, forKey: .appStatus)
+        orderMode = try container.decode(String.self, forKey: .orderMode)
+        accountMode = try container.decode(String.self, forKey: .accountMode)
+        executionMode = try container.decodeIfPresent(String.self, forKey: .executionMode)
+        engineState = try container.decodeIfPresent(String.self, forKey: .engineState)
+        engineAvailableActions = try container.decodeIfPresent([String].self, forKey: .engineAvailableActions)
+        engineTransitioningAction = try container.decodeIfPresent(String.self, forKey: .engineTransitioningAction)
+        engineLastAction = try container.decodeIfPresent(String.self, forKey: .engineLastAction)
+        engineLastError = try container.decodeIfPresent(String.self, forKey: .engineLastError)
+        engineMessage = try container.decodeIfPresent(String.self, forKey: .engineMessage)
+        engineEmergencyLatched = try container.decodeIfPresent(Bool.self, forKey: .engineEmergencyLatched)
+        engineUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .engineUpdatedAt)
+        databaseStatus = try container.decode(String.self, forKey: .databaseStatus)
+        databaseConnected = try container.decode(Bool.self, forKey: .databaseConnected)
+        readinessStatus = try container.decode(String.self, forKey: .readinessStatus)
+        startupOk = try container.decode(Bool.self, forKey: .startupOk)
+        startupStatus = try container.decode(String.self, forKey: .startupStatus)
+        startupError = try container.decodeIfPresent(String.self, forKey: .startupError)
+        activeWsClients = try container.decode(Int.self, forKey: .activeWsClients)
+        accountSummary = try container.decodeIfPresent(AccountSummarySnapshot.self, forKey: .accountSummary)
+        workers = try container.decodeIfPresent(WorkersSnapshot.self, forKey: .workers) ?? WorkersSnapshot.fallback
+    }
 }
 
 struct AccountSummarySnapshot: Decodable {
@@ -57,6 +114,33 @@ struct AccountSummarySnapshot: Decodable {
     let totalAccountValue: Double?
     let cashBalance: Double?
     let unrealizedPnlTotal: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case mode
+        case source
+        case available
+        case unavailableReason
+        case accountLabel
+        case accountNumber
+        case maskedAccount
+        case totalAccountValue
+        case cashBalance
+        case unrealizedPnlTotal
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        mode = try container.decode(String.self, forKey: .mode)
+        source = try container.decode(String.self, forKey: .source)
+        available = try container.decode(Bool.self, forKey: .available)
+        unavailableReason = try container.decodeIfPresent(String.self, forKey: .unavailableReason)
+        accountLabel = try container.decodeIfPresent(String.self, forKey: .accountLabel)
+        accountNumber = try container.decodeIfPresent(String.self, forKey: .accountNumber)
+        maskedAccount = try container.decodeIfPresent(String.self, forKey: .maskedAccount)
+        totalAccountValue = try container.decodeIfPresent(Double.self, forKey: .totalAccountValue)
+        cashBalance = try container.decodeIfPresent(Double.self, forKey: .cashBalance)
+        unrealizedPnlTotal = try container.decodeIfPresent(Double.self, forKey: .unrealizedPnlTotal)
+    }
 }
 
 struct RuntimeStatusResponseEnvelope: Decodable {
@@ -75,6 +159,11 @@ struct WorkerSummarySnapshot: Decodable {
 struct WorkersSnapshot: Decodable {
     var summary: WorkerSummarySnapshot
     var workers: [String: [String: JSONValue]]
+
+    static let fallback = WorkersSnapshot(
+        summary: WorkerSummarySnapshot(count: 0, running: 0, error: 0, stopping: 0, starting: 0, stopped: 0),
+        workers: [:]
+    )
 }
 
 struct MarketRankSnapshotItem: Decodable, Identifiable {

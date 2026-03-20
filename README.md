@@ -19,6 +19,7 @@
   - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
+- snapshot/runtime 디코딩은 서버 계약(`order_mode/account_mode`, `engine_*`, `account_summary`)을 기준으로 nullable 필드를 optional 처리
 - 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
 - 스타일 토큰 매핑 파일: `AutotradingMac/Core/DesignTokens.swift`
   - 출처: `design_ref/figma_web_export/src/styles/theme.css` (.dark 토큰)

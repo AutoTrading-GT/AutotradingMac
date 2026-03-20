@@ -87,7 +87,11 @@ final class MonitoringStore: ObservableObject {
             lastUpdatedAt = Date()
             lastRuntimeRefreshedAt = Date()
         } catch {
-            lastErrorMessage = "Snapshot load failed: \(error.localizedDescription)"
+            if let decodingError = error as? DecodingError {
+                lastErrorMessage = "Snapshot decode failed: \(decodingErrorDescription(decodingError))"
+            } else {
+                lastErrorMessage = "Snapshot load failed: \(error.localizedDescription)"
+            }
             snapshotLoaded = false
         }
     }
@@ -774,6 +778,28 @@ final class MonitoringStore: ObservableObject {
             lastErrorMessage = "Runtime refresh failed: \(error.localizedDescription)"
         }
     }
+}
+
+private func decodingErrorDescription(_ error: DecodingError) -> String {
+    switch error {
+    case .typeMismatch(let type, let context):
+        return "typeMismatch(\(type)) at \(codingPath(context.codingPath)): \(context.debugDescription)"
+    case .valueNotFound(let type, let context):
+        return "valueNotFound(\(type)) at \(codingPath(context.codingPath)): \(context.debugDescription)"
+    case .keyNotFound(let key, let context):
+        return "keyNotFound(\(key.stringValue)) at \(codingPath(context.codingPath)): \(context.debugDescription)"
+    case .dataCorrupted(let context):
+        return "dataCorrupted at \(codingPath(context.codingPath)): \(context.debugDescription)"
+    @unknown default:
+        return "unknown decoding error"
+    }
+}
+
+private func codingPath(_ path: [CodingKey]) -> String {
+    if path.isEmpty {
+        return "<root>"
+    }
+    return path.map(\.stringValue).joined(separator: ".")
 }
 
 enum EngineControlAction: Equatable {

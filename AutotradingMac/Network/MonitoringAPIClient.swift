@@ -78,7 +78,11 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
-        return try MonitoringCoding.decoder().decode(MonitoringSnapshotResponse.self, from: data)
+        return try decodeModel(
+            MonitoringSnapshotResponse.self,
+            from: data,
+            context: "GET /api/monitoring/snapshot"
+        )
     }
 
     func fetchRuntime() async throws -> RuntimeStatusSnapshot {
@@ -93,7 +97,11 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
-        let envelope = try MonitoringCoding.decoder().decode(RuntimeStatusResponseEnvelope.self, from: data)
+        let envelope = try decodeModel(
+            RuntimeStatusResponseEnvelope.self,
+            from: data,
+            context: "GET /api/monitoring/runtime"
+        )
         return envelope.data
     }
 
@@ -142,7 +150,11 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
-        return try MonitoringCoding.decoder().decode(EngineControlCommandResponse.self, from: data)
+        return try decodeModel(
+            EngineControlCommandResponse.self,
+            from: data,
+            context: "POST \(url.path)"
+        )
     }
 
     private func sendModeCommand(
@@ -164,7 +176,52 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
-        return try MonitoringCoding.decoder().decode(EngineModeCommandResponse.self, from: data)
+        return try decodeModel(
+            EngineModeCommandResponse.self,
+            from: data,
+            context: "POST \(url.path)"
+        )
+    }
+
+    private func decodeModel<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        context: String
+    ) throws -> T {
+        do {
+            return try MonitoringCoding.decoder().decode(type, from: data)
+        } catch let decodingError as DecodingError {
+            logDecodingError(decodingError, data: data, context: context)
+            throw decodingError
+        } catch {
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            print("[MonitoringAPIClient] decode failed (\(context)): \(error.localizedDescription)\nbody=\(body.prefix(800))")
+            throw error
+        }
+    }
+
+    private func logDecodingError(_ error: DecodingError, data: Data, context: String) {
+        let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+        switch error {
+        case .typeMismatch(let type, let debug):
+            print("[MonitoringAPIClient] typeMismatch (\(context)): type=\(type), path=\(codingPath(debug.codingPath)), desc=\(debug.debugDescription)")
+        case .valueNotFound(let type, let debug):
+            print("[MonitoringAPIClient] valueNotFound (\(context)): type=\(type), path=\(codingPath(debug.codingPath)), desc=\(debug.debugDescription)")
+        case .keyNotFound(let key, let debug):
+            print("[MonitoringAPIClient] keyNotFound (\(context)): key=\(key.stringValue), path=\(codingPath(debug.codingPath)), desc=\(debug.debugDescription)")
+        case .dataCorrupted(let debug):
+            print("[MonitoringAPIClient] dataCorrupted (\(context)): path=\(codingPath(debug.codingPath)), desc=\(debug.debugDescription)")
+        @unknown default:
+            print("[MonitoringAPIClient] unknown decoding error (\(context))")
+        }
+        print("[MonitoringAPIClient] response body (\(context))=\(body.prefix(800))")
+    }
+
+    private func codingPath(_ path: [CodingKey]) -> String {
+        if path.isEmpty {
+            return "<root>"
+        }
+        return path.map(\.stringValue).joined(separator: ".")
     }
 
     private func parseErrorDetail(from data: Data) -> String? {
