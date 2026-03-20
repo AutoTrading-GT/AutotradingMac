@@ -81,7 +81,7 @@
   - 총 평가금액
   - 예수금
   - 평가손익
-  - 승률
+  - 최근 7일 승률
 - 본문 2컬럼
   - 좌측: 스캔종목, 보유종목
   - 우측: 매매신호, 미체결주문, 최근로그
@@ -91,6 +91,7 @@
   - `runtime.account_summary.total_account_value`
   - `runtime.account_summary.cash_balance`
   - `runtime.account_summary.unrealized_pnl_total`
+  - `승률`: `recent_closed_positions`에서 최근 7일 + 현재 `order_mode` 기준으로 계산
   - 값 미가용 시 `-` 표시, 계좌 식별은 `masked_account` 우선(`account_label` fallback)
 
 ## 백엔드 URL 설정
@@ -130,8 +131,9 @@ URL 결정 우선순위:
 15. top bar에서 `긴급 정지` 클릭 시 확인 다이얼로그가 먼저 노출되고, 실행 후 `긴급 정지 상태`가 표시되는지 확인
 16. `긴급 정지 상태`에서 `해제` 클릭 시 상태가 `stopped`로 바뀌고, 이후 `시작`이 다시 활성화되는지 확인
 17. Dashboard KPI(총 평가금액/예수금/평가손익)가 `runtime.account_summary` 값과 일치하는지 확인
-18. `order_mode=live` 전환 실패 시 Dev에 `주문 모드 전환 실패`가 표시되고, top bar에는 오류 문구가 표시되지 않는지 확인
-19. `account_mode=live`에서 계좌 조회 실패 시 Dev에 `계좌정보 조회 실패`가 표시되고, Dashboard KPI가 즉시 비워지지 않는지 확인
+18. Dashboard `최근 7일 승률`이 현재 `order_mode` 기준으로 계산되어 mode 전환 시 값이 달라지는지 확인
+19. `order_mode=live` 전환 실패 시 Dev에 `주문 모드 전환 실패`가 표시되고, top bar에는 오류 문구가 표시되지 않는지 확인
+20. `account_mode=live`에서 계좌 조회 실패 시 Dev에 `계좌정보 조회 실패`가 표시되고, Dashboard KPI가 즉시 비워지지 않는지 확인
 
 ## 주의사항
 - 거래 실행/설정 저장 기능은 구현하지 않음 (read-only)

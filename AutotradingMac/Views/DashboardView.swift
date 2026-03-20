@@ -40,10 +40,10 @@ struct DashboardView: View {
                 trend: trendForValue(store.pnlSummary.unrealizedPnlTotal)
             )
             dashboardMetricCard(
-                label: "승률",
+                label: "최근 7일 승률",
                 value: winRateText,
                 change: winRateChangeText,
-                trend: trendForValue(winRateDelta),
+                trend: .flat,
                 iconSystemName: "target"
             )
         }
@@ -548,7 +548,7 @@ struct DashboardView: View {
     }
 
     private var winRateValue: Double? {
-        let closed = store.recentClosedPositions.compactMap(\.realizedPnl)
+        let closed = weeklyClosedPositionsForCurrentMode.compactMap(\.realizedPnl)
         guard !closed.isEmpty else { return nil }
         let wins = closed.filter { $0 > 0 }.count
         return (Double(wins) / Double(closed.count)) * 100.0
@@ -559,15 +559,29 @@ struct DashboardView: View {
         return DisplayFormatters.percent(value)
     }
 
-    private var winRateDelta: Double? {
-        guard let value = winRateValue else { return nil }
-        return value - 50.0
+    private var winRateChangeText: String? {
+        guard winRateValue != nil else { return nil }
+        return "기준: \(currentOrderModeLabel) · 최근 7일"
     }
 
-    private var winRateChangeText: String? {
-        guard let delta = winRateDelta else { return nil }
-        let sign = delta >= 0 ? "+" : ""
-        return "\(sign)\(String(format: "%.1f%%", delta))"
+    private var currentOrderModeForWinRate: String {
+        let mode = (store.runtime?.orderMode ?? "paper").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return mode == "live" ? "live" : "paper"
+    }
+
+    private var currentOrderModeLabel: String {
+        currentOrderModeForWinRate.uppercased()
+    }
+
+    private var weeklyClosedPositionsForCurrentMode: [ClosedPositionSnapshotItem] {
+        let cutoff = Date().addingTimeInterval(-(7 * 24 * 60 * 60))
+        return store.recentClosedPositions.filter { row in
+            guard row.createdAt >= cutoff else { return false }
+            let rowMode = (row.orderMode ?? row.executionMode ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            return rowMode == currentOrderModeForWinRate
+        }
     }
 
     private var lastScanText: String {

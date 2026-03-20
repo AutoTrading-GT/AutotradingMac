@@ -420,6 +420,8 @@ struct ClosedPositionSnapshotItem: Decodable, Identifiable {
     let realizedPnl: Double?
     let realizedPnlPct: Double?
     let reason: String?
+    let orderMode: String?
+    let executionMode: String?
     let createdAt: Date
 }
 
