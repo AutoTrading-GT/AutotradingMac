@@ -7,17 +7,16 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: MonitoringStore
-    @State private var selectedTab: SettingsTab = .general
+    let mode: SettingsPageMode
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 pageHeader
-                tabPicker
-                switch selectedTab {
-                case .general:
+                switch mode {
+                case .settings:
                     generalGrid
-                case .strategy:
+                case .stategy:
                     strategyContent
                 }
             }
@@ -27,22 +26,30 @@ struct SettingsView: View {
 
     private var pageHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(selectedTab.title)
+            Text(pageTitle)
                 .font(.title3.weight(.semibold))
-            Text(selectedTab.subtitle)
+            Text(pageSubtitle)
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
         }
     }
 
-    private var tabPicker: some View {
-        Picker("", selection: $selectedTab) {
-            ForEach(SettingsTab.allCases) { tab in
-                Text(tab.tabLabel).tag(tab)
-            }
+    private var pageTitle: String {
+        switch mode {
+        case .settings:
+            return "Settings"
+        case .stategy:
+            return "Stategy"
         }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: 320)
+    }
+
+    private var pageSubtitle: String {
+        switch mode {
+        case .settings:
+            return "애플리케이션 환경설정"
+        case .stategy:
+            return "전략을 선택하고 기본 조건을 확인하는 공간입니다"
+        }
     }
 
     private var generalGrid: some View {
@@ -538,38 +545,9 @@ struct SettingsView: View {
     }
 }
 
-private enum SettingsTab: String, CaseIterable, Identifiable {
-    case general
-    case strategy
-
-    var id: String { rawValue }
-
-    var tabLabel: String {
-        switch self {
-        case .general:
-            return "일반 설정"
-        case .strategy:
-            return "전략 설정"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .general:
-            return "설정"
-        case .strategy:
-            return "전략 설정"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .general:
-            return "애플리케이션 환경설정"
-        case .strategy:
-            return "전략을 선택하고 기본 조건을 확인하는 공간입니다"
-        }
-    }
+enum SettingsPageMode {
+    case settings
+    case stategy
 }
 
 private struct StrategyActionButtonStyle: ButtonStyle {

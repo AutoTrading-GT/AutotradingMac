@@ -8,6 +8,7 @@
   - Dashboard
   - Scanner
   - Chart
+  - Stategy
   - Logs
   - Settings
   - Dev
@@ -40,8 +41,8 @@
   - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
   - `design_ref/figma_web_export/src/app/pages/SettingsPage.tsx` 정보구조를 SwiftUI로 반영
   - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
-- Strategy Settings 페이지(설정 탭 내부)
-  - `Settings` 화면 내 `전략 설정` 탭으로 제공
+- Stategy 페이지(사이드바 독립 화면)
+  - 사이드바 메뉴명/페이지 제목은 `Stategy`
   - `design_ref/figma_web_export/src/app/pages/StrategySettings.tsx` 정보구조를 SwiftUI로 반영
   - 패널: `현재 전략`, `매수 조건`, `매도 조건`, `전략 선택`, `위험 관리`
   - 표시값은 `StrategyRuntimeConfig`가 읽는 실제 실행 환경값(`PAPER_*`, `RISK_*`, `EXECUTION_MODE`)과 코드 기본값을 사용

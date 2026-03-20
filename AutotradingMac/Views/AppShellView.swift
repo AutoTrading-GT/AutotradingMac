@@ -32,10 +32,12 @@ struct AppShellView: View {
                         MarketView()
                     case .chart:
                         ChartView()
+                    case .stategy:
+                        SettingsView(mode: .stategy)
                     case .logs:
                         LogsView()
                     case .settings:
-                        SettingsView()
+                        SettingsView(mode: .settings)
                     case .dev:
                         DevWorkspaceView()
                     }
@@ -65,6 +67,7 @@ enum ConsoleSection: String, CaseIterable, Identifiable {
     case dashboard
     case scanner
     case chart
+    case stategy
     case logs
     case settings
     case dev
@@ -79,6 +82,8 @@ enum ConsoleSection: String, CaseIterable, Identifiable {
             return "Scanner"
         case .chart:
             return "Chart"
+        case .stategy:
+            return "Stategy"
         case .logs:
             return "Logs"
         case .settings:
@@ -96,6 +101,8 @@ enum ConsoleSection: String, CaseIterable, Identifiable {
             return "chart.line.uptrend.xyaxis"
         case .chart:
             return "waveform.path.ecg"
+        case .stategy:
+            return "slider.horizontal.3"
         case .logs:
             return "text.append"
         case .settings:
