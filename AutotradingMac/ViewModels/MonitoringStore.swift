@@ -152,7 +152,10 @@ final class MonitoringStore: ObservableObject {
             lastUpdatedAt = Date()
             await reloadSnapshot()
         } catch {
-            lastErrorMessage = "주문 모드 변경 실패: \(error.localizedDescription)"
+            lastErrorMessage = modeSwitchErrorMessage(
+                prefix: "주문 모드 변경 실패",
+                error: error
+            )
         }
     }
 
@@ -169,7 +172,10 @@ final class MonitoringStore: ObservableObject {
             lastUpdatedAt = Date()
             await reloadSnapshot()
         } catch {
-            lastErrorMessage = "계좌 모드 변경 실패: \(error.localizedDescription)"
+            lastErrorMessage = modeSwitchErrorMessage(
+                prefix: "계좌 모드 변경 실패",
+                error: error
+            )
         }
     }
 
@@ -756,6 +762,16 @@ final class MonitoringStore: ObservableObject {
             return
         }
         selectedScannerCode = rows.first?.code
+    }
+
+    private func modeSwitchErrorMessage(prefix: String, error: Error) -> String {
+        if let apiError = error as? MonitoringAPIError,
+           case .httpStatus(_, let detail) = apiError,
+           let detail,
+           !detail.isEmpty {
+            return detail
+        }
+        return "\(prefix): \(error.localizedDescription)"
     }
 
     private func parseISODate(_ raw: String) -> Date? {
