@@ -18,7 +18,6 @@ struct AppShellView: View {
                     .listRowBackground(Color.clear)
             }
             .listStyle(.sidebar)
-            .listRowSpacing(6)
             .navigationTitle("Autotrading Console")
             .scrollContentBackground(.hidden)
             .background(AppTheme.sidebarBackground)
