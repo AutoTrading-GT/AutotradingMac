@@ -9,8 +9,9 @@ private enum ScannerLayout {
     static let paneSpacing: CGFloat = 16
     static let leftPaneWidth: CGFloat = 660
     static let rightPaneWidth: CGFloat = 440
-    static let paneHeight: CGFloat = 500
+    static let paneHeight: CGFloat = 520
     static let contentPadding: CGFloat = 16
+    static let paneCornerRadius: CGFloat = 14
 
     static let columnSpacing: CGFloat = 2
     static let rankColumnWidth: CGFloat = 44
@@ -105,8 +106,27 @@ struct MarketView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .frame(width: 220)
+            .frame(width: 236)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.72),
+                            DesignTokens.Colors.surface1.opacity(0.48),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+        )
     }
 
     private var scannerListPane: some View {
@@ -151,7 +171,7 @@ struct MarketView: View {
         }
         .padding()
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .appPanelStyle()
+        .scannerPaneStyle()
     }
 
     private var scannerDetailPane: some View {
@@ -168,9 +188,9 @@ struct MarketView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(0)
+        .padding(10)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .appPanelStyle()
+        .scannerPaneStyle()
     }
 
     private func detailPanel(for candidate: ScannerCandidate) -> some View {
@@ -499,6 +519,44 @@ struct MarketView: View {
         if delta < 60 { return "\(delta)초 전" }
         if delta < 3600 { return "\(delta / 60)분 전" }
         return "\(delta / 3600)시간 전"
+    }
+}
+
+private extension View {
+    func scannerPaneStyle() -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignTokens.Colors.bgPanel.opacity(0.96),
+                                DesignTokens.Colors.bgElevated.opacity(0.9),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.92), lineWidth: 1)
+            )
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.06), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: 42)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: ScannerLayout.paneCornerRadius, style: .continuous)
+                    )
+            }
+            .shadow(color: DesignTokens.Shadows.cardBase.opacity(0.36), radius: 14, x: 0, y: 9)
     }
 }
 
@@ -949,4 +1007,3 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
     MarketViewPreviewContainer()
 }
 #endif
-

@@ -20,6 +20,7 @@ struct AppShellView: View {
             .navigationTitle("Autotrading Console")
             .scrollContentBackground(.hidden)
             .background(AppTheme.sidebarBackground)
+            .navigationSplitViewColumnWidth(min: 196, ideal: 208, max: 220)
         } detail: {
             VStack(alignment: .leading, spacing: 12) {
                 GlobalTopBarView()
@@ -45,7 +46,7 @@ struct AppShellView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .padding([.top, .horizontal], 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 10)
             .background(AppTheme.contentBackground)
             .overlay {
                 if store.isLoadingSnapshot && !store.snapshotLoaded {
