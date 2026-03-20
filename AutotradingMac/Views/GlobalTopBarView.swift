@@ -88,7 +88,7 @@ struct GlobalTopBarView: View {
 
                 toolbarInfoPill(
                     icon: "clock.fill",
-                    title: "장 상태",
+                    title: "",
                     value: marketStatusText,
                     tone: marketStatusTone
                 )
@@ -151,9 +151,11 @@ struct GlobalTopBarView: View {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(tone.foreground)
-            Text(title)
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(title)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
             Text(value)
                 .font(DesignTokens.Typography.caption.weight(.semibold))
                 .foregroundStyle(tone.foreground)
@@ -238,17 +240,17 @@ struct GlobalTopBarView: View {
         let state = store.runtime?.engineState?.lowercased()
         switch state {
         case "running":
-            return "자동매매 실행 중"
+            return "실행 중"
         case "paused":
-            return "자동매매 일시정지"
+            return "일시정지"
         case "stopped":
-            return "자동매매 정지"
+            return "정지"
         case "emergency_stopped":
-            return "긴급 정지 상태"
+            return "긴급 정지"
         case "transitioning":
-            return "상태 전환 중"
+            return "전환 중"
         default:
-            return "자동매매 상태 확인 중"
+            return "확인 중"
         }
     }
 
@@ -301,10 +303,7 @@ struct GlobalTopBarView: View {
         let open = marketDate(hour: 9, minute: 0, base: now, calendar: calendar)
         let close = marketDate(hour: 15, minute: 30, base: now, calendar: calendar)
 
-        if now < open {
-            return "장 시작까지 \(countdownText(from: now, to: open))"
-        }
-        if now < close {
+        if now >= open && now < close {
             return "장 마감까지 \(countdownText(from: now, to: close))"
         }
         return "장 종료"
@@ -312,7 +311,6 @@ struct GlobalTopBarView: View {
 
     private var marketStatusTone: StatusTone {
         if marketStatusText.contains("마감까지") { return .success }
-        if marketStatusText.contains("시작까지") { return .warning }
         return .neutral
     }
 
