@@ -258,7 +258,7 @@ struct DashboardView: View {
                 panelEmptyState("표시할 최근 로그가 없습니다.")
             } else {
                 VStack(spacing: 0) {
-                    ForEach(logItems.prefix(8)) { item in
+                    ForEach(Array(logItems.prefix(8)), id: \.id) { (item: DashboardLogItem) in
                         dashboardRow {
                             HStack(spacing: 10) {
                                 Text(timeString(item.timestamp))
