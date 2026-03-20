@@ -28,6 +28,18 @@ enum AppConfig {
         apiEndpoint("monitoring/runtime")
     }
 
+    static func scannerRanksURL(mode: String, limit: Int) -> URL {
+        var components = URLComponents(
+            url: apiEndpoint("monitoring/scanner/ranks"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "mode", value: mode),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+        return components?.url ?? apiEndpoint("monitoring/scanner/ranks")
+    }
+
     static var engineStartURL: URL {
         apiEndpoint("engine/start")
     }

@@ -39,6 +39,10 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var chartSeriesCache: [String: ChartSeriesResponse] = [:]
     @Published private(set) var chartLoadingKeys: Set<String> = []
     @Published private(set) var chartErrorMessages: [String: String] = [:]
+    @Published private(set) var scannerRankRowsByMode: [String: [MarketRankSnapshotItem]] = [:]
+    @Published private(set) var scannerLoadedLimitByMode: [String: Int] = [:]
+    @Published private(set) var scannerHasMoreByMode: [String: Bool] = [:]
+    @Published private(set) var scannerLoadingModes: Set<String> = []
 
     private let apiClient: MonitoringAPIClientProtocol
     private let webSocketClient: MonitoringWebSocketClient
@@ -51,6 +55,8 @@ final class MonitoringStore: ObservableObject {
     private var lastRuntimeRefreshedAt: Date?
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
+    private let scannerStep = 10
+    private let scannerMaxLimit = 50
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -268,6 +274,79 @@ final class MonitoringStore: ObservableObject {
         await fetchChartSeries(symbol: symbol, timeframe: selectedChartTimeframe, force: force)
     }
 
+    func activateScannerMode(_ mode: String) async {
+        let normalized = normalizeScannerMode(mode)
+        scannerRankRowsByMode[normalized] = []
+        scannerLoadedLimitByMode[normalized] = 0
+        scannerHasMoreByMode[normalized] = true
+        await loadScannerRanks(mode: normalized, limit: scannerStep)
+    }
+
+    func loadMoreScannerRanksIfNeeded(mode: String) async {
+        let normalized = normalizeScannerMode(mode)
+        guard !scannerLoadingModes.contains(normalized) else { return }
+        let currentLimit = scannerLoadedLimitByMode[normalized] ?? 0
+        guard currentLimit < scannerMaxLimit else { return }
+        if scannerHasMoreByMode[normalized] == false {
+            return
+        }
+        let nextLimit = min(currentLimit + scannerStep, scannerMaxLimit)
+        await loadScannerRanks(mode: normalized, limit: nextLimit)
+    }
+
+    func scannerRows(for mode: String) -> [MarketRow] {
+        let normalized = normalizeScannerMode(mode)
+        let baseRows: [MarketRankSnapshotItem]
+        if let rows = scannerRankRowsByMode[normalized], !rows.isEmpty {
+            baseRows = rows
+        } else if normalized == "turnover" {
+            baseRows = marketTopRanks
+        } else {
+            baseRows = []
+        }
+
+        return baseRows.map { rankItem in
+            let tick = latestTicks[rankItem.code]
+            return MarketRow(
+                id: rankItem.code,
+                code: rankItem.code,
+                symbol: rankItem.symbol ?? tick?.symbol ?? "-",
+                rank: rankItem.rank,
+                rankingMode: rankItem.rankingMode ?? normalized,
+                price: tick?.price ?? rankItem.price,
+                changePct: tick?.changePct ?? rankItem.changePct,
+                metric: tick?.metric ?? rankItem.metric,
+                source: tick?.source ?? rankItem.source,
+                updatedAt: tick?.timestamp ?? rankItem.capturedAt
+            )
+        }
+        .sorted { lhs, rhs in
+            switch (lhs.rank, rhs.rank) {
+            case let (l?, r?):
+                return l < r
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                return lhs.code < rhs.code
+            }
+        }
+    }
+
+    func scannerIsLoading(mode: String) -> Bool {
+        scannerLoadingModes.contains(normalizeScannerMode(mode))
+    }
+
+    func scannerCanLoadMore(mode: String) -> Bool {
+        let normalized = normalizeScannerMode(mode)
+        let currentLimit = scannerLoadedLimitByMode[normalized] ?? 0
+        if currentLimit >= scannerMaxLimit {
+            return false
+        }
+        return scannerHasMoreByMode[normalized] ?? true
+    }
+
     var workerRows: [WorkerStatusRow] {
         guard let workers = runtime?.workers.workers else { return [] }
         return workers.keys.sorted().map { workerName in
@@ -339,8 +418,9 @@ final class MonitoringStore: ObservableObject {
                 code: code,
                 symbol: rankItem?.symbol ?? tick?.symbol ?? "-",
                 rank: rankItem?.rank,
+                rankingMode: rankItem?.rankingMode ?? "turnover",
                 price: tick?.price ?? rankItem?.price,
-                changePct: tick?.changePct,
+                changePct: tick?.changePct ?? rankItem?.changePct,
                 metric: tick?.metric ?? rankItem?.metric,
                 source: tick?.source ?? rankItem?.source,
                 updatedAt: tick?.timestamp ?? rankItem?.capturedAt
@@ -399,6 +479,20 @@ final class MonitoringStore: ObservableObject {
         runtime = snapshot.runtime
         updateAccountSummaryDiagnostics(from: runtime)
         marketTopRanks = snapshot.marketTopRanks
+        scannerRankRowsByMode["turnover"] = snapshot.marketTopRanks.sorted { lhs, rhs in
+            switch (lhs.rank, rhs.rank) {
+            case let (l?, r?):
+                return l < r
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                return lhs.code < rhs.code
+            }
+        }
+        scannerLoadedLimitByMode["turnover"] = min(scannerStep, snapshot.marketTopRanks.count)
+        scannerHasMoreByMode["turnover"] = snapshot.marketTopRanks.count >= scannerStep
         recentSignals = snapshot.recentSignals
         recentRiskDecisions = snapshot.recentRiskDecisions
         recentOrders = snapshot.recentOrders
@@ -408,6 +502,51 @@ final class MonitoringStore: ObservableObject {
         pnlSummary = snapshot.pnlSummary
         ensureSelectedScannerCode()
         scheduleChartFetchForSelectedSymbol(force: false)
+    }
+
+    private func normalizeScannerMode(_ mode: String) -> String {
+        let normalized = mode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized == "surge" ? "surge" : "turnover"
+    }
+
+    private func loadScannerRanks(mode: String, limit: Int) async {
+        let normalizedMode = normalizeScannerMode(mode)
+        let normalizedLimit = min(max(limit, scannerStep), scannerMaxLimit)
+        guard !scannerLoadingModes.contains(normalizedMode) else { return }
+
+        scannerLoadingModes.insert(normalizedMode)
+        defer { scannerLoadingModes.remove(normalizedMode) }
+
+        do {
+            let response = try await apiClient.fetchScannerRanks(
+                mode: normalizedMode,
+                limit: normalizedLimit
+            )
+            scannerRankRowsByMode[normalizedMode] = response.data.sorted { lhs, rhs in
+                switch (lhs.rank, rhs.rank) {
+                case let (l?, r?):
+                    return l < r
+                case (.some, .none):
+                    return true
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    return lhs.code < rhs.code
+                }
+            }
+            scannerLoadedLimitByMode[normalizedMode] = response.limit
+            scannerHasMoreByMode[normalizedMode] = response.hasMore
+            if normalizedMode == "turnover" {
+                marketTopRanks = response.data
+            }
+            lastErrorMessage = nil
+        } catch {
+            let detail = diagnosticsErrorText(
+                prefix: "Scanner(\(normalizedMode)) load failed",
+                error: error
+            )
+            lastErrorMessage = detail
+        }
     }
 
     private func handle(event: EventEnvelope) {
@@ -552,12 +691,15 @@ final class MonitoringStore: ObservableObject {
     }
 
     private func applyMarketRank(payload: MarketRankSnapshotPayload) {
+        let mode = normalizeScannerMode(payload.rankingMode ?? "turnover")
         let incoming = MarketRankSnapshotItem(
             code: payload.code,
             symbol: payload.symbol,
             rank: payload.rank,
             metric: payload.metric,
             price: payload.payload?["price"]?.doubleValue,
+            changePct: payload.payload?["change_pct"]?.doubleValue,
+            rankingMode: mode,
             source: payload.source,
             capturedAt: payload.timestamp
         )
@@ -577,6 +719,27 @@ final class MonitoringStore: ObservableObject {
             case (.none, .none):
                 return lhs.code < rhs.code
             }
+        }
+        if var modeRows = scannerRankRowsByMode[mode] {
+            if let index = modeRows.firstIndex(where: { $0.code == incoming.code }) {
+                modeRows[index] = incoming
+            } else {
+                modeRows.insert(incoming, at: 0)
+            }
+            modeRows.sort { lhs, rhs in
+                switch (lhs.rank, rhs.rank) {
+                case let (l?, r?):
+                    return l < r
+                case (.some, .none):
+                    return true
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    return lhs.code < rhs.code
+                }
+            }
+            let loadedLimit = scannerLoadedLimitByMode[mode] ?? scannerStep
+            scannerRankRowsByMode[mode] = Array(modeRows.prefix(max(loadedLimit, scannerStep)))
         }
         ensureSelectedScannerCode()
     }

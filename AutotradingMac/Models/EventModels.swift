@@ -37,6 +37,7 @@ struct MarketRankSnapshotPayload: Decodable {
     let rank: Int?
     let metric: Double?
     let source: String
+    let rankingMode: String?
     let symbol: String?
     let payload: [String: JSONValue]?
 }

@@ -8,6 +8,7 @@ import Foundation
 protocol MonitoringAPIClientProtocol {
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse
     func fetchRuntime() async throws -> RuntimeStatusSnapshot
+    func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse
     func fetchChartSeries(symbol: String, timeframe: ChartTimeframeOption, limit: Int) async throws -> ChartSeriesResponse
     func startEngine() async throws -> EngineControlCommandResponse
     func pauseEngine() async throws -> EngineControlCommandResponse
@@ -147,6 +148,32 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
             ChartSeriesResponse.self,
             from: data,
             context: "GET /api/chart/{symbol}"
+        )
+    }
+
+    func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse {
+        var request = URLRequest(url: AppConfig.scannerRanksURL(mode: mode, limit: limit))
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        logRequest(request, context: "scanner-ranks")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MonitoringAPIError.invalidResponse
+        }
+        logResponse(
+            context: "scanner-ranks",
+            url: request.url,
+            statusCode: http.statusCode,
+            data: data
+        )
+        guard (200..<300).contains(http.statusCode) else {
+            throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
+        }
+        return try decodeModel(
+            ScannerRanksResponse.self,
+            from: data,
+            context: "GET /api/monitoring/scanner/ranks"
         )
     }
 

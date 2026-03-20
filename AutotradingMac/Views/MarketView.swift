@@ -34,11 +34,21 @@ struct MarketView: View {
             scannerHeader
 
             if candidates.isEmpty {
+                if store.scannerIsLoading(mode: scanMode.rawValue) {
+                    VStack(spacing: 10) {
+                        ProgressView()
+                        Text("스캔 종목 로딩 중...")
+                            .font(DesignTokens.Typography.caption)
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
                 ContentUnavailableView(
                     "스캔 데이터가 없습니다",
                     systemImage: "chart.line.uptrend.xyaxis",
                     description: Text("snapshot 또는 websocket market 이벤트 수신 후 후보가 표시됩니다.")
                 )
+                }
             } else {
                 HStack(alignment: .top, spacing: ScannerLayout.paneSpacing) {
                     scannerListPane
@@ -55,8 +65,9 @@ struct MarketView: View {
         }
         .padding(ScannerLayout.contentPadding)
         .onAppear {
-            syncSelection()
             Task {
+                await store.activateScannerMode(scanMode.rawValue)
+                syncSelection()
                 await store.refreshSelectedChartSeries(force: false)
             }
         }
@@ -64,7 +75,10 @@ struct MarketView: View {
             syncSelection()
         }
         .onChange(of: scanMode) { _ in
-            syncSelection()
+            Task {
+                await store.activateScannerMode(scanMode.rawValue)
+                syncSelection()
+            }
         }
         .frame(
             width: ScannerLayout.leftPaneWidth + ScannerLayout.rightPaneWidth + ScannerLayout.paneSpacing + (ScannerLayout.contentPadding * 2),
@@ -150,7 +164,7 @@ struct MarketView: View {
 
                 ScrollView {
                     LazyVStack(spacing: ScannerLayout.rowSpacing) {
-                        ForEach(candidates) { candidate in
+                        ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
                             Button {
                                 store.setSelectedScannerCode(candidate.code)
                             } label: {
@@ -161,6 +175,30 @@ struct MarketView: View {
                             }
                             .buttonStyle(.plain)
                             .frame(height: ScannerLayout.rowHeight)
+                            .onAppear {
+                                guard index == candidates.count - 1 else { return }
+                                Task {
+                                    await store.loadMoreScannerRanksIfNeeded(mode: scanMode.rawValue)
+                                }
+                            }
+                        }
+
+                        if store.scannerIsLoading(mode: scanMode.rawValue) {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("추가 종목 불러오는 중...")
+                                    .font(DesignTokens.Typography.caption)
+                                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 8)
+                        } else if !store.scannerCanLoadMore(mode: scanMode.rawValue), !candidates.isEmpty {
+                            Text("최대 50위까지 표시됨")
+                                .font(DesignTokens.Typography.caption)
+                                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
                         }
                     }
                     .padding(.top, 6)
@@ -353,41 +391,13 @@ struct MarketView: View {
     }
 
     private var candidates: [ScannerCandidate] {
-        let sortedRows = store.marketRows.sorted { lhs, rhs in
-            switch scanMode {
-            case .turnover:
-                let lMetric = lhs.metric ?? .leastNormalMagnitude
-                let rMetric = rhs.metric ?? .leastNormalMagnitude
-                if lMetric != rMetric {
-                    return lMetric > rMetric
-                }
-                let lRank = lhs.rank ?? Int.max
-                let rRank = rhs.rank ?? Int.max
-                if lRank != rRank {
-                    return lRank < rRank
-                }
-                return lhs.code < rhs.code
-            case .surge:
-                let lChange = lhs.changePct ?? -Double.greatestFiniteMagnitude
-                let rChange = rhs.changePct ?? -Double.greatestFiniteMagnitude
-                if lChange != rChange {
-                    return lChange > rChange
-                }
-                let lMetric = lhs.metric ?? .leastNormalMagnitude
-                let rMetric = rhs.metric ?? .leastNormalMagnitude
-                if lMetric != rMetric {
-                    return lMetric > rMetric
-                }
-                return lhs.code < rhs.code
-            }
-        }
-
-        return sortedRows.enumerated().map { index, row in
+        let scannerRows = store.scannerRows(for: scanMode.rawValue)
+        return scannerRows.enumerated().map { index, row in
             let displayRank = index + 1
             return ScannerCandidate(
                 row: row,
                 displayRank: displayRank,
-                score: score(for: row, index: index, total: sortedRows.count),
+                score: score(for: row, index: index, total: scannerRows.count),
                 reason: reasonText(for: row, rank: displayRank)
             )
         }
@@ -951,6 +961,35 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
 
     func fetchRuntime() async throws -> RuntimeStatusSnapshot {
         Self.previewSnapshot.runtime
+    }
+
+    func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse {
+        let normalized = mode.lowercased() == "surge" ? "surge" : "turnover"
+        let all = Self.previewSnapshot.marketTopRanks
+        let ranked: [MarketRankSnapshotItem]
+        if normalized == "surge" {
+            ranked = all.sorted { lhs, rhs in
+                let l = lhs.changePct ?? -Double.greatestFiniteMagnitude
+                let r = rhs.changePct ?? -Double.greatestFiniteMagnitude
+                if l != r { return l > r }
+                return (lhs.rank ?? Int.max) < (rhs.rank ?? Int.max)
+            }
+        } else {
+            ranked = all.sorted { lhs, rhs in
+                let l = lhs.metric ?? .leastNonzeroMagnitude
+                let r = rhs.metric ?? .leastNonzeroMagnitude
+                if l != r { return l > r }
+                return (lhs.rank ?? Int.max) < (rhs.rank ?? Int.max)
+            }
+        }
+        let boundedLimit = min(max(limit, 10), 50)
+        return ScannerRanksResponse(
+            mode: normalized,
+            limit: boundedLimit,
+            hasMore: ranked.count > boundedLimit,
+            data: Array(ranked.prefix(boundedLimit)),
+            count: min(ranked.count, boundedLimit)
+        )
     }
 
     func fetchChartSeries(
