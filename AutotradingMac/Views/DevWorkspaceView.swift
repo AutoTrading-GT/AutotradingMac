@@ -78,6 +78,17 @@ struct DevWorkspaceView: View {
                     .font(.caption)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
+
+            if let errorMessage = store.lastErrorMessage, !errorMessage.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                    Text(errorMessage)
+                        .font(.caption)
+                        .textSelection(.enabled)
+                }
+                .foregroundStyle(DesignTokens.Colors.warningMuted)
+            }
         }
         .padding()
         .appPanelStyle()

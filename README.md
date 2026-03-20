@@ -35,7 +35,8 @@
 - 상단 정보 계층 분리
   - Global top bar(운영): 자동매매 상태, 장 상태, 마지막 갱신, `시작/일시정지/긴급 정지`(서버 엔진 제어 연동)
   - 자동매매 상태 컬러: `running=초록`, `paused=노랑`, `emergency_stopped=빨강`
-  - `engine started`, `engine paused` 성공 토스트성 문구는 top bar에 노출하지 않음(오류 메시지는 유지)
+  - `engine started`, `engine paused` 성공 토스트성 문구는 top bar에 노출하지 않음
+  - 모드 전환/제어 실패 사유(`409 detail`)는 Dev 화면에서 확인
   - `emergency_stopped` 상태에서는 `해제` 버튼이 추가 노출되고, 해제 전 `시작`은 비활성 유지
   - toolbar 스타일: 다층 패널(그라데이션/이중 보더/섀도우) + 데스크톱 리듬 중심 간격 + 세미-톤 액션 버튼 스타일 적용
   - 페이지 제목은 top bar에서 노출하지 않고, 사이드바 선택 상태로 현재 페이지를 파악

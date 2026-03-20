@@ -239,14 +239,35 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     private func parseErrorDetail(from data: Data) -> String? {
-        guard
-            let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let detail = raw["detail"] as? String,
-            !detail.isEmpty
-        else {
-            return nil
+        if let raw = try? JSONSerialization.jsonObject(with: data) {
+            if let object = raw as? [String: Any], let detail = object["detail"] {
+                return stringify(detail)
+            }
+            return stringify(raw)
         }
-        return detail
+
+        let plain = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let plain, !plain.isEmpty {
+            return plain
+        }
+        return nil
+    }
+
+    private func stringify(_ value: Any) -> String? {
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        if let number = value as? NSNumber {
+            return number.stringValue
+        }
+        if JSONSerialization.isValidJSONObject(value),
+           let data = try? JSONSerialization.data(withJSONObject: value, options: []),
+           let text = String(data: data, encoding: .utf8) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return "\(value)"
     }
 
     private func logRequest(_ request: URLRequest, context: String) {

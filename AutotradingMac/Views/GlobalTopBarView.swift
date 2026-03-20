@@ -344,9 +344,6 @@ struct GlobalTopBarView: View {
     }
 
     private var controlFeedbackText: String? {
-        if let error = store.lastErrorMessage, !error.isEmpty {
-            return error
-        }
         guard let message = store.engineActionResultMessage else {
             return nil
         }
@@ -361,16 +358,10 @@ struct GlobalTopBarView: View {
     }
 
     private var controlFeedbackIcon: String {
-        if let error = store.lastErrorMessage, !error.isEmpty {
-            return "exclamationmark.triangle.fill"
-        }
         return "checkmark.circle.fill"
     }
 
     private var controlFeedbackColor: Color {
-        if let error = store.lastErrorMessage, !error.isEmpty {
-            return DesignTokens.Colors.warningMuted
-        }
         return DesignTokens.Colors.successMuted
     }
 }
