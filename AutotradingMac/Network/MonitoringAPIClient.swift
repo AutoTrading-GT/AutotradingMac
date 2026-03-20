@@ -8,6 +8,7 @@ import Foundation
 protocol MonitoringAPIClientProtocol {
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse
     func fetchRuntime() async throws -> RuntimeStatusSnapshot
+    func fetchChartSeries(symbol: String, timeframe: ChartTimeframeOption, limit: Int) async throws -> ChartSeriesResponse
     func startEngine() async throws -> EngineControlCommandResponse
     func pauseEngine() async throws -> EngineControlCommandResponse
     func emergencyStopEngine() async throws -> EngineControlCommandResponse
@@ -117,6 +118,36 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
             context: "GET /api/monitoring/runtime"
         )
         return envelope.data
+    }
+
+    func fetchChartSeries(
+        symbol: String,
+        timeframe: ChartTimeframeOption,
+        limit: Int
+    ) async throws -> ChartSeriesResponse {
+        var request = URLRequest(url: AppConfig.chartSeriesURL(symbol: symbol, timeframe: timeframe, limit: limit))
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        logRequest(request, context: "chart")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MonitoringAPIError.invalidResponse
+        }
+        logResponse(
+            context: "chart",
+            url: request.url,
+            statusCode: http.statusCode,
+            data: data
+        )
+        guard (200..<300).contains(http.statusCode) else {
+            throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
+        }
+        return try decodeModel(
+            ChartSeriesResponse.self,
+            from: data,
+            context: "GET /api/chart/{symbol}"
+        )
     }
 
     func startEngine() async throws -> EngineControlCommandResponse {

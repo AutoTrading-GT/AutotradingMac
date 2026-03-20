@@ -52,6 +52,23 @@ enum AppConfig {
         apiEndpoint("engine/account-mode")
     }
 
+    static func chartSeriesURL(
+        symbol: String,
+        timeframe: ChartTimeframeOption,
+        limit: Int
+    ) -> URL {
+        let sanitized = symbol.trimmingCharacters(in: .whitespacesAndNewlines)
+        var components = URLComponents(
+            url: apiEndpoint("chart").appendingPathComponent(sanitized),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "timeframe", value: timeframe.rawValue),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+        return components?.url ?? apiEndpoint("chart/\(sanitized)")
+    }
+
     static var webSocketURL: URL {
         let env = ProcessInfo.processInfo.environment[websocketEnvKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let env, !env.isEmpty, let url = URL(string: env) {

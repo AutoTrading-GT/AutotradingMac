@@ -35,6 +35,10 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var engineActionResultMessage: String?
     @Published private(set) var modeSwitchInFlight: RuntimeModeSwitchTarget?
     @Published private(set) var selectedScannerCode: String?
+    @Published private(set) var selectedChartTimeframe: ChartTimeframeOption = .minute1
+    @Published private(set) var chartSeriesCache: [String: ChartSeriesResponse] = [:]
+    @Published private(set) var chartLoadingKeys: Set<String> = []
+    @Published private(set) var chartErrorMessages: [String: String] = [:]
 
     private let apiClient: MonitoringAPIClientProtocol
     private let webSocketClient: MonitoringWebSocketClient
@@ -42,6 +46,7 @@ final class MonitoringStore: ObservableObject {
     private let maxRecentItems = 100
     private var runtimeRefreshTask: Task<Void, Never>?
     private var snapshotRetryTask: Task<Void, Never>?
+    private var chartFetchTasks: [String: Task<Void, Never>] = [:]
     private var lastRuntimeRefreshedAt: Date?
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
     private static let iso8601WithFractional: ISO8601DateFormatter = {
@@ -77,6 +82,10 @@ final class MonitoringStore: ObservableObject {
         runtimeRefreshTask = nil
         snapshotRetryTask?.cancel()
         snapshotRetryTask = nil
+        for task in chartFetchTasks.values {
+            task.cancel()
+        }
+        chartFetchTasks.removeAll()
         webSocketClient.disconnect()
         started = false
     }
@@ -218,7 +227,41 @@ final class MonitoringStore: ObservableObject {
     }
 
     func setSelectedScannerCode(_ code: String?) {
+        guard selectedScannerCode != code else { return }
         selectedScannerCode = code
+        scheduleChartFetchForSelectedSymbol(force: true)
+    }
+
+    func setSelectedChartTimeframe(_ timeframe: ChartTimeframeOption) {
+        guard selectedChartTimeframe != timeframe else { return }
+        selectedChartTimeframe = timeframe
+        scheduleChartFetchForSelectedSymbol(force: true)
+    }
+
+    func chartSeries(
+        for symbol: String,
+        timeframe: ChartTimeframeOption
+    ) -> ChartSeriesResponse? {
+        chartSeriesCache[chartCacheKey(symbol: symbol, timeframe: timeframe)]
+    }
+
+    func chartErrorMessage(
+        for symbol: String,
+        timeframe: ChartTimeframeOption
+    ) -> String? {
+        chartErrorMessages[chartCacheKey(symbol: symbol, timeframe: timeframe)]
+    }
+
+    func isChartLoading(
+        for symbol: String,
+        timeframe: ChartTimeframeOption
+    ) -> Bool {
+        chartLoadingKeys.contains(chartCacheKey(symbol: symbol, timeframe: timeframe))
+    }
+
+    func refreshSelectedChartSeries(force: Bool = true) async {
+        guard let symbol = selectedScannerCode else { return }
+        await fetchChartSeries(symbol: symbol, timeframe: selectedChartTimeframe, force: force)
     }
 
     var workerRows: [WorkerStatusRow] {
@@ -360,6 +403,7 @@ final class MonitoringStore: ObservableObject {
         recentClosedPositions = snapshot.recentClosedPositions
         pnlSummary = snapshot.pnlSummary
         ensureSelectedScannerCode()
+        scheduleChartFetchForSelectedSymbol(force: false)
     }
 
     private func handle(event: EventEnvelope) {
@@ -774,6 +818,7 @@ final class MonitoringStore: ObservableObject {
             return
         }
         selectedScannerCode = rows.first?.code
+        scheduleChartFetchForSelectedSymbol(force: false)
     }
 
     private func modeSwitchErrorMessage(prefix: String, error: Error) -> String {
@@ -796,6 +841,59 @@ final class MonitoringStore: ObservableObject {
             return
         }
         lastAccountSummaryErrorMessage = nil
+    }
+
+    private func chartCacheKey(symbol: String, timeframe: ChartTimeframeOption) -> String {
+        "\(symbol.uppercased())|\(timeframe.rawValue)"
+    }
+
+    private func scheduleChartFetchForSelectedSymbol(force: Bool) {
+        guard let symbol = selectedScannerCode else { return }
+        let timeframe = selectedChartTimeframe
+        let key = chartCacheKey(symbol: symbol, timeframe: timeframe)
+        if chartFetchTasks[key] != nil {
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.fetchChartSeries(symbol: symbol, timeframe: timeframe, force: force)
+        }
+        chartFetchTasks[key] = task
+    }
+
+    private func fetchChartSeries(
+        symbol: String,
+        timeframe: ChartTimeframeOption,
+        force: Bool
+    ) async {
+        let key = chartCacheKey(symbol: symbol, timeframe: timeframe)
+        defer {
+            chartFetchTasks[key] = nil
+        }
+        if !force, chartSeriesCache[key] != nil {
+            return
+        }
+
+        chartLoadingKeys.insert(key)
+        chartErrorMessages[key] = nil
+        do {
+            let response = try await apiClient.fetchChartSeries(symbol: symbol, timeframe: timeframe, limit: 240)
+            chartSeriesCache[key] = response
+            chartErrorMessages[key] = nil
+            lastUpdatedAt = Date()
+        } catch {
+            let detail: String
+            if let apiError = error as? MonitoringAPIError,
+               case let .httpStatus(_, bodyDetail) = apiError,
+               let bodyDetail,
+               !bodyDetail.isEmpty {
+                detail = bodyDetail
+            } else {
+                detail = error.localizedDescription
+            }
+            chartErrorMessages[key] = "차트 조회 실패: \(detail)"
+        }
+        chartLoadingKeys.remove(key)
     }
 
     private func parseISODate(_ raw: String) -> Date? {

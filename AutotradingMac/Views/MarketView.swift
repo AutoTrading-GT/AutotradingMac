@@ -28,7 +28,6 @@ private enum ScannerLayout {
 struct MarketView: View {
     @EnvironmentObject private var store: MonitoringStore
     @State private var scanMode: ScannerMode = .turnover
-    @State private var chartTimeframe: ChartTimeframe = .minute1
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
@@ -57,6 +56,9 @@ struct MarketView: View {
         .padding(ScannerLayout.contentPadding)
         .onAppear {
             syncSelection()
+            Task {
+                await store.refreshSelectedChartSeries(force: false)
+            }
         }
         .onChange(of: candidateCodes) { _ in
             syncSelection()
@@ -194,13 +196,16 @@ struct MarketView: View {
     }
 
     private func detailPanel(for candidate: ScannerCandidate) -> some View {
-        let trend = TrendDirection.from(changePercent: candidate.row.changePct)
+        let series = store.chartSeries(for: candidate.code, timeframe: store.selectedChartTimeframe)
+        let chartPoints = series?.points ?? []
+        let trend = chartTrend(points: chartPoints, fallbackChangePct: candidate.row.changePct)
         let signal = latestSignal(for: candidate.code)
         let holding = isHolding(code: candidate.code)
-        let points = chartPoints(for: candidate)
-        let metrics = chartMetrics(from: points, currentPrice: candidate.row.price, changePct: candidate.row.changePct)
+        let metrics = chartMetrics(from: chartPoints, currentPrice: candidate.row.price, changePct: candidate.row.changePct)
         let score = candidate.score
         let scoreTone: StatusTone = score >= 75 ? .success : (score >= 50 ? .warning : .neutral)
+        let isLoadingChart = store.isChartLoading(for: candidate.code, timeframe: store.selectedChartTimeframe)
+        let chartError = store.chartErrorMessage(for: candidate.code, timeframe: store.selectedChartTimeframe)
 
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
@@ -264,7 +269,7 @@ struct MarketView: View {
                 Spacer()
                 HStack {
                     Picker("", selection: $chartTimeframe) {
-                        ForEach(ChartTimeframe.allCases) { timeframe in
+                        ForEach(ChartTimeframeOption.allCases) { timeframe in
                             Text(timeframe.title).tag(timeframe)
                         }
                     }
@@ -277,10 +282,32 @@ struct MarketView: View {
 
             Divider().opacity(0.5)
 
-            ScannerLineChartView(points: points, trend: trend)
-                .frame(minHeight: 220, maxHeight: .infinity)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+            ZStack {
+                ScannerLineChartView(points: chartPoints, trend: trend)
+                    .frame(minHeight: 220, maxHeight: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+
+                if isLoadingChart {
+                    ProgressView("차트 로딩 중...")
+                        .padding(10)
+                        .appPanelStyle()
+                } else if let chartError {
+                    ContentUnavailableView(
+                        "차트 조회 실패",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(chartError)
+                    )
+                    .padding(.horizontal, 16)
+                } else if chartPoints.isEmpty {
+                    ContentUnavailableView(
+                        "차트 데이터 없음",
+                        systemImage: "chart.xyaxis.line",
+                        description: Text("해당 종목/구간의 시계열 데이터가 없습니다.")
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
 
             Divider().opacity(0.5)
             chartSupportInfoRow(metrics: metrics)
@@ -288,6 +315,13 @@ struct MarketView: View {
                 .padding(.vertical, 8)
         }
         .appSurfaceStyle()
+    }
+
+    private var chartTimeframe: Binding<ChartTimeframeOption> {
+        Binding(
+            get: { store.selectedChartTimeframe },
+            set: { store.setSelectedChartTimeframe($0) }
+        )
     }
 
     private func chartSupportInfoRow(metrics: ScannerChartMetrics) -> some View {
@@ -433,39 +467,16 @@ struct MarketView: View {
         }
     }
 
-    private func chartPoints(for candidate: ScannerCandidate) -> [Double] {
-        let base = max(candidate.row.price ?? 10_000, 100)
-        let count = chartTimeframe.sampleCount
-        let drift = (candidate.row.changePct ?? 0) / 100.0
-        let seed = Double(candidate.row.code.unicodeScalars.map { Int($0.value) }.reduce(0, +) % 97) / 97.0
-
-        var points: [Double] = []
-        points.reserveCapacity(count)
-
-        for index in 0..<count {
-            let progress = Double(index) / Double(max(count - 1, 1))
-            let waveA = sin((progress * .pi * Double(chartTimeframe.waveCycle)) + (seed * 2.1))
-            let waveB = cos((progress * .pi * Double(chartTimeframe.waveCycle * 2)) + (seed * 3.4)) * 0.35
-            let trend = base * (drift * progress * 0.35)
-            let amplitude = base * (0.0015 + (seed * 0.0012))
-            let value = max(1, base + trend + (waveA + waveB) * amplitude)
-            points.append(value)
-        }
-
-        if !points.isEmpty, let price = candidate.row.price {
-            points[points.count - 1] = price
-        }
-        return points
-    }
-
-    private func chartMetrics(from points: [Double], currentPrice: Double?, changePct: Double?) -> ScannerChartMetrics {
-        let open = points.first
-        let high = points.max()
-        let low = points.min()
-        let current = currentPrice ?? points.last
+    private func chartMetrics(from points: [ChartPoint], currentPrice: Double?, changePct: Double?) -> ScannerChartMetrics {
+        let open = points.first?.open
+        let high = points.map(\.high).max()
+        let low = points.map(\.low).min()
+        let current = currentPrice ?? points.last?.close
 
         let prevClose: Double?
-        if let current, let changePct {
+        if points.count >= 2 {
+            prevClose = points[points.count - 2].close
+        } else if let current, let changePct {
             let denominator = 1.0 + (changePct / 100.0)
             if abs(denominator) > 0.0001 {
                 prevClose = current / denominator
@@ -478,8 +489,9 @@ struct MarketView: View {
 
         let volatility: Double?
         if points.count > 1 {
-            let mean = points.reduce(0, +) / Double(points.count)
-            let variance = points.reduce(0) { partial, point in
+            let closes = points.map(\.close)
+            let mean = closes.reduce(0, +) / Double(closes.count)
+            let variance = closes.reduce(0) { partial, point in
                 partial + pow(point - mean, 2.0)
             } / Double(points.count)
             volatility = mean > 0 ? sqrt(variance) / mean * 100.0 : nil
@@ -494,6 +506,17 @@ struct MarketView: View {
             prevClose: prevClose,
             volatility: volatility
         )
+    }
+
+    private func chartTrend(points: [ChartPoint], fallbackChangePct: Double?) -> TrendDirection {
+        if points.count >= 2 {
+            let prev = points[points.count - 2].close
+            let last = points[points.count - 1].close
+            if prev != 0 {
+                return TrendDirection.from(changePercent: ((last - prev) / prev) * 100.0)
+            }
+        }
+        return TrendDirection.from(changePercent: fallbackChangePct)
     }
 
     private func latestSignal(for code: String) -> String? {
@@ -581,54 +604,6 @@ private enum ScannerMode: String, CaseIterable, Identifiable {
             return "거래대금 상위 종목"
         case .surge:
             return "등락률 상위 종목"
-        }
-    }
-}
-
-private enum ChartTimeframe: String, CaseIterable, Identifiable {
-    case minute1
-    case minute5
-    case day
-    case week
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .minute1:
-            return "1분"
-        case .minute5:
-            return "5분"
-        case .day:
-            return "일"
-        case .week:
-            return "주"
-        }
-    }
-
-    var sampleCount: Int {
-        switch self {
-        case .minute1:
-            return 50
-        case .minute5:
-            return 55
-        case .day:
-            return 45
-        case .week:
-            return 40
-        }
-    }
-
-    var waveCycle: Int {
-        switch self {
-        case .minute1:
-            return 8
-        case .minute5:
-            return 5
-        case .day:
-            return 3
-        case .week:
-            return 2
         }
     }
 }
@@ -736,14 +711,14 @@ private struct ScannerCandidateRowView: View {
 }
 
 private struct ScannerLineChartView: View {
-    let points: [Double]
+    let points: [ChartPoint]
     let trend: TrendDirection
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let minValue = points.min() ?? 0
-            let maxValue = points.max() ?? 0
+            let minValue = points.map(\.close).min() ?? 0
+            let maxValue = points.map(\.close).max() ?? 0
             let range = max(maxValue - minValue, 0.0001)
 
             ZStack {
@@ -780,7 +755,7 @@ private struct ScannerLineChartView: View {
         Path { path in
             for (index, point) in points.enumerated() {
                 let x = size.width * CGFloat(Double(index) / Double(max(points.count - 1, 1)))
-                let yRatio = (point - minValue) / range
+                let yRatio = (point.close - minValue) / range
                 let y = size.height * (1 - CGFloat(yRatio))
                 if index == 0 {
                     path.move(to: CGPoint(x: x, y: y))
@@ -976,6 +951,33 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
 
     func fetchRuntime() async throws -> RuntimeStatusSnapshot {
         Self.previewSnapshot.runtime
+    }
+
+    func fetchChartSeries(
+        symbol: String,
+        timeframe: ChartTimeframeOption,
+        limit: Int
+    ) async throws -> ChartSeriesResponse {
+        let baseDate = Date()
+        let points = (0..<max(limit, 20)).map { index -> ChartPoint in
+            let ts = baseDate.addingTimeInterval(Double(index - max(limit, 20)) * 60)
+            let close = 70_000.0 + (Double(index) * 12.0) + sin(Double(index) / 3.0) * 55.0
+            return ChartPoint(
+                ts: ts,
+                open: close - 8.0,
+                high: close + 15.0,
+                low: close - 20.0,
+                close: close,
+                volume: 10_000 + Double(index * 120)
+            )
+        }
+        return ChartSeriesResponse(
+            symbol: symbol,
+            timeframe: timeframe,
+            source: "preview.mock.chart",
+            timezone: "UTC",
+            points: points
+        )
     }
 
     func startEngine() async throws -> EngineControlCommandResponse {
