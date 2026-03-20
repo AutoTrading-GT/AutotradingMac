@@ -12,6 +12,7 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 metricsRow
+                accountStatusRow
                 contentColumns
             }
             .padding(16)
@@ -107,6 +108,30 @@ struct DashboardView: View {
                 recentLogsPanel
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    @ViewBuilder
+    private var accountStatusRow: some View {
+        if let accountSummary {
+            HStack(spacing: 8) {
+                Text(accountSummary.accountLabel ?? "계좌")
+                    .font(.caption.weight(.semibold))
+                if let masked = accountSummary.maskedAccount {
+                    Text(masked)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                }
+                Spacer(minLength: 8)
+                if !accountSummary.available {
+                    Text(accountSummary.unavailableReason ?? "계좌 정보를 조회할 수 없습니다.")
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.Colors.warning)
+                        .lineLimit(1)
+                }
+            }
+            .foregroundStyle(DesignTokens.Colors.textSecondary)
+            .padding(.horizontal, 2)
         }
     }
 
@@ -489,29 +514,29 @@ struct DashboardView: View {
         return max(0, min(100, Int((rankScore + changeScore).rounded())))
     }
 
-    private var totalEvaluationValue: Double? {
-        guard !store.currentPositions.isEmpty else { return nil }
-        return store.currentPositions.reduce(0.0) { partial, row in
-            let referencePrice = row.markPrice ?? row.avgPrice ?? 0.0
-            return partial + (row.qty * referencePrice)
-        }
+    private var accountSummary: AccountSummarySnapshot? {
+        store.runtime?.accountSummary
     }
 
-    private var totalEvaluationText: String { DisplayFormatters.number(totalEvaluationValue) }
+    private var totalEvaluationValue: Double? {
+        accountSummary?.totalAccountValue
+    }
 
-    private var totalEvaluationChangeValue: Double? { store.pnlSummary.unrealizedPnlTotal }
+    private var totalEvaluationText: String { DisplayFormatters.krw(totalEvaluationValue) }
+
+    private var totalEvaluationChangeValue: Double? { accountSummary?.unrealizedPnlTotal }
 
     private var totalEvaluationChangeText: String? {
-        guard totalEvaluationChangeValue != nil else { return nil }
-        return DisplayFormatters.pnl(totalEvaluationChangeValue)
+        guard let totalEvaluationChangeValue else { return nil }
+        return "평가손익 \(DisplayFormatters.pnl(totalEvaluationChangeValue))"
     }
 
-    private var cashText: String { "-" }
+    private var cashText: String { DisplayFormatters.krw(accountSummary?.cashBalance) }
 
-    private var valuationPnLText: String { DisplayFormatters.pnl(store.pnlSummary.unrealizedPnlTotal) }
+    private var valuationPnLText: String { DisplayFormatters.pnl(accountSummary?.unrealizedPnlTotal) }
 
     private var valuationPnLChangeText: String? {
-        guard let pnl = store.pnlSummary.unrealizedPnlTotal else { return nil }
+        guard let pnl = accountSummary?.unrealizedPnlTotal else { return nil }
         guard let total = totalEvaluationValue, total > 0 else { return nil }
         return DisplayFormatters.percent((pnl / total) * 100.0)
     }

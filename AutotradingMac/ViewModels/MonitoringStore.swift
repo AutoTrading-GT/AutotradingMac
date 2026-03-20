@@ -37,6 +37,9 @@ final class MonitoringStore: ObservableObject {
     private let webSocketClient: MonitoringWebSocketClient
     private var started = false
     private let maxRecentItems = 100
+    private var runtimeRefreshTask: Task<Void, Never>?
+    private var lastRuntimeRefreshedAt: Date?
+    private let runtimeRefreshMinInterval: TimeInterval = 2.0
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -65,6 +68,8 @@ final class MonitoringStore: ObservableObject {
     }
 
     func stop() {
+        runtimeRefreshTask?.cancel()
+        runtimeRefreshTask = nil
         webSocketClient.disconnect()
         started = false
     }
@@ -79,6 +84,7 @@ final class MonitoringStore: ObservableObject {
             snapshotLoaded = true
             lastErrorMessage = nil
             lastUpdatedAt = Date()
+            lastRuntimeRefreshedAt = Date()
         } catch {
             lastErrorMessage = "Snapshot load failed: \(error.localizedDescription)"
             snapshotLoaded = false
@@ -325,22 +331,27 @@ final class MonitoringStore: ObservableObject {
         case "order.updated":
             if let payload = decodePayload(OrderUpdatedPayload.self, from: event.data) {
                 appendOrUpdateOrderUpdated(payload: payload)
+                scheduleRuntimeRefresh()
             }
         case "fill.received":
             if let payload = decodePayload(FillReceivedPayload.self, from: event.data) {
                 appendFill(payload: payload)
+                scheduleRuntimeRefresh()
             }
         case "position.updated":
             if let payload = decodePayload(PositionUpdatedPayload.self, from: event.data) {
                 appendOrUpdatePosition(payload: payload)
+                scheduleRuntimeRefresh()
             }
         case "position.pnl_updated":
             if let payload = decodePayload(PositionPnlUpdatedPayload.self, from: event.data) {
                 applyPositionPnL(payload: payload)
+                scheduleRuntimeRefresh()
             }
         case "position.closed":
             if let payload = decodePayload(PositionClosedPayload.self, from: event.data) {
                 applyPositionClosed(payload: payload)
+                scheduleRuntimeRefresh()
             }
         default:
             break
@@ -681,6 +692,32 @@ final class MonitoringStore: ObservableObject {
 
     private func parseISODate(_ raw: String) -> Date? {
         Self.iso8601WithFractional.date(from: raw) ?? Self.iso8601Basic.date(from: raw)
+    }
+
+    private func scheduleRuntimeRefresh() {
+        guard runtimeRefreshTask == nil else { return }
+        runtimeRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard let self else { return }
+            await self.refreshRuntimeStatusIfNeeded()
+            self.runtimeRefreshTask = nil
+        }
+    }
+
+    private func refreshRuntimeStatusIfNeeded() async {
+        let now = Date()
+        if let lastRuntimeRefreshedAt,
+           now.timeIntervalSince(lastRuntimeRefreshedAt) < runtimeRefreshMinInterval {
+            return
+        }
+        do {
+            let latestRuntime = try await apiClient.fetchRuntime()
+            runtime = latestRuntime
+            lastRuntimeRefreshedAt = now
+            lastUpdatedAt = now
+        } catch {
+            lastErrorMessage = "Runtime refresh failed: \(error.localizedDescription)"
+        }
     }
 }
 

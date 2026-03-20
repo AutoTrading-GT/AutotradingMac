@@ -22,6 +22,10 @@ enum AppConfig {
         backendBaseURL.appendingPathComponent("api/monitoring/snapshot")
     }
 
+    static var runtimeURL: URL {
+        backendBaseURL.appendingPathComponent("api/monitoring/runtime")
+    }
+
     static var engineStartURL: URL {
         backendBaseURL.appendingPathComponent("api/engine/start")
     }

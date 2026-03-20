@@ -40,7 +40,24 @@ struct RuntimeStatusSnapshot: Decodable {
     var startupStatus: String
     var startupError: String?
     var activeWsClients: Int
+    var accountSummary: AccountSummarySnapshot?
     var workers: WorkersSnapshot
+}
+
+struct AccountSummarySnapshot: Decodable {
+    let mode: String
+    let source: String
+    let available: Bool
+    let unavailableReason: String?
+    let accountLabel: String?
+    let maskedAccount: String?
+    let totalAccountValue: Double?
+    let cashBalance: Double?
+    let unrealizedPnlTotal: Double?
+}
+
+struct RuntimeStatusResponseEnvelope: Decodable {
+    let data: RuntimeStatusSnapshot
 }
 
 struct WorkerSummarySnapshot: Decodable {

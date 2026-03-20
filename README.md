@@ -69,7 +69,7 @@
 ## Dashboard 레이아웃(현재)
 - 상단 KPI 4카드
   - 총 평가금액
-  - 예수금(placeholder)
+  - 예수금
   - 평가손익
   - 승률
 - 본문 2컬럼
@@ -77,6 +77,11 @@
   - 우측: 매매신호, 미체결주문, 최근로그
 - 스타일: `design_ref/figma_web_export/src/app/pages/Dashboard.tsx` 정보구조를 SwiftUI 패널/행 컴포지션으로 반영
 - 데이터가 비어 있는 경우 각 섹션은 빈 상태 메시지를 표시
+- 계좌 KPI 데이터 소스:
+  - `runtime.account_summary.total_account_value`
+  - `runtime.account_summary.cash_balance`
+  - `runtime.account_summary.unrealized_pnl_total`
+  - 값 미가용 시 `-` 표시, 계좌 식별은 `masked_account`만 노출
 
 ## 백엔드 URL 설정
 Xcode Scheme 환경변수로 설정 가능합니다.
@@ -101,6 +106,7 @@ Xcode Scheme 환경변수로 설정 가능합니다.
 14. top bar에서 `시작` 클릭 시 엔진 상태가 `running`으로 복귀하는지 확인
 15. top bar에서 `긴급 정지` 클릭 시 확인 다이얼로그가 먼저 노출되고, 실행 후 `긴급 정지 상태`가 표시되는지 확인
 16. `긴급 정지 상태`에서 `해제` 클릭 시 상태가 `stopped`로 바뀌고, 이후 `시작`이 다시 활성화되는지 확인
+17. Dashboard KPI(총 평가금액/예수금/평가손익)가 `runtime.account_summary` 값과 일치하는지 확인
 
 ## 주의사항
 - 거래 실행/설정 저장 기능은 구현하지 않음 (read-only)

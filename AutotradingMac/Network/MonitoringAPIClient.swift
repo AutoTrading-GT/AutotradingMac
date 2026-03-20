@@ -7,6 +7,7 @@ import Foundation
 
 protocol MonitoringAPIClientProtocol {
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse
+    func fetchRuntime() async throws -> RuntimeStatusSnapshot
     func startEngine() async throws -> EngineControlCommandResponse
     func pauseEngine() async throws -> EngineControlCommandResponse
     func emergencyStopEngine() async throws -> EngineControlCommandResponse
@@ -33,6 +34,7 @@ enum MonitoringAPIError: LocalizedError {
 final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     private let session: URLSession
     private let snapshotURL: URL
+    private let runtimeURL: URL
     private let engineStartURL: URL
     private let enginePauseURL: URL
     private let engineEmergencyStopURL: URL
@@ -41,6 +43,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     init(
         session: URLSession = .shared,
         snapshotURL: URL = AppConfig.snapshotURL,
+        runtimeURL: URL = AppConfig.runtimeURL,
         engineStartURL: URL = AppConfig.engineStartURL,
         enginePauseURL: URL = AppConfig.enginePauseURL,
         engineEmergencyStopURL: URL = AppConfig.engineEmergencyStopURL,
@@ -48,6 +51,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     ) {
         self.session = session
         self.snapshotURL = snapshotURL
+        self.runtimeURL = runtimeURL
         self.engineStartURL = engineStartURL
         self.enginePauseURL = enginePauseURL
         self.engineEmergencyStopURL = engineEmergencyStopURL
@@ -67,6 +71,22 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
         return try MonitoringCoding.decoder().decode(MonitoringSnapshotResponse.self, from: data)
+    }
+
+    func fetchRuntime() async throws -> RuntimeStatusSnapshot {
+        var request = URLRequest(url: runtimeURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MonitoringAPIError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
+        }
+        let envelope = try MonitoringCoding.decoder().decode(RuntimeStatusResponseEnvelope.self, from: data)
+        return envelope.data
     }
 
     func startEngine() async throws -> EngineControlCommandResponse {
