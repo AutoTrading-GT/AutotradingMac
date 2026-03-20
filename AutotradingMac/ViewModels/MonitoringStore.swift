@@ -93,11 +93,10 @@ final class MonitoringStore: ObservableObject {
             snapshotRetryTask?.cancel()
             snapshotRetryTask = nil
         } catch {
-            if let decodingError = error as? DecodingError {
-                lastErrorMessage = "Snapshot decode failed: \(decodingErrorDescription(decodingError))"
-            } else {
-                lastErrorMessage = "Snapshot load failed: \(error.localizedDescription)"
-            }
+            lastErrorMessage = diagnosticsErrorText(
+                prefix: "Snapshot load failed",
+                error: error
+            )
             snapshotLoaded = false
             scheduleSnapshotRetryIfNeeded()
         }
@@ -785,7 +784,10 @@ final class MonitoringStore: ObservableObject {
             lastRuntimeRefreshedAt = now
             lastUpdatedAt = now
         } catch {
-            lastErrorMessage = "Runtime refresh failed: \(error.localizedDescription)"
+            lastErrorMessage = diagnosticsErrorText(
+                prefix: "Runtime refresh failed",
+                error: error
+            )
         }
     }
 
@@ -805,6 +807,13 @@ final class MonitoringStore: ObservableObject {
             self?.snapshotRetryTask = nil
         }
     }
+}
+
+private func diagnosticsErrorText(prefix: String, error: Error) -> String {
+    if let decodingError = error as? DecodingError {
+        return "\(prefix): \(decodingErrorDescription(decodingError))"
+    }
+    return "\(prefix): \(error.localizedDescription)"
 }
 
 private func decodingErrorDescription(_ error: DecodingError) -> String {

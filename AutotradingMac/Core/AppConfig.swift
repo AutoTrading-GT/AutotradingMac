@@ -6,12 +6,19 @@
 import Foundation
 
 enum AppConfig {
+    static let debugBuildMarker = "AUTOTRADING_MAC_DEBUG_BUILD_20260320"
+    private static let forceDiagnosticEndpointMode = true
+    private static let diagnosticBackendBaseURL = URL(string: "http://127.0.0.1:8008")!
+    private static let diagnosticWebSocketURL = URL(string: "ws://127.0.0.1:8008/ws/events")!
     private static let defaultBackendBaseURL = "http://127.0.0.1:8008"
     private static let defaultWebSocketPath = "/ws/events"
     private static let backendEnvKey = "AUTOTRADING_BACKEND_BASE_URL"
     private static let websocketEnvKey = "AUTOTRADING_BACKEND_WS_URL"
 
     static var backendBaseURL: URL {
+        if forceDiagnosticEndpointMode {
+            return diagnosticBackendBaseURL
+        }
         let env = ProcessInfo.processInfo.environment[backendEnvKey]
         let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)
         let raw = (candidate?.isEmpty == false) ? candidate! : defaultBackendBaseURL
@@ -51,12 +58,23 @@ enum AppConfig {
     }
 
     static var webSocketURL: URL {
+        if forceDiagnosticEndpointMode {
+            return diagnosticWebSocketURL
+        }
         let env = ProcessInfo.processInfo.environment[websocketEnvKey]
         let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let candidate, !candidate.isEmpty, let url = URL(string: candidate) {
             return url
         }
         return deriveWebSocketURL(from: backendBaseURL)
+    }
+
+    static func printResolvedEndpoints() {
+        print("[\(debugBuildMarker)] forceDiagnosticEndpointMode=\(forceDiagnosticEndpointMode)")
+        print("[\(debugBuildMarker)] final base URL=\(backendBaseURL.absoluteString)")
+        print("[\(debugBuildMarker)] final snapshot URL=\(snapshotURL.absoluteString)")
+        print("[\(debugBuildMarker)] final runtime URL=\(runtimeURL.absoluteString)")
+        print("[\(debugBuildMarker)] final ws URL=\(webSocketURL.absoluteString)")
     }
 
     private static func deriveWebSocketURL(from baseURL: URL) -> URL {

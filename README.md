@@ -22,6 +22,9 @@
 - snapshot/runtime 디코딩은 서버 계약(`order_mode/account_mode`, `engine_*`, `account_summary`)을 기준으로 nullable 필드를 optional 처리
 - snapshot 최초 로드 실패 시 5초 주기로 자동 재시도하며, WS 연결 직후에도 snapshot 미로드 상태면 즉시 재시도
 - 백엔드 base URL은 `http://host:port`와 `http://host:port/api`를 모두 허용하며 API 경로를 자동 정규화
+- 임시 진단 모드(2026-03-20):
+  - 앱이 실제 붙는 endpoint를 강제 확인하기 위해 base/ws를 `127.0.0.1:8008`로 고정 가능
+  - 앱 시작/REST 요청/WS 연결 단계별 URL·status·응답 body prefix 로그를 콘솔에 출력
 - 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
 - 스타일 토큰 매핑 파일: `AutotradingMac/Core/DesignTokens.swift`
   - 출처: `design_ref/figma_web_export/src/styles/theme.css` (.dark 토큰)

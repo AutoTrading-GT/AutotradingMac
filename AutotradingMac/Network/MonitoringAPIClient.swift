@@ -70,11 +70,18 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         var request = URLRequest(url: snapshotURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 10
+        logRequest(request, context: "snapshot")
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw MonitoringAPIError.invalidResponse
         }
+        logResponse(
+            context: "snapshot",
+            url: request.url,
+            statusCode: http.statusCode,
+            data: data
+        )
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
@@ -89,11 +96,18 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         var request = URLRequest(url: runtimeURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 10
+        logRequest(request, context: "runtime")
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw MonitoringAPIError.invalidResponse
         }
+        logResponse(
+            context: "runtime",
+            url: request.url,
+            statusCode: http.statusCode,
+            data: data
+        )
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
@@ -233,5 +247,18 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
             return nil
         }
         return detail
+    }
+
+    private func logRequest(_ request: URLRequest, context: String) {
+        let method = request.httpMethod ?? "GET"
+        let url = request.url?.absoluteString ?? "<nil-url>"
+        print("[MonitoringAPIClient][\(context)] request \(method) \(url)")
+    }
+
+    private func logResponse(context: String, url: URL?, statusCode: Int, data: Data) {
+        let requestURL = url?.absoluteString ?? "<nil-url>"
+        let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+        print("[MonitoringAPIClient][\(context)] status=\(statusCode) url=\(requestURL)")
+        print("[MonitoringAPIClient][\(context)] body=\(body.prefix(500))")
     }
 }

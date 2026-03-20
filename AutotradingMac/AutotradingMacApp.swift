@@ -11,6 +11,10 @@ import SwiftUI
 struct AutotradingMacApp: App {
     @StateObject private var store = MonitoringStore()
 
+    init() {
+        AppConfig.printResolvedEndpoints()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
