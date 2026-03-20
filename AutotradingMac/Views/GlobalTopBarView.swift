@@ -313,7 +313,14 @@ struct GlobalTopBarView: View {
         if let error = store.lastErrorMessage, error.contains("엔진 제어 실패") {
             return error
         }
-        return store.engineActionResultMessage
+        guard let message = store.engineActionResultMessage else {
+            return nil
+        }
+        let normalized = message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized == "engine started" || normalized == "engine paused" {
+            return nil
+        }
+        return message
     }
 
     private var controlFeedbackIcon: String {
