@@ -71,12 +71,41 @@ struct MarketView: View {
     }
 
     private var scannerHeader: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Spacer()
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("종목 스캔")
+                    .font(.title3.weight(.semibold))
 
-            Text("마지막 갱신 \(DisplayFormatters.dateTime(store.lastUpdatedAt))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                HStack(spacing: 14) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text("자동 갱신")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("최근 스캔: \(lastScanRelativeText)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            Picker("", selection: $scanMode) {
+                ForEach(ScannerMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
         }
     }
 
@@ -90,14 +119,6 @@ struct MarketView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
-            Picker("", selection: $scanMode) {
-                ForEach(ScannerMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: .infinity)
 
             VStack(spacing: 0) {
                 scannerTableHeader
@@ -136,8 +157,7 @@ struct MarketView: View {
     private var scannerDetailPane: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let selectedCandidate {
-                summaryCard(for: selectedCandidate)
-                chartCard(for: selectedCandidate)
+                detailPanel(for: selectedCandidate)
                     .frame(maxHeight: .infinity, alignment: .top)
             } else {
                 ContentUnavailableView(
@@ -153,88 +173,100 @@ struct MarketView: View {
         .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    private func summaryCard(for candidate: ScannerCandidate) -> some View {
+    private func detailPanel(for candidate: ScannerCandidate) -> some View {
         let trend = TrendDirection.from(changePercent: candidate.row.changePct)
         let signal = latestSignal(for: candidate.code)
         let holding = isHolding(code: candidate.code)
-        let scoreText = "\(candidate.score)점"
-        let scoreTone: StatusTone = candidate.score >= 75 ? .success : (candidate.score >= 50 ? .warning : .neutral)
+        let points = chartPoints(for: candidate)
+        let metrics = chartMetrics(from: points, currentPrice: candidate.row.price, changePct: candidate.row.changePct)
+        let score = candidate.score
+        let scoreTone: StatusTone = score >= 75 ? .success : (score >= 50 ? .warning : .neutral)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(candidate.displayName)
-                        .font(.title3.weight(.semibold))
-                    Text(candidate.code)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(candidate.displayName)
+                            .font(.title3.weight(.semibold))
+                        Text(candidate.code)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("스캔 점수")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(score)")
+                            .font(.title3.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(scoreTone.foreground)
+                    }
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
+
+                HStack(alignment: .center, spacing: 10) {
                     Text(DisplayFormatters.krw(candidate.row.price))
-                        .font(.title3.weight(.semibold))
+                        .font(.title2.monospacedDigit().weight(.semibold))
+
                     HStack(spacing: 6) {
-                        Text("\(trend.symbol) \(DisplayFormatters.signedPercent(candidate.row.changePct))")
+                        if trend == .up {
+                            Image(systemName: "arrow.up.right")
+                        } else if trend == .down {
+                            Image(systemName: "arrow.down.right")
+                        }
+                        Text("\(DisplayFormatters.signedPercent(candidate.row.changePct))")
                         Text("(\(DisplayFormatters.signedNumber(changeValue(for: candidate.row))))")
                     }
-                    .font(.caption.weight(.medium))
+                    .font(.subheadline.monospacedDigit().weight(.semibold))
                     .foregroundStyle(trend.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(trend == .up ? Color.red.opacity(0.15) : (trend == .down ? Color.blue.opacity(0.15) : Color.secondary.opacity(0.15)))
+                    )
                 }
-            }
 
-            HStack(spacing: 8) {
-                StatusBadge(text: holding ? "보유 중" : "미보유", tone: holding ? .warning : .neutral)
-                if let signal, !signal.isEmpty {
-                    StatusBadge(text: "최근 신호 \(signal)", tone: .fromStatus(signal))
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("스캔 점수")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    StatusBadge(text: scoreText, tone: scoreTone)
-                }
-                ProgressView(value: Double(candidate.score), total: 100)
-                    .tint(scoreTone.foreground)
-                Text("거래대금/등락률/순위를 100점 기준으로 단순 가중치 환산한 관찰용 점수입니다.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-        .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func chartCard(for candidate: ScannerCandidate) -> some View {
-        let points = chartPoints(for: candidate)
-        let trend = TrendDirection.from(changePercent: candidate.row.changePct)
-        let metrics = chartMetrics(from: points, currentPrice: candidate.row.price, changePct: candidate.row.changePct)
-
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Spacer()
-                Picker("", selection: $chartTimeframe) {
-                    ForEach(ChartTimeframe.allCases) { timeframe in
-                        Text(timeframe.title).tag(timeframe)
+                HStack(spacing: 8) {
+                    StatusBadge(text: holding ? "보유 중" : "미보유", tone: holding ? .warning : .neutral)
+                    if let signal, !signal.isEmpty {
+                        StatusBadge(text: "최근 신호 \(signal)", tone: .fromStatus(signal))
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 260)
             }
+            .padding(14)
+
+            Divider().opacity(0.5)
+
+            HStack {
+                Text("차트")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                HStack {
+                    Picker("", selection: $chartTimeframe) {
+                        ForEach(ChartTimeframe.allCases) { timeframe in
+                            Text(timeframe.title).tag(timeframe)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 260)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider().opacity(0.5)
 
             ScannerLineChartView(points: points, trend: trend)
                 .frame(minHeight: 220, maxHeight: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
 
+            Divider().opacity(0.5)
             chartSupportInfoRow(metrics: metrics)
-
-            Text(candidate.reason)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
         }
-        .padding()
-        .frame(maxHeight: .infinity, alignment: .top)
         .background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
     }
 
@@ -458,6 +490,15 @@ struct MarketView: View {
         guard abs(denominator) > 0.0001 else { return nil }
         let previousClose = price / denominator
         return price - previousClose
+    }
+
+    private var lastScanRelativeText: String {
+        guard let last = store.lastUpdatedAt else { return "대기 중" }
+        let delta = max(Int(Date().timeIntervalSince(last)), 0)
+        if delta < 10 { return "방금 전" }
+        if delta < 60 { return "\(delta)초 전" }
+        if delta < 3600 { return "\(delta / 60)분 전" }
+        return "\(delta / 3600)시간 전"
     }
 }
 
