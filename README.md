@@ -22,8 +22,7 @@
 - snapshot/runtime 디코딩은 서버 계약(`order_mode/account_mode`, `engine_*`, `account_summary`)을 기준으로 nullable 필드를 optional 처리
 - snapshot 최초 로드 실패 시 5초 주기로 자동 재시도하며, WS 연결 직후에도 snapshot 미로드 상태면 즉시 재시도
 - 백엔드 base URL은 `http://host:port`와 `http://host:port/api`를 모두 허용하며 API 경로를 자동 정규화
-- 임시 진단 모드(2026-03-20):
-  - 앱이 실제 붙는 endpoint를 강제 확인하기 위해 base/ws를 `127.0.0.1:8008`로 고정 가능
+- 임시 진단 로그(2026-03-20):
   - 앱 시작/REST 요청/WS 연결 단계별 URL·status·응답 body prefix 로그를 콘솔에 출력
 - 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
 - 스타일 토큰 매핑 파일: `AutotradingMac/Core/DesignTokens.swift`
@@ -95,8 +94,13 @@
 ## 백엔드 URL 설정
 Xcode Scheme 환경변수로 설정 가능합니다.
 
-- `AUTOTRADING_BACKEND_BASE_URL` (기본값: `http://127.0.0.1:8008`)
-- `AUTOTRADING_BACKEND_WS_URL` (미설정 시 BASE_URL에서 `/ws/events` 자동 파생)
+- `AUTOTRADING_BACKEND_BASE_URL` (필수 권장)
+- `AUTOTRADING_BACKEND_WS_URL` (선택, 미설정 시 BASE_URL에서 `/ws/events` 자동 파생)
+
+주의:
+- macOS 앱이 로컬에서 실행되고 백엔드가 원격 Linux 서버에서 실행되는 경우 `127.0.0.1`을 사용하면 안 됩니다.
+- `127.0.0.1`은 Mac 자기 자신을 가리키므로, 반드시 원격 서버 IP 또는 도메인으로 설정해야 합니다.
+- URL 환경변수가 비어 있으면 앱은 `backend-url-not-configured.invalid` placeholder로 실패하도록 동작하며, 시작 로그에서 최종 URL을 확인할 수 있습니다.
 
 ## 로컬 실행
 1. macOS에서 `AutotradingMac.xcodeproj` 오픈

@@ -7,22 +7,27 @@ import Foundation
 
 enum AppConfig {
     static let debugBuildMarker = "AUTOTRADING_MAC_DEBUG_BUILD_20260320"
-    private static let forceDiagnosticEndpointMode = true
-    private static let diagnosticBackendBaseURL = URL(string: "http://127.0.0.1:8008")!
-    private static let diagnosticWebSocketURL = URL(string: "ws://127.0.0.1:8008/ws/events")!
-    private static let defaultBackendBaseURL = "http://127.0.0.1:8008"
+    private static let unresolvedBackendBaseURL = URL(string: "http://backend-url-not-configured.invalid")!
+    private static let unresolvedWebSocketURL = URL(string: "ws://backend-url-not-configured.invalid/ws/events")!
     private static let defaultWebSocketPath = "/ws/events"
     private static let backendEnvKey = "AUTOTRADING_BACKEND_BASE_URL"
     private static let websocketEnvKey = "AUTOTRADING_BACKEND_WS_URL"
+    private static let explicitBackendBaseURL: URL? = nil
+    private static let explicitWebSocketURL: URL? = nil
 
     static var backendBaseURL: URL {
-        if forceDiagnosticEndpointMode {
-            return diagnosticBackendBaseURL
+        if let explicitBackendBaseURL {
+            return explicitBackendBaseURL
         }
+
         let env = ProcessInfo.processInfo.environment[backendEnvKey]
         let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let raw = (candidate?.isEmpty == false) ? candidate! : defaultBackendBaseURL
-        return normalizedBackendURL(raw) ?? URL(string: defaultBackendBaseURL)!
+        if let candidate, !candidate.isEmpty {
+            return normalizedBackendURL(candidate) ?? unresolvedBackendBaseURL
+        }
+
+        print("[\(debugBuildMarker)] WARNING: \(backendEnvKey) is not set. Using unresolved backend URL placeholder.")
+        return unresolvedBackendBaseURL
     }
 
     static var snapshotURL: URL {
@@ -58,19 +63,23 @@ enum AppConfig {
     }
 
     static var webSocketURL: URL {
-        if forceDiagnosticEndpointMode {
-            return diagnosticWebSocketURL
+        if let explicitWebSocketURL {
+            return explicitWebSocketURL
         }
+
         let env = ProcessInfo.processInfo.environment[websocketEnvKey]
         let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let candidate, !candidate.isEmpty, let url = URL(string: candidate) {
             return url
         }
+        if backendBaseURL.host == unresolvedBackendBaseURL.host {
+            print("[\(debugBuildMarker)] WARNING: \(websocketEnvKey) is not set and backend URL is unresolved.")
+            return unresolvedWebSocketURL
+        }
         return deriveWebSocketURL(from: backendBaseURL)
     }
 
     static func printResolvedEndpoints() {
-        print("[\(debugBuildMarker)] forceDiagnosticEndpointMode=\(forceDiagnosticEndpointMode)")
         print("[\(debugBuildMarker)] final base URL=\(backendBaseURL.absoluteString)")
         print("[\(debugBuildMarker)] final snapshot URL=\(snapshotURL.absoluteString)")
         print("[\(debugBuildMarker)] final runtime URL=\(runtimeURL.absoluteString)")
@@ -79,7 +88,7 @@ enum AppConfig {
 
     private static func deriveWebSocketURL(from baseURL: URL) -> URL {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
-            return URL(string: "ws://127.0.0.1:8008\(defaultWebSocketPath)")!
+            return unresolvedWebSocketURL
         }
         if components.scheme == "https" {
             components.scheme = "wss"
@@ -89,7 +98,7 @@ enum AppConfig {
         components.path = defaultWebSocketPath
         components.query = nil
         components.fragment = nil
-        return components.url ?? URL(string: "ws://127.0.0.1:8008\(defaultWebSocketPath)")!
+        return components.url ?? unresolvedWebSocketURL
     }
 
     private static func apiEndpoint(_ suffix: String) -> URL {
