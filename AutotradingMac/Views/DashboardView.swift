@@ -266,7 +266,7 @@ struct DashboardView: View {
                                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                                     .frame(width: 62, alignment: .leading)
                                 Circle()
-                                    .fill(item.tone.color)
+                                    .fill(item.tone.foreground)
                                     .frame(width: 7, height: 7)
                                 Text(item.message)
                                     .font(.callout)
