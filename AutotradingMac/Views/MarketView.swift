@@ -268,7 +268,7 @@ struct MarketView: View {
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
                 HStack {
-                    Picker("", selection: $chartTimeframe) {
+                    Picker("", selection: chartTimeframe) {
                         ForEach(ChartTimeframeOption.allCases) { timeframe in
                             Text(timeframe.title).tag(timeframe)
                         }
