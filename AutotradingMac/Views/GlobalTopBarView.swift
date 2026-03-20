@@ -351,7 +351,10 @@ struct GlobalTopBarView: View {
             return nil
         }
         let normalized = message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if normalized == "engine started" || normalized == "engine paused" {
+        if normalized == "engine started"
+            || normalized == "engine paused"
+            || normalized.contains("account mode")
+            || normalized.contains("order mode") {
             return nil
         }
         return message
