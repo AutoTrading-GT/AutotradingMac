@@ -709,3 +709,10 @@ private func timeString(_ date: Date) -> String {
     formatter.dateFormat = "HH:mm:ss"
     return formatter.string(from: date)
 }
+
+#Preview("Dashboard") {
+    DashboardView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

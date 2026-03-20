@@ -87,3 +87,10 @@ struct OrdersFillsView: View {
         }
     }
 }
+
+#Preview("Orders / Fills") {
+    OrdersFillsView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

@@ -79,3 +79,10 @@ struct SignalsRiskView: View {
         }
     }
 }
+
+#Preview("Signals / Risk") {
+    SignalsRiskView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

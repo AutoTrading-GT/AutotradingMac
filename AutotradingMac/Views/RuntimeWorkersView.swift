@@ -61,3 +61,10 @@ struct RuntimeWorkersView: View {
         .padding()
     }
 }
+
+#Preview("Runtime / Workers") {
+    RuntimeWorkersView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

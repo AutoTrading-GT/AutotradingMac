@@ -631,3 +631,10 @@ private struct LogDetailPanel: View {
         }
     }
 }
+
+#Preview("Logs") {
+    LogsView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

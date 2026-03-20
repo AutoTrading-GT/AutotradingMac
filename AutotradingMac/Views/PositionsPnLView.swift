@@ -149,3 +149,10 @@ struct PositionsPnLView: View {
         return DesignTokens.Colors.textSecondary
     }
 }
+
+#Preview("Positions / PnL") {
+    PositionsPnLView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

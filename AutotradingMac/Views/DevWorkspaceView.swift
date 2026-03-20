@@ -229,3 +229,10 @@ enum DevSubsection: String, CaseIterable, Identifiable {
         }
     }
 }
+
+#Preview("Dev Workspace") {
+    DevWorkspaceView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

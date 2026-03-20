@@ -30,3 +30,10 @@ struct ChartView: View {
         .padding()
     }
 }
+
+#Preview("Chart") {
+    ChartView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}

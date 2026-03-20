@@ -19,6 +19,9 @@
   - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
+- 페이지별 SwiftUI `#Preview` 지원
+  - Dashboard / Scanner / Chart / Stategy / Logs / Settings / Dev
+  - Dev 하위(`Signals / Risk`, `Orders / Fills`, `Positions / PnL`, `Runtime / Workers`) 및 `GlobalTopBarView` 포함
 - snapshot/runtime 디코딩은 서버 계약(`order_mode/account_mode`, `engine_*`, `account_summary`)을 기준으로 nullable 필드를 optional 처리
 - snapshot 최초 로드 실패 시 5초 주기로 자동 재시도하며, WS 연결 직후에도 snapshot 미로드 상태면 즉시 재시도
 - 백엔드 base URL은 `http://host:port`와 `http://host:port/api`를 모두 허용하며 API 경로를 자동 정규화

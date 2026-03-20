@@ -478,3 +478,11 @@ private struct TopBarActionButtonStyle: ButtonStyle {
         }
     }
 }
+
+#Preview("Global Top Bar") {
+    GlobalTopBarView()
+        .environmentObject(MonitoringStore())
+        .padding()
+        .frame(width: 1148, height: 90)
+        .background(AppTheme.contentBackground)
+}

@@ -113,3 +113,9 @@ enum ConsoleSection: String, CaseIterable, Identifiable {
         }
     }
 }
+
+#Preview("App Shell") {
+    AppShellView()
+        .environmentObject(MonitoringStore())
+        .frame(width: 1360, height: 760)
+}

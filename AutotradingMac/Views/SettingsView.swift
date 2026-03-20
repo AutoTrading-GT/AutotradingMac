@@ -597,3 +597,17 @@ private struct StrategyActionButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.85 : 1.0)
     }
 }
+
+#Preview("Settings") {
+    SettingsView(mode: .settings)
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}
+
+#Preview("Stategy") {
+    SettingsView(mode: .stategy)
+        .environmentObject(MonitoringStore())
+        .frame(width: 1148, height: 612)
+        .background(AppTheme.contentBackground)
+}
