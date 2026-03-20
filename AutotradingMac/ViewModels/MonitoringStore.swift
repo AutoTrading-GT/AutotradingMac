@@ -719,6 +719,8 @@ final class MonitoringStore: ObservableObject {
                 realizedPnl: payload.realizedPnl,
                 realizedPnlPct: payload.realizedPnlPct,
                 reason: payload.reason,
+                orderMode: payload.orderMode,
+                executionMode: payload.executionMode,
                 createdAt: payload.timestamp
             ),
             at: 0

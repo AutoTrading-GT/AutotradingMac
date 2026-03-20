@@ -151,4 +151,6 @@ struct PositionClosedPayload: Decodable {
     let realizedPnl: Double
     let realizedPnlPct: Double
     let reason: String
+    let orderMode: String?
+    let executionMode: String?
 }
