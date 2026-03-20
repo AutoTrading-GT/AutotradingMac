@@ -12,22 +12,12 @@ enum AppConfig {
     private static let defaultWebSocketPath = "/ws/events"
     private static let backendEnvKey = "AUTOTRADING_BACKEND_BASE_URL"
     private static let websocketEnvKey = "AUTOTRADING_BACKEND_WS_URL"
-    private static let explicitBackendBaseURL: URL? = nil
-    private static let explicitWebSocketURL: URL? = nil
+    private static let explicitBackendBaseURLString: String? = nil
+    private static let explicitWebSocketURLString: String? = nil
+    private static let effectiveBackendResolution = resolveBackendBaseURL()
 
     static var backendBaseURL: URL {
-        if let explicitBackendBaseURL {
-            return explicitBackendBaseURL
-        }
-
-        let env = ProcessInfo.processInfo.environment[backendEnvKey]
-        let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let candidate, !candidate.isEmpty {
-            return normalizedBackendURL(candidate) ?? unresolvedBackendBaseURL
-        }
-
-        print("[\(debugBuildMarker)] WARNING: \(backendEnvKey) is not set. Using unresolved backend URL placeholder.")
-        return unresolvedBackendBaseURL
+        effectiveBackendResolution.url
     }
 
     static var snapshotURL: URL {
@@ -63,15 +53,17 @@ enum AppConfig {
     }
 
     static var webSocketURL: URL {
-        if let explicitWebSocketURL {
-            return explicitWebSocketURL
-        }
-
-        let env = ProcessInfo.processInfo.environment[websocketEnvKey]
-        let candidate = env?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let candidate, !candidate.isEmpty, let url = URL(string: candidate) {
+        let env = ProcessInfo.processInfo.environment[websocketEnvKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let env, !env.isEmpty, let url = URL(string: env) {
             return url
         }
+
+        if let explicit = explicitWebSocketURLString?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicit.isEmpty,
+           let url = URL(string: explicit) {
+            return url
+        }
+
         if backendBaseURL.host == unresolvedBackendBaseURL.host {
             print("[\(debugBuildMarker)] WARNING: \(websocketEnvKey) is not set and backend URL is unresolved.")
             return unresolvedWebSocketURL
@@ -80,6 +72,7 @@ enum AppConfig {
     }
 
     static func printResolvedEndpoints() {
+        print("[\(debugBuildMarker)] backend resolution source=\(effectiveBackendResolution.source)")
         print("[\(debugBuildMarker)] final base URL=\(backendBaseURL.absoluteString)")
         print("[\(debugBuildMarker)] final snapshot URL=\(snapshotURL.absoluteString)")
         print("[\(debugBuildMarker)] final runtime URL=\(runtimeURL.absoluteString)")
@@ -118,5 +111,21 @@ enum AppConfig {
         let trimmedPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         components.path = trimmedPath.isEmpty ? "" : "/\(trimmedPath)"
         return components.url
+    }
+
+    private static func resolveBackendBaseURL() -> (url: URL, source: String) {
+        let env = ProcessInfo.processInfo.environment[backendEnvKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let env, !env.isEmpty, let url = normalizedBackendURL(env) {
+            return (url, "env:\(backendEnvKey)")
+        }
+
+        if let explicit = explicitBackendBaseURLString?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicit.isEmpty,
+           let url = normalizedBackendURL(explicit) {
+            return (url, "explicit-setting")
+        }
+
+        print("[\(debugBuildMarker)] WARNING: \(backendEnvKey) is not set and explicit setting is empty. Using unresolved backend URL placeholder.")
+        return (unresolvedBackendBaseURL, "fallback-unresolved")
     }
 }

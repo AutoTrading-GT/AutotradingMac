@@ -97,6 +97,11 @@ Xcode Scheme 환경변수로 설정 가능합니다.
 - `AUTOTRADING_BACKEND_BASE_URL` (필수 권장)
 - `AUTOTRADING_BACKEND_WS_URL` (선택, 미설정 시 BASE_URL에서 `/ws/events` 자동 파생)
 
+URL 결정 우선순위:
+1. 환경변수
+2. 앱 명시 설정값(코드 상수)
+3. unresolved fallback(`backend-url-not-configured.invalid`)
+
 주의:
 - macOS 앱이 로컬에서 실행되고 백엔드가 원격 Linux 서버에서 실행되는 경우 `127.0.0.1`을 사용하면 안 됩니다.
 - `127.0.0.1`은 Mac 자기 자신을 가리키므로, 반드시 원격 서버 IP 또는 도메인으로 설정해야 합니다.
