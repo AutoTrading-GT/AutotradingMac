@@ -19,6 +19,9 @@
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
 - 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
+- 스타일 토큰 매핑 파일: `AutotradingMac/Core/DesignTokens.swift`
+  - 출처: `design_ref/figma_web_export/src/styles/theme.css` (.dark 토큰)
+  - 현재 단계: 토큰 정의만 추가(화면 일괄 적용은 후속)
 - 역할 분리
   - 운영 메인: Dashboard/Scanner/Chart/Logs/Settings
   - 개발/디버깅: Dev 하위 화면
