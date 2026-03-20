@@ -104,7 +104,7 @@ struct SettingsView: View {
             settingsRow(icon: "wifi", title: "연결 상태", value: connectionHealthText, tone: connectionStatusTone)
             settingsRow(
                 icon: "person.text.rectangle",
-                title: "계좌번호",
+                title: "계좌번호(마스킹)",
                 value: accountNumberText,
                 tone: accountStatusTone,
                 mono: true
@@ -137,7 +137,8 @@ struct SettingsView: View {
         settingsPanel(title: "정보") {
             settingsRow(title: "버전", value: appVersion, mono: true)
             settingsRow(title: "빌드", value: appBuild, mono: true)
-            settingsRow(title: "실행 모드", value: store.runtime?.executionMode ?? "-")
+            settingsRow(title: "주문 모드", value: store.runtime?.orderMode ?? "-")
+            settingsRow(title: "계좌정보 모드", value: store.runtime?.accountMode ?? "-")
             settingsRow(title: "앱 상태", value: store.runtime?.appStatus ?? "-")
             settingsRow(title: "환경", value: store.runtime?.env ?? "-")
         }
@@ -498,10 +499,6 @@ struct SettingsView: View {
     }
 
     private var accountNumberText: String {
-        if let accountNumber = store.runtime?.accountSummary?.accountNumber,
-           !accountNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return accountNumber
-        }
         if let masked = store.runtime?.accountSummary?.maskedAccount,
            !masked.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return masked

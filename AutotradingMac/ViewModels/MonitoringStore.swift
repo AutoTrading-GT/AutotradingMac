@@ -31,6 +31,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var engineActionInFlight: EngineControlAction?
     @Published private(set) var engineActionResultMessage: String?
+    @Published private(set) var modeSwitchInFlight: RuntimeModeSwitchTarget?
     @Published private(set) var selectedScannerCode: String?
 
     private let apiClient: MonitoringAPIClientProtocol
@@ -128,6 +129,40 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
+    func updateOrderMode(_ mode: String, confirmLive: Bool) async {
+        guard modeSwitchInFlight == nil else { return }
+        modeSwitchInFlight = .orderMode
+        defer { modeSwitchInFlight = nil }
+
+        do {
+            let result = try await apiClient.setOrderMode(mode, confirmLive: confirmLive)
+            applyEngineControlSnapshot(result.engine)
+            engineActionResultMessage = result.message
+            lastErrorMessage = nil
+            lastUpdatedAt = Date()
+            await reloadSnapshot()
+        } catch {
+            lastErrorMessage = "주문 모드 변경 실패: \(error.localizedDescription)"
+        }
+    }
+
+    func updateAccountMode(_ mode: String) async {
+        guard modeSwitchInFlight == nil else { return }
+        modeSwitchInFlight = .accountMode
+        defer { modeSwitchInFlight = nil }
+
+        do {
+            let result = try await apiClient.setAccountMode(mode)
+            applyEngineControlSnapshot(result.engine)
+            engineActionResultMessage = result.message
+            lastErrorMessage = nil
+            lastUpdatedAt = Date()
+            await reloadSnapshot()
+        } catch {
+            lastErrorMessage = "계좌 모드 변경 실패: \(error.localizedDescription)"
+        }
+    }
+
     func canPerformEngineAction(_ action: EngineControlAction) -> Bool {
         if let inFlight = engineActionInFlight, inFlight != action {
             return false
@@ -200,9 +235,15 @@ final class MonitoringStore: ObservableObject {
                 tone: .fromStatus(runtime.databaseStatus)
             ),
             RuntimeMetricCard(
-                id: "execution-mode",
-                title: "Execution Mode",
-                value: runtime.executionMode,
+                id: "order-mode",
+                title: "Order Mode",
+                value: runtime.orderMode,
+                tone: .info
+            ),
+            RuntimeMetricCard(
+                id: "account-mode",
+                title: "Account Mode",
+                value: runtime.accountMode,
                 tone: .info
             ),
             RuntimeMetricCard(
@@ -379,6 +420,13 @@ final class MonitoringStore: ObservableObject {
     private func applyEngineHealth(payload: EngineHealthPayload) {
         guard var runtime else { return }
         runtime.appStatus = payload.healthy ? "ready" : "degraded"
+        if let orderMode = payload.details?["order_mode"]?.stringValue {
+            runtime.orderMode = orderMode
+            runtime.executionMode = orderMode
+        }
+        if let accountMode = payload.details?["account_mode"]?.stringValue {
+            runtime.accountMode = accountMode
+        }
         if let executionMode = payload.details?["execution_mode"]?.stringValue {
             runtime.executionMode = executionMode
         }
@@ -419,6 +467,9 @@ final class MonitoringStore: ObservableObject {
         runtime.engineEmergencyLatched = snapshot.emergencyLatched
         runtime.engineAvailableActions = snapshot.availableActions
         runtime.engineUpdatedAt = snapshot.updatedAt
+        runtime.orderMode = snapshot.orderMode
+        runtime.accountMode = snapshot.accountMode
+        runtime.executionMode = snapshot.orderMode
         runtime.appStatus = snapshot.state == "emergency_stopped" ? "degraded" : runtime.appStatus
         self.runtime = runtime
     }
@@ -494,7 +545,8 @@ final class MonitoringStore: ObservableObject {
             orderQty: payload.qty,
             orderPrice: payload.orderPrice,
             status: payload.status,
-            executionMode: runtime?.executionMode,
+            orderMode: runtime?.orderMode,
+            executionMode: runtime?.executionMode ?? runtime?.orderMode,
             sourceSignalReference: payload.sourceSignalReference,
             brokerOrderId: nil,
             createdAt: payload.timestamp,
@@ -514,7 +566,8 @@ final class MonitoringStore: ObservableObject {
                 orderQty: payload.qty,
                 orderPrice: payload.orderPrice,
                 status: payload.status,
-                executionMode: previous.executionMode ?? runtime?.executionMode,
+                orderMode: previous.orderMode ?? runtime?.orderMode,
+                executionMode: previous.executionMode ?? runtime?.executionMode ?? runtime?.orderMode,
                 sourceSignalReference: payload.sourceSignalReference,
                 brokerOrderId: previous.brokerOrderId,
                 createdAt: previous.createdAt,
@@ -529,7 +582,8 @@ final class MonitoringStore: ObservableObject {
                 orderQty: payload.qty,
                 orderPrice: payload.orderPrice,
                 status: payload.status,
-                executionMode: runtime?.executionMode,
+                orderMode: runtime?.orderMode,
+                executionMode: runtime?.executionMode ?? runtime?.orderMode,
                 sourceSignalReference: payload.sourceSignalReference,
                 brokerOrderId: nil,
                 createdAt: payload.timestamp,
@@ -549,7 +603,8 @@ final class MonitoringStore: ObservableObject {
             side: payload.side ?? "-",
             filledQty: payload.filledQty,
             filledPrice: payload.filledPrice,
-            executionMode: runtime?.executionMode,
+            orderMode: runtime?.orderMode,
+            executionMode: runtime?.executionMode ?? runtime?.orderMode,
             filledAt: payload.timestamp
         )
         if recentFills.contains(where: { $0.fillId == row.fillId }) {
@@ -752,4 +807,9 @@ enum EngineControlAction: Equatable {
             return "해제"
         }
     }
+}
+
+enum RuntimeModeSwitchTarget: Equatable {
+    case orderMode
+    case accountMode
 }

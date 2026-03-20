@@ -122,6 +122,12 @@ struct DashboardView: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                 }
+                Text("주문 모드: \((store.runtime?.orderMode ?? "paper").uppercased())")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                Text("계좌 기준: \((store.runtime?.accountMode ?? "paper").uppercased())")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
                 Spacer(minLength: 8)
                 if !accountSummary.available {
                     Text(accountSummary.unavailableReason ?? "계좌 정보를 조회할 수 없습니다.")

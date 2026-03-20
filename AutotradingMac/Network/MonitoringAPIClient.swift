@@ -12,6 +12,8 @@ protocol MonitoringAPIClientProtocol {
     func pauseEngine() async throws -> EngineControlCommandResponse
     func emergencyStopEngine() async throws -> EngineControlCommandResponse
     func clearEmergencyStop() async throws -> EngineControlCommandResponse
+    func setOrderMode(_ mode: String, confirmLive: Bool) async throws -> EngineModeCommandResponse
+    func setAccountMode(_ mode: String) async throws -> EngineModeCommandResponse
 }
 
 enum MonitoringAPIError: LocalizedError {
@@ -39,6 +41,8 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     private let enginePauseURL: URL
     private let engineEmergencyStopURL: URL
     private let engineClearEmergencyStopURL: URL
+    private let engineOrderModeURL: URL
+    private let engineAccountModeURL: URL
 
     init(
         session: URLSession = .shared,
@@ -47,7 +51,9 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         engineStartURL: URL = AppConfig.engineStartURL,
         enginePauseURL: URL = AppConfig.enginePauseURL,
         engineEmergencyStopURL: URL = AppConfig.engineEmergencyStopURL,
-        engineClearEmergencyStopURL: URL = AppConfig.engineClearEmergencyStopURL
+        engineClearEmergencyStopURL: URL = AppConfig.engineClearEmergencyStopURL,
+        engineOrderModeURL: URL = AppConfig.engineOrderModeURL,
+        engineAccountModeURL: URL = AppConfig.engineAccountModeURL
     ) {
         self.session = session
         self.snapshotURL = snapshotURL
@@ -56,6 +62,8 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         self.enginePauseURL = enginePauseURL
         self.engineEmergencyStopURL = engineEmergencyStopURL
         self.engineClearEmergencyStopURL = engineClearEmergencyStopURL
+        self.engineOrderModeURL = engineOrderModeURL
+        self.engineAccountModeURL = engineAccountModeURL
     }
 
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
@@ -105,6 +113,22 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         try await sendEngineCommand(to: engineClearEmergencyStopURL)
     }
 
+    func setOrderMode(_ mode: String, confirmLive: Bool) async throws -> EngineModeCommandResponse {
+        try await sendModeCommand(
+            to: engineOrderModeURL,
+            mode: mode,
+            confirmLive: confirmLive
+        )
+    }
+
+    func setAccountMode(_ mode: String) async throws -> EngineModeCommandResponse {
+        try await sendModeCommand(
+            to: engineAccountModeURL,
+            mode: mode,
+            confirmLive: false
+        )
+    }
+
     private func sendEngineCommand(to url: URL) async throws -> EngineControlCommandResponse {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -119,6 +143,28 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
         return try MonitoringCoding.decoder().decode(EngineControlCommandResponse.self, from: data)
+    }
+
+    private func sendModeCommand(
+        to url: URL,
+        mode: String,
+        confirmLive: Bool
+    ) async throws -> EngineModeCommandResponse {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = ["mode": mode, "confirm_live": confirmLive] as [String : Any]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MonitoringAPIError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
+        }
+        return try MonitoringCoding.decoder().decode(EngineModeCommandResponse.self, from: data)
     }
 
     private func parseErrorDetail(from data: Data) -> String? {

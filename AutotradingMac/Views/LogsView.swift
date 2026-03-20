@@ -181,7 +181,7 @@ struct LogsView: View {
                         status: order.status
                     ),
                     status: order.status,
-                    source: order.executionMode ?? "execution",
+                    source: order.orderMode ?? order.executionMode ?? "execution",
                     iconName: order.status.lowercased() == "rejected" ? "xmark.circle" : "shippingbox",
                     iconTone: .fromStatus(order.status),
                     metaPairs: [
@@ -190,7 +190,7 @@ struct LogsView: View {
                         .init(key: "order_qty", value: DisplayFormatters.number(order.orderQty)),
                         .init(key: "order_price", value: DisplayFormatters.number(order.orderPrice)),
                         .init(key: "status", value: order.status),
-                        .init(key: "execution_mode", value: order.executionMode ?? "-"),
+                        .init(key: "order_mode", value: order.orderMode ?? order.executionMode ?? "-"),
                         .init(key: "source_signal_reference", value: order.sourceSignalReference ?? "-"),
                         .init(key: "broker_order_id", value: order.brokerOrderId ?? "-")
                     ]
@@ -217,7 +217,7 @@ struct LogsView: View {
                         price: fill.filledPrice
                     ),
                     status: fill.side,
-                    source: fill.executionMode ?? "execution",
+                    source: fill.orderMode ?? fill.executionMode ?? "execution",
                     iconName: "checkmark.circle.fill",
                     iconTone: .success,
                     metaPairs: [
@@ -226,7 +226,7 @@ struct LogsView: View {
                         .init(key: "side", value: fill.side),
                         .init(key: "filled_qty", value: DisplayFormatters.number(fill.filledQty)),
                         .init(key: "filled_price", value: DisplayFormatters.number(fill.filledPrice)),
-                        .init(key: "execution_mode", value: fill.executionMode ?? "-")
+                        .init(key: "order_mode", value: fill.orderMode ?? fill.executionMode ?? "-")
                     ]
                 )
             }

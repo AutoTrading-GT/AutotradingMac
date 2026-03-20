@@ -69,6 +69,24 @@ struct GlobalTopBarView: View {
                 separatorPill
 
                 toolbarInfoPill(
+                    icon: "shippingbox.fill",
+                    title: "주문 모드",
+                    value: orderModeText,
+                    tone: orderModeTone
+                )
+
+                separatorPill
+
+                toolbarInfoPill(
+                    icon: "creditcard.fill",
+                    title: "계좌 기준",
+                    value: accountModeText,
+                    tone: accountModeTone
+                )
+
+                separatorPill
+
+                toolbarInfoPill(
                     icon: "clock.fill",
                     title: "장 상태",
                     value: marketStatusText,
@@ -251,6 +269,22 @@ struct GlobalTopBarView: View {
 
     private var isEmergencyStopped: Bool {
         (store.runtime?.engineState?.lowercased() ?? "") == "emergency_stopped"
+    }
+
+    private var orderModeText: String {
+        (store.runtime?.orderMode ?? "paper").uppercased()
+    }
+
+    private var accountModeText: String {
+        (store.runtime?.accountMode ?? "paper").uppercased()
+    }
+
+    private var orderModeTone: StatusTone {
+        (store.runtime?.orderMode ?? "paper").lowercased() == "live" ? .warning : .info
+    }
+
+    private var accountModeTone: StatusTone {
+        (store.runtime?.accountMode ?? "paper").lowercased() == "live" ? .warning : .info
     }
 
     private var marketStatusText: String {

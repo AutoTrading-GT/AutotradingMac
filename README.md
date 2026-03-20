@@ -43,14 +43,14 @@
   - 로그 미선택 시 우측 empty state 표시
 - Settings 페이지(운영형 2x2 패널)
   - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
-  - `API 연결` 패널에 `계좌번호` 표시(`runtime.account_summary.account_number` 우선)
+  - `API 연결` 패널에 마스킹 계좌 식별자 표시(`runtime.account_summary.masked_account` 우선)
   - `design_ref/figma_web_export/src/app/pages/SettingsPage.tsx` 정보구조를 SwiftUI로 반영
   - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`
   - `design_ref/figma_web_export/src/app/pages/StrategySettings.tsx` 정보구조를 SwiftUI로 반영
   - 패널: `현재 전략`, `매수 조건`, `매도 조건`, `전략 선택`, `위험 관리`
-  - 표시값은 `StrategyRuntimeConfig`가 읽는 실제 실행 환경값(`PAPER_*`, `RISK_*`, `EXECUTION_MODE`)과 코드 기본값을 사용
+  - 표시값은 `StrategyRuntimeConfig`가 읽는 실제 실행 환경값(`PAPER_*`, `RISK_*`, `ORDER_MODE`, fallback: `EXECUTION_MODE`)과 코드 기본값을 사용
   - `임시 저장`/`적용` 버튼은 현재 placeholder(비활성) 상태
 - Scanner 페이지(운영형 2-pane)
   - 상단 헤더: `종목 스캔` + `자동 갱신` + `최근 스캔` 상태, 우측에 스캔 기준 토글 배치
@@ -84,7 +84,7 @@
   - `runtime.account_summary.total_account_value`
   - `runtime.account_summary.cash_balance`
   - `runtime.account_summary.unrealized_pnl_total`
-  - 값 미가용 시 `-` 표시, 계좌 식별은 `account_number` 우선(부재 시 `masked_account`/`account_label` fallback)
+  - 값 미가용 시 `-` 표시, 계좌 식별은 `masked_account` 우선(`account_label` fallback)
 
 ## 백엔드 URL 설정
 Xcode Scheme 환경변수로 설정 가능합니다.

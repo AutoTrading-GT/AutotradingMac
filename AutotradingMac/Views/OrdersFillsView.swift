@@ -44,7 +44,7 @@ struct OrdersFillsView: View {
                         )
                     }
                     TableColumn("Mode") { row in
-                        Text(row.executionMode ?? "-")
+                        Text(row.orderMode ?? row.executionMode ?? "-")
                     }
                     TableColumn("Updated") { row in
                         Text(DisplayFormatters.dateTime(row.updatedAt))

@@ -24,7 +24,9 @@ struct RuntimeStatusSnapshot: Decodable {
     var appVersion: String
     var env: String
     var appStatus: String
-    var executionMode: String
+    var orderMode: String
+    var accountMode: String
+    var executionMode: String?
     var engineState: String?
     var engineAvailableActions: [String]?
     var engineTransitioningAction: String?
@@ -124,6 +126,7 @@ struct OrderSnapshotItem: Decodable, Identifiable {
     let orderQty: Double
     let orderPrice: Double?
     let status: String
+    let orderMode: String?
     let executionMode: String?
     let sourceSignalReference: String?
     let brokerOrderId: String?
@@ -140,6 +143,7 @@ struct FillSnapshotItem: Decodable, Identifiable {
     let side: String
     let filledQty: Double
     let filledPrice: Double
+    let orderMode: String?
     let executionMode: String?
     let filledAt: Date
 }
@@ -216,6 +220,9 @@ struct MarketRow: Identifiable {
 
 struct EngineControlSnapshot: Decodable {
     let state: String
+    let orderMode: String
+    let accountMode: String
+    let orderModeLiveAllowed: Bool
     let transitioningAction: String?
     let lastAction: String?
     let lastError: String?
@@ -228,6 +235,14 @@ struct EngineControlSnapshot: Decodable {
 struct EngineControlCommandResponse: Decodable {
     let ok: Bool
     let action: String
+    let message: String
+    let engine: EngineControlSnapshot
+}
+
+struct EngineModeCommandResponse: Decodable {
+    let ok: Bool
+    let target: String
+    let mode: String
     let message: String
     let engine: EngineControlSnapshot
 }

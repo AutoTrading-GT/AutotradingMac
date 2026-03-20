@@ -22,7 +22,11 @@ struct StrategyRuntimeConfig {
     static var current: StrategyRuntimeConfig {
         let env = ProcessInfo.processInfo.environment
         return StrategyRuntimeConfig(
-            executionMode: envString(env, key: "EXECUTION_MODE", default: "paper"),
+            executionMode: envString(
+                env,
+                key: "ORDER_MODE",
+                default: envString(env, key: "EXECUTION_MODE", default: "paper")
+            ),
             paperOrderQty: envDouble(env, key: "PAPER_ORDER_QTY", default: 1.0),
             paperTakeProfitPct: envDouble(env, key: "PAPER_TAKE_PROFIT_PCT", default: 0.03),
             paperStopLossPct: envDouble(env, key: "PAPER_STOP_LOSS_PCT", default: 0.02),

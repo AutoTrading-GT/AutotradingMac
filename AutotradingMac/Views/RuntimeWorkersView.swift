@@ -29,8 +29,12 @@ struct RuntimeWorkersView: View {
                     Text(store.runtime?.databaseStatus ?? "-")
                 }
                 GridRow {
-                    Text("Execution Mode").foregroundStyle(DesignTokens.Colors.textSecondary)
-                    Text(store.runtime?.executionMode ?? "-")
+                    Text("Order Mode").foregroundStyle(DesignTokens.Colors.textSecondary)
+                    Text(store.runtime?.orderMode ?? "-")
+                }
+                GridRow {
+                    Text("Account Mode").foregroundStyle(DesignTokens.Colors.textSecondary)
+                    Text(store.runtime?.accountMode ?? "-")
                 }
             }
             .padding()
