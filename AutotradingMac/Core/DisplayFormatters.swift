@@ -118,7 +118,7 @@ enum DisplayFormatters {
             let totalEokRounded = Int(eokValue.rounded())
             let jo = totalEokRounded / eokPerJo
             let remainderEok = totalEokRounded % eokPerJo
-            return "\(sign)\(jo)조 \(String(format: "%04d", remainderEok))억"
+            return "\(sign)\(jo)조 \(String(format: "%4d", remainderEok))억"
         }
 
         return "\(sign)\(String(format: "%.1f", roundedEokOneDecimal))억"
