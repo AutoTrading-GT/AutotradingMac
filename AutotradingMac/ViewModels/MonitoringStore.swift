@@ -56,7 +56,7 @@ final class MonitoringStore: ObservableObject {
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private let scannerStep = 10
-    private let scannerMaxLimit = 50
+    private let scannerMaxLimit = 30
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

@@ -195,7 +195,7 @@ struct MarketView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 8)
                         } else if !store.scannerCanLoadMore(mode: scanMode.rawValue), !candidates.isEmpty {
-                            Text("최대 50위까지 표시됨")
+                            Text("최대 30위까지 표시됨")
                                 .font(DesignTokens.Typography.caption)
                                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
