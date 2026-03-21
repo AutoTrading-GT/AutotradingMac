@@ -311,11 +311,11 @@ final class MonitoringStore: ObservableObject {
                 id: rankItem.code,
                 code: rankItem.code,
                 symbol: rankItem.symbol ?? tick?.symbol ?? "-",
-                rank: rankItem.rank,
+                rank: rankItem.displayRank ?? rankItem.rank,
                 rankingMode: rankItem.rankingMode ?? normalized,
                 price: tick?.price ?? rankItem.price,
-                changePct: tick?.changePct ?? rankItem.changePct,
-                metric: tick?.metric ?? rankItem.metric,
+                changePct: rankItem.changePct ?? tick?.changePct,
+                metric: rankItem.metric ?? tick?.metric,
                 source: tick?.source ?? rankItem.source,
                 updatedAt: tick?.timestamp ?? rankItem.capturedAt
             )
@@ -696,6 +696,7 @@ final class MonitoringStore: ObservableObject {
             code: payload.code,
             symbol: payload.symbol,
             rank: payload.rank,
+            displayRank: nil,
             metric: payload.metric,
             price: payload.payload?["price"]?.doubleValue,
             changePct: payload.payload?["change_pct"]?.doubleValue,

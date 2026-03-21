@@ -72,6 +72,10 @@
   - 좌측: 후보 리스트(순위/종목명/현재가/등락률/거래대금) 테이블형 정렬
   - 좌측 리스트 상단 토글: `거래대금 순위` / `급등률 순위`
   - 데이터 소스: `GET /api/monitoring/scanner/ranks?mode=turnover|surge&limit=...`
+  - 정렬 기준:
+    - `turnover`: `metric desc`
+    - `surge`: `change_pct desc`
+  - 좌측 순위 박스 숫자는 서버 `display_rank`(mode 정렬 결과 `index+1`)를 기준으로 표시
   - mode 전환 시 10건부터 재조회하고, 하단 스크롤 도달 시 10건씩 추가 로드(최대 50)
   - `거래대금`/`급등률`은 동일 pool 재정렬이 아니라 서버 mode별 독립 랭킹 결과를 사용
   - 좌측 순위는 선택 기준 정렬 결과를 숫자만 표시하며, 1~3위는 파란 계열 박스로 강조

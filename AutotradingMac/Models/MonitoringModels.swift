@@ -324,6 +324,7 @@ struct MarketRankSnapshotItem: Decodable, Identifiable {
     let code: String
     let symbol: String?
     let rank: Int?
+    let displayRank: Int?
     let metric: Double?
     let price: Double?
     let changePct: Double?
