@@ -66,7 +66,11 @@
   - Strategy 1단계는 read-only 브리핑 화면
   - 데이터 소스: `GET /api/monitoring/strategy-settings`
   - 섹션: `Scanner Settings`, `Signal Settings`, `Risk Settings`
-  - Scanner 섹션에는 스캔 점수 정의/가중치가 포함되며, 점수는 “후보 우선순위(관찰용)”임을 명시
+  - Scanner 섹션은 “스캔 점수 = 관찰용 후보 우선순위”를 중심으로 설명하며, 실전 매수 확률 점수로 오해되지 않게 안내
+  - 내부 구현 용어는 사용자 문구로 번역해 노출
+    - `turnover/surge` -> `거래대금 순위/급등률 순위`
+    - `new_entry/rank_jump/rank_maintained` -> `신규 진입 후보/순위 급상승/상위권 유지`
+  - 전략 이해에 직접 필요 없는 구현 항목(`페이지 증가 단위`, `스캔 최대 노출`, `후보군 상한`, `내부 소스명`)은 화면에서 숨김
   - 저장/적용 버튼은 제거되었고, 조회 전용으로 현재 운용 기준만 표시
 - Scanner 페이지(운영형 2-pane)
   - 상단 헤더: `종목 스캔` + `자동 갱신` + `최근 스캔` 상태, 우측에 스캔 기준 토글 배치
@@ -202,6 +206,7 @@ URL 결정 우선순위:
 23. `order_mode=live` 전환 실패 시 Dev에 `주문 모드 전환 실패`가 표시되고, top bar에는 오류 문구가 표시되지 않는지 확인
 24. `account_mode=live`에서 계좌 조회 실패 시 Dev에 `계좌정보 조회 실패`가 표시되고, Dashboard KPI가 즉시 비워지지 않는지 확인
 25. `Stategy` 페이지에서 `Scanner/Signal/Risk` 섹션이 `/api/monitoring/strategy-settings` 기준 read-only로 표시되고, 저장/적용 버튼이 노출되지 않는지 확인
+26. Strategy 페이지에서 내부 구현 필드 대신 사용자 설명 문구(후보 선정 기준, 신호 생성 기준, 리스크 게이트 기준)가 우선 노출되는지 확인
 
 ## 주의사항
 - 거래 실행/설정 저장 기능은 구현하지 않음 (read-only)

@@ -67,7 +67,7 @@ struct SettingsView: View {
 
     private var strategyContent: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
-            Text("Strategy Settings 1단계: read-only 브리핑")
+            Text("현재 운용 전략을 이해하기 위한 read-only 브리핑 화면입니다.")
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, 2)
@@ -118,55 +118,77 @@ struct SettingsView: View {
         ) {
             settingsRow(
                 icon: "scope",
-                title: "스캐너 점수 성격",
-                value: scanner.scoreDefinition.name,
-                tone: .neutral
+                title: "무엇을 위한 기준인가요?",
+                value: "시장 종목 후보를 빠르게 훑고 우선순위를 정하기 위한 스캐너 기준입니다.",
+                tone: .neutral,
+                multiline: true
             )
             settingsRow(
                 icon: "text.alignleft",
-                title: "설명",
+                title: "스캔 점수",
                 value: scanner.scoreDefinition.summary,
                 tone: .neutral,
                 multiline: true
             )
             settingsRow(
-                icon: "function",
-                title: "계산 기준",
-                value: scanner.scoreDefinition.formulaBasis,
+                icon: "chart.bar.doc.horizontal",
+                title: "점수 반영 요소",
+                value: "순위, 거래대금, 등락률을 함께 반영해 후보를 우선순위로 정렬합니다.",
                 tone: .neutral,
                 multiline: true
             )
             Divider().opacity(0.25)
             settingsRow(
                 icon: "line.3.horizontal.decrease.circle",
-                title: "지원 모드",
-                value: scanner.modes.joined(separator: ", ")
+                title: "기본 스캔 기준",
+                value: scannerModeLabel(scanner.defaultMode)
             )
-            settingsRow(title: "기본 모드", value: scanner.defaultMode)
-            settingsRow(title: "페이지 증가 단위", value: "\(scanner.pageStep)")
-            settingsRow(title: "스캔 최대 노출", value: "\(scanner.maxLimit)")
-            settingsRow(title: "후보군 상한", value: "\(scanner.candidateLimit)")
-            settingsRow(title: "랭킹 소스", value: scanner.rankingSource)
+            settingsRow(
+                title: "지원 스캔 기준",
+                value: scanner.modes.map(scannerModeLabel).joined(separator: " · ")
+            )
+            settingsRow(
+                icon: "info.circle",
+                title: "후보 선정 방식",
+                value: "거래대금 순위 기준 또는 급등률 순위 기준 중 선택한 방식으로 상위 후보를 정렬합니다.",
+                tone: .neutral,
+                multiline: true
+            )
+
+            if let minTurnover = scanner.minTurnover {
+                settingsRow(
+                    title: "최소 거래대금 필터",
+                    value: DisplayFormatters.metricKorean(minTurnover)
+                )
+            }
+            if let minChangePct = scanner.minChangePct {
+                settingsRow(
+                    title: "최소 등락률 필터",
+                    value: DisplayFormatters.percent(minChangePct)
+                )
+            }
 
             if let turnover = scanner.scoreDefinition.weights["turnover"] {
                 settingsRow(
                     icon: "chart.bar.xaxis",
-                    title: "가중치(turnover)",
-                    value: scoreWeightText(turnover)
+                    title: "거래대금 순위 기준 비중",
+                    value: scannerWeightSummary(weights: turnover),
+                    multiline: true
                 )
             }
             if let surge = scanner.scoreDefinition.weights["surge"] {
                 settingsRow(
                     icon: "chart.line.uptrend.xyaxis",
-                    title: "가중치(surge)",
-                    value: scoreWeightText(surge)
+                    title: "급등률 순위 기준 비중",
+                    value: scannerWeightSummary(weights: surge),
+                    multiline: true
                 )
             }
             ForEach(Array(scanner.scoreDefinition.notes.enumerated()), id: \.offset) { _, note in
                 settingsRow(
                     icon: "info.circle",
-                    title: "노트",
-                    value: note,
+                    title: "참고",
+                    value: localizedScannerNote(note),
                     tone: .neutral,
                     multiline: true
                 )
@@ -179,11 +201,31 @@ struct SettingsView: View {
             title: "Signal Settings",
             trailing: { StatusBadge(text: "Read-only", tone: .neutral) }
         ) {
-            settingsRow(title: "Top-N 범위", value: "\(signal.topN)")
-            settingsRow(title: "급상승 임계값", value: "\(signal.rankJumpThreshold)")
-            settingsRow(title: "급상승 윈도우(초)", value: "\(signal.rankJumpWindowSeconds)")
-            settingsRow(title: "유지 허용 편차", value: "\(signal.rankHoldTolerance)")
-            settingsRow(title: "활성 신호 타입", value: signal.enabledSignalTypes.joined(separator: ", "))
+            settingsRow(
+                icon: "dot.scope",
+                title: "무엇을 위한 기준인가요?",
+                value: "스캐너 후보 중 어떤 종목을 실제 관찰 신호로 올릴지 판단하는 기준입니다.",
+                tone: .neutral,
+                multiline: true
+            )
+            settingsRow(
+                title: "신호 판단 범위",
+                value: "상위 \(signal.topN)위 후보 내에서 신호를 생성합니다."
+            )
+            settingsRow(
+                title: "순위 급상승 조건",
+                value: "\(signal.rankJumpWindowSeconds)초 내 순위가 \(signal.rankJumpThreshold)단계 이상 좋아지면 급상승 신호로 봅니다.",
+                multiline: true
+            )
+            settingsRow(
+                title: "상위권 유지 조건",
+                value: "기준 순위 대비 ±\(signal.rankHoldTolerance)단계 이내면 상위권 유지 신호로 봅니다.",
+                multiline: true
+            )
+            settingsRow(
+                title: "활성 신호 유형",
+                value: signal.enabledSignalTypes.map(localizedSignalType).joined(separator: " · ")
+            )
         }
     }
 
@@ -192,23 +234,78 @@ struct SettingsView: View {
             title: "Risk Settings",
             trailing: { StatusBadge(text: "Read-only", tone: .neutral) }
         ) {
-            settingsRow(title: "허용 신호 타입", value: risk.allowedSignalTypes.joined(separator: ", "))
-            settingsRow(title: "최대 동시 후보", value: "\(risk.maxConcurrentCandidates)")
-            settingsRow(title: "쿨다운(분)", value: "\(risk.cooldownMinutes)")
-            settingsRow(title: "신호 윈도우(분)", value: "\(risk.signalWindowMinutes)")
-            settingsRow(title: "동시성 윈도우(분)", value: "\(risk.concurrencyWindowMinutes)")
+            settingsRow(
+                icon: "shield",
+                title: "무엇을 위한 기준인가요?",
+                value: "신호가 나와도 보수적으로 걸러서 과도한 진입을 막는 안전 기준입니다.",
+                tone: .neutral,
+                multiline: true
+            )
+            settingsRow(
+                title: "허용 신호 유형",
+                value: risk.allowedSignalTypes.map(localizedSignalType).joined(separator: " · ")
+            )
+            settingsRow(
+                title: "동시 승인 후보 수",
+                value: "최대 \(risk.maxConcurrentCandidates)종목"
+            )
+            settingsRow(
+                title: "재진입 대기 시간",
+                value: "동일 종목은 \(risk.cooldownMinutes)분 동안 재진입을 제한합니다.",
+                multiline: true
+            )
+            settingsRow(
+                title: "신호 유효 시간",
+                value: "최근 \(risk.signalWindowMinutes)분 이내 신호만 판정에 사용합니다.",
+                multiline: true
+            )
+            settingsRow(
+                title: "동시성 계산 시간창",
+                value: "최근 \(risk.concurrencyWindowMinutes)분 기준으로 동시 후보 수를 계산합니다.",
+                multiline: true
+            )
             settingsRow(
                 title: "보유 시 신규 진입 차단",
-                value: risk.blockWhenPositionExists ? "활성" : "비활성"
+                value: risk.blockWhenPositionExists ? "적용" : "미적용"
             )
         }
     }
 
-    private func scoreWeightText(_ weights: ScannerScoreWeightsSnapshot) -> String {
+    private func scannerWeightSummary(weights: ScannerScoreWeightsSnapshot) -> String {
         let rank = Int(weights.rank.rounded())
         let turnover = Int(weights.turnover.rounded())
         let change = Int(weights.changePct.rounded())
-        return "순위 \(rank) / 거래대금 \(turnover) / 등락률 \(change)"
+        return "순위 \(rank) · 거래대금 \(turnover) · 등락률 \(change) (가중치)"
+    }
+
+    private func scannerModeLabel(_ mode: String) -> String {
+        switch mode.lowercased() {
+        case "turnover":
+            return "거래대금 순위"
+        case "surge":
+            return "급등률 순위"
+        default:
+            return mode
+        }
+    }
+
+    private func localizedSignalType(_ type: String) -> String {
+        switch type.lowercased() {
+        case "new_entry":
+            return "신규 진입 후보"
+        case "rank_jump":
+            return "순위 급상승"
+        case "rank_maintained":
+            return "상위권 유지"
+        default:
+            return type
+        }
+    }
+
+    private func localizedScannerNote(_ note: String) -> String {
+        note
+            .replacingOccurrences(of: "turnover", with: "거래대금 순위")
+            .replacingOccurrences(of: "surge", with: "급등률 순위")
     }
 
     private var apiConnectionPanel: some View {
