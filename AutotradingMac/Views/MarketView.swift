@@ -165,6 +165,7 @@ struct MarketView: View {
                 ScrollView {
                     LazyVStack(spacing: ScannerLayout.rowSpacing) {
                         ForEach(candidates) { candidate in
+                            let isLastRow = candidate.id == candidates.last?.id
                             Button {
                                 store.setSelectedScannerCode(candidate.code)
                             } label: {
@@ -175,6 +176,12 @@ struct MarketView: View {
                             }
                             .buttonStyle(.plain)
                             .frame(height: ScannerLayout.rowHeight)
+                            .onAppear {
+                                guard isLastRow else { return }
+                                Task {
+                                    await store.loadMoreScannerRanksIfNeeded(mode: scanMode.rawValue)
+                                }
+                            }
                         }
 
                         if store.scannerIsLoading(mode: scanMode.rawValue) {
@@ -195,16 +202,6 @@ struct MarketView: View {
                                 .padding(.vertical, 8)
                         }
 
-                        if store.scannerCanLoadMore(mode: scanMode.rawValue) {
-                            Color.clear
-                                .frame(height: 1)
-                                .id("scanner-load-sentinel-\(scanMode.rawValue)-\(candidates.count)")
-                                .onAppear {
-                                    Task {
-                                        await store.loadMoreScannerRanksIfNeeded(mode: scanMode.rawValue)
-                                    }
-                                }
-                        }
                     }
                     .padding(.top, 6)
                     .padding(.horizontal, 2)

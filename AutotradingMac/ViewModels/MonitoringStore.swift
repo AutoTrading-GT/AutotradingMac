@@ -523,7 +523,9 @@ final class MonitoringStore: ObservableObject {
                 limit: normalizedLimit
             )
             scannerRankRowsByMode[normalizedMode] = response.data.sorted { lhs, rhs in
-                switch (lhs.rank, rhs.rank) {
+                let lhsRank = lhs.displayRank ?? lhs.rank
+                let rhsRank = rhs.displayRank ?? rhs.rank
+                switch (lhsRank, rhsRank) {
                 case let (l?, r?):
                     return l < r
                 case (.some, .none):
