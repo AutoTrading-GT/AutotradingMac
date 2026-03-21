@@ -329,18 +329,6 @@ struct MarketView: View {
             .padding(.horizontal, 14)
             .padding(.top, 10)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(chartDebugLine(series: series))
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                    .lineLimit(2)
-                Text("변화율 기준: 구간 전체(첫 봉 기준값 대비 마지막 종가)")
-                    .font(.caption2)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
-
             Divider().opacity(0.5)
 
             ZStack {
@@ -547,14 +535,6 @@ struct MarketView: View {
 
     private func latestSignal(for code: String) -> String? {
         store.recentSignals.first(where: { $0.code == code })?.signalType
-    }
-
-    private func chartDebugLine(series: ChartSeriesResponse?) -> String {
-        let first = series?.firstPointTs ?? series?.points.first?.ts
-        let last = series?.lastPointTs ?? series?.points.last?.ts
-        let source = series?.source ?? "-"
-        let basis = series?.aggregationBasis ?? "-"
-        return "TF: \(store.selectedChartTimeframe.rawValue) | source: \(source) | basis: \(basis) | first: \(DisplayFormatters.dateTime(first)) | last: \(DisplayFormatters.dateTime(last))"
     }
 
     private func isHolding(code: String) -> Bool {

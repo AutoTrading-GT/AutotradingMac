@@ -110,24 +110,6 @@ struct ChartView: View {
                 }
             }
 
-            HStack {
-                Spacer()
-                Text(series?.source ?? "source: -")
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-
-            Text(chartDebugLine(series: series))
-                .font(.caption2.monospaced())
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("변화율 기준: 구간 전체(첫 봉 기준값 대비 마지막 종가)")
-                .font(.caption2)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             ZStack {
                 TimeSeriesLineChartView(
                     points: points,
@@ -189,14 +171,6 @@ struct ChartView: View {
 
     private func marketRow(for code: String) -> MarketRow? {
         store.marketRows.first(where: { $0.code == code })
-    }
-
-    private func chartDebugLine(series: ChartSeriesResponse?) -> String {
-        let first = series?.firstPointTs ?? series?.points.first?.ts
-        let last = series?.lastPointTs ?? series?.points.last?.ts
-        let source = series?.source ?? "-"
-        let basis = series?.aggregationBasis ?? "-"
-        return "TF: \(store.selectedChartTimeframe.rawValue) | source: \(source) | basis: \(basis) | first: \(DisplayFormatters.dateTime(first)) | last: \(DisplayFormatters.dateTime(last))"
     }
 
     private func chartMetrics(points: [ChartPoint]) -> ChartMetrics {
