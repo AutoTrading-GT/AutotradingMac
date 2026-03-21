@@ -882,11 +882,12 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
         Self.previewSnapshot.runtime
     }
 
-    func fetchStrategySettings() async throws -> StrategySettingsSnapshot {
-        StrategySettingsSnapshot(
+    func fetchStrategySettings() async throws -> StrategySettingsResponseEnvelope {
+        let snapshot = StrategySettingsSnapshot(
             scanner: ScannerSettingsSnapshot(
                 modes: ["turnover", "surge"],
                 defaultMode: "turnover",
+                topN: 10,
                 pageStep: 10,
                 maxLimit: 30,
                 candidateLimit: 30,
@@ -920,6 +921,16 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
                 blockWhenPositionExists: true
             )
         )
+        return StrategySettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+    }
+
+    func updateStrategySettings(_ payload: StrategySettingsUpdatePayload) async throws -> StrategySettingsResponseEnvelope {
+        try await fetchStrategySettings()
     }
 
     func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse {

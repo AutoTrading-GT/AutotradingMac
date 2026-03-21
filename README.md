@@ -1,6 +1,7 @@
 # AutotradingMac (macOS Monitoring Console)
 
-읽기 전용 운영 콘솔입니다.  
+운영 콘솔 앱입니다.  
+기본적으로는 read-only 모니터링이며, Strategy 페이지에서 핵심 파라미터만 부분 수정할 수 있습니다.
 백엔드(`autotrading-core`)의 REST snapshot + WebSocket delta를 수신해 상태를 표시합니다.
 
 ## 현재 범위
@@ -63,15 +64,19 @@
   - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`
-  - Strategy 1단계는 read-only 브리핑 화면
+  - Strategy 2단계는 “설명 + 핵심 파라미터 부분 편집” 화면
   - 데이터 소스: `GET /api/monitoring/strategy-settings`
+  - 저장 API: `PATCH /api/monitoring/strategy-settings`
+  - 응답 메타(`defaults`, `apply_policy`, `updated_at`)를 함께 사용
+  - 편집 흐름: `server snapshot`과 `local draft` 분리, `취소`/`기본값 복원`/`저장` 제공
+  - 저장 전 로컬 검증 + 서버 검증(`422 detail`) 메시지 표시
   - 섹션: `Scanner Settings`, `Signal Settings`, `Risk Settings`
   - Scanner 섹션은 “스캔 점수 = 관찰용 후보 우선순위”를 중심으로 설명하며, 실전 매수 확률 점수로 오해되지 않게 안내
   - 내부 구현 용어는 사용자 문구로 번역해 노출
     - `turnover/surge` -> `거래대금 순위/급등률 순위`
     - `new_entry/rank_jump/rank_maintained` -> `신규 진입 후보/순위 급상승/상위권 유지`
   - 전략 이해에 직접 필요 없는 구현 항목(`페이지 증가 단위`, `스캔 최대 노출`, `후보군 상한`, `내부 소스명`)은 화면에서 숨김
-  - 저장/적용 버튼은 제거되었고, 조회 전용으로 현재 운용 기준만 표시
+  - 완성형 전략 빌더가 아니라 핵심 파라미터만 안전하게 조정 가능(템플릿/조건 블록 편집은 미지원)
 - Scanner 페이지(운영형 2-pane)
   - 상단 헤더: `종목 스캔` + `자동 갱신` + `최근 스캔` 상태, 우측에 스캔 기준 토글 배치
   - 좌측: 후보 리스트(순위/종목명/현재가/등락률/거래대금) 테이블형 정렬
@@ -205,11 +210,15 @@ URL 결정 우선순위:
 22. Dashboard `최근 7일 승률`이 현재 `order_mode` 기준으로 계산되어 mode 전환 시 값이 달라지는지 확인
 23. `order_mode=live` 전환 실패 시 Dev에 `주문 모드 전환 실패`가 표시되고, top bar에는 오류 문구가 표시되지 않는지 확인
 24. `account_mode=live`에서 계좌 조회 실패 시 Dev에 `계좌정보 조회 실패`가 표시되고, Dashboard KPI가 즉시 비워지지 않는지 확인
-25. `Stategy` 페이지에서 `Scanner/Signal/Risk` 섹션이 `/api/monitoring/strategy-settings` 기준 read-only로 표시되고, 저장/적용 버튼이 노출되지 않는지 확인
+25. `Stategy` 페이지에서 `Scanner/Signal/Risk` 섹션이 서버값을 로드하고 draft 변경 시 `변경 사항 있음` 상태가 표시되는지 확인
+26. `취소` 클릭 시 마지막 저장값으로 되돌아가는지 확인
+27. `기본값 복원` 클릭 시 시스템 기본 전략값이 draft로 반영되는지 확인(즉시 저장 아님)
+28. `저장` 클릭 시 `PATCH /api/monitoring/strategy-settings` 호출 후 `updated_at`이 갱신되는지 확인
+29. 잘못된 값 입력 시 저장 전 검증 메시지 또는 서버 `422 detail` 메시지가 표시되는지 확인
 26. Strategy 페이지에서 내부 구현 필드 대신 사용자 설명 문구(후보 선정 기준, 신호 생성 기준, 리스크 게이트 기준)가 우선 노출되는지 확인
 
 ## 주의사항
-- 거래 실행/설정 저장 기능은 구현하지 않음 (read-only)
+- 거래 실행 기능은 구현하지 않음(read-only monitoring 유지)
 - `시작/일시정지/긴급 정지/해제`는 백엔드 `/api/engine/*` 제어 API와 연결된다.
 - 긴급 정지는 확인 다이얼로그 후 실행되며, 복구는 반드시 `해제 -> 시작` 순서로 수행된다.
 - 백엔드 계약(`/api/monitoring/*`, `/ws/events`)을 변경하지 않는 전제

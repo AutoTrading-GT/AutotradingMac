@@ -10,6 +10,13 @@ import Combine
 final class MonitoringStore: ObservableObject {
     @Published private(set) var runtime: RuntimeStatusSnapshot?
     @Published private(set) var strategySettings: StrategySettingsSnapshot?
+    @Published private(set) var strategyDefaults: StrategySettingsSnapshot?
+    @Published private(set) var strategyDraft: StrategySettingsSnapshot?
+    @Published private(set) var strategyApplyPolicy: String?
+    @Published private(set) var strategyUpdatedAt: Date?
+    @Published private(set) var strategyDirty = false
+    @Published private(set) var strategySaveInFlight = false
+    @Published private(set) var strategyValidationMessages: [String] = []
     @Published private(set) var marketTopRanks: [MarketRankSnapshotItem] = []
     @Published private(set) var recentSignals: [SignalSnapshotItem] = []
     @Published private(set) var recentRiskDecisions: [RiskDecisionSnapshotItem] = []
@@ -59,6 +66,7 @@ final class MonitoringStore: ObservableObject {
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private let scannerStep = 10
     private let scannerMaxLimit = 30
+    private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained"]
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -134,14 +142,189 @@ final class MonitoringStore: ObservableObject {
 
     func reloadStrategySettings() async {
         do {
-            let settings = try await apiClient.fetchStrategySettings()
-            strategySettings = settings
+            let envelope = try await apiClient.fetchStrategySettings()
+            applyStrategySettingsEnvelope(envelope, preserveDirtyDraft: strategyDirty)
             lastStrategySettingsErrorMessage = nil
         } catch {
             lastStrategySettingsErrorMessage = diagnosticsErrorText(
                 prefix: "Strategy settings load failed",
                 error: error
             )
+        }
+    }
+
+    func updateStrategyScannerDefaultMode(_ mode: String) {
+        mutateStrategyDraft { draft in
+            draft.scanner.defaultMode = mode
+        }
+    }
+
+    func updateStrategyScannerTopN(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 1), 30)
+            draft.scanner.topN = normalized
+            draft.signal.topN = normalized
+        }
+    }
+
+    func updateStrategyScannerMinTurnover(_ value: Double?) {
+        mutateStrategyDraft { draft in
+            draft.scanner.minTurnover = value
+        }
+    }
+
+    func updateStrategyScannerMinChangePct(_ value: Double?) {
+        mutateStrategyDraft { draft in
+            draft.scanner.minChangePct = value
+        }
+    }
+
+    func updateStrategyScannerWeight(mode: String, key: String, value: Double) {
+        mutateStrategyDraft { draft in
+            guard var weights = draft.scanner.scoreDefinition.weights[mode] else { return }
+            let normalized = max(0, value)
+            switch key {
+            case "rank":
+                weights.rank = normalized
+            case "turnover":
+                weights.turnover = normalized
+            case "change_pct":
+                weights.changePct = normalized
+            default:
+                return
+            }
+            draft.scanner.scoreDefinition.weights[mode] = weights
+        }
+    }
+
+    func updateStrategySignalTopN(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 1), 30)
+            draft.signal.topN = normalized
+            draft.scanner.topN = normalized
+        }
+    }
+
+    func updateStrategyRankJumpThreshold(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.signal.rankJumpThreshold = min(max(value, 1), 50)
+        }
+    }
+
+    func updateStrategyRankJumpWindowSeconds(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.signal.rankJumpWindowSeconds = min(max(value, 10), 86_400)
+        }
+    }
+
+    func updateStrategyRankHoldTolerance(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.signal.rankHoldTolerance = min(max(value, 0), 20)
+        }
+    }
+
+    func updateStrategySignalTypeEnabled(_ type: String, isEnabled: Bool) {
+        mutateStrategyDraft { draft in
+            var current = Set(draft.signal.enabledSignalTypes)
+            if isEnabled {
+                current.insert(type)
+            } else {
+                current.remove(type)
+            }
+            draft.signal.enabledSignalTypes = strategySupportedSignalTypes.filter(current.contains)
+        }
+    }
+
+    func updateStrategyRiskTypeAllowed(_ type: String, isAllowed: Bool) {
+        mutateStrategyDraft { draft in
+            var current = Set(draft.risk.allowedSignalTypes)
+            if isAllowed {
+                current.insert(type)
+            } else {
+                current.remove(type)
+            }
+            draft.risk.allowedSignalTypes = strategySupportedSignalTypes.filter(current.contains)
+        }
+    }
+
+    func updateStrategyMaxConcurrentCandidates(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.risk.maxConcurrentCandidates = min(max(value, 1), 50)
+        }
+    }
+
+    func updateStrategyCooldownMinutes(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.risk.cooldownMinutes = min(max(value, 1), 1_440)
+        }
+    }
+
+    func updateStrategySignalWindowMinutes(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.risk.signalWindowMinutes = min(max(value, 1), 1_440)
+            if draft.risk.cooldownMinutes < draft.risk.signalWindowMinutes {
+                draft.risk.cooldownMinutes = draft.risk.signalWindowMinutes
+            }
+        }
+    }
+
+    func updateStrategyConcurrencyWindowMinutes(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.risk.concurrencyWindowMinutes = min(max(value, 1), 1_440)
+        }
+    }
+
+    func updateStrategyBlockWhenPositionExists(_ value: Bool) {
+        mutateStrategyDraft { draft in
+            draft.risk.blockWhenPositionExists = value
+        }
+    }
+
+    func cancelStrategyDraftChanges() {
+        strategyDraft = strategySettings
+        strategyValidationMessages = []
+        strategyDirty = false
+        lastStrategySettingsErrorMessage = nil
+    }
+
+    func restoreStrategyDraftDefaults() {
+        guard let defaults = strategyDefaults else { return }
+        strategyDraft = defaults
+        strategyValidationMessages = []
+        recalculateStrategyDirty()
+    }
+
+    func saveStrategyDraft() async {
+        guard strategySaveInFlight == false else { return }
+        guard let base = strategySettings, let draft = strategyDraft else { return }
+        let validationMessages = validateStrategyDraft(draft)
+        strategyValidationMessages = validationMessages
+        guard validationMessages.isEmpty else {
+            lastStrategySettingsErrorMessage = validationMessages.joined(separator: "\n")
+            return
+        }
+        if draft == base {
+            strategyDirty = false
+            return
+        }
+
+        strategySaveInFlight = true
+        defer { strategySaveInFlight = false }
+
+        do {
+            let payload = buildStrategyUpdatePayload(base: base, draft: draft)
+            let envelope = try await apiClient.updateStrategySettings(payload)
+            applyStrategySettingsEnvelope(envelope, preserveDirtyDraft: false)
+            strategyValidationMessages = []
+            lastStrategySettingsErrorMessage = nil
+            lastErrorMessage = nil
+            lastUpdatedAt = Date()
+        } catch {
+            let message = diagnosticsErrorText(
+                prefix: "Strategy settings save failed",
+                error: error
+            )
+            lastStrategySettingsErrorMessage = message
         }
     }
 
@@ -454,6 +637,267 @@ final class MonitoringStore: ObservableObject {
             errors.append("\(row.worker): \(row.error ?? "")")
         }
         return errors
+    }
+
+    private func applyStrategySettingsEnvelope(
+        _ envelope: StrategySettingsResponseEnvelope,
+        preserveDirtyDraft: Bool
+    ) {
+        strategySettings = envelope.data
+        strategyDefaults = envelope.defaults
+        strategyApplyPolicy = envelope.applyPolicy
+        strategyUpdatedAt = envelope.updatedAt
+        if !preserveDirtyDraft {
+            strategyDraft = envelope.data
+            strategyValidationMessages = []
+            strategyDirty = false
+        } else {
+            recalculateStrategyDirty()
+        }
+    }
+
+    private func mutateStrategyDraft(_ mutate: (inout StrategySettingsSnapshot) -> Void) {
+        guard var draft = strategyDraft ?? strategySettings else { return }
+        mutate(&draft)
+        strategyDraft = draft
+        strategyValidationMessages = validateStrategyDraft(draft)
+        recalculateStrategyDirty()
+    }
+
+    private func recalculateStrategyDirty() {
+        guard let server = strategySettings, let draft = strategyDraft else {
+            strategyDirty = false
+            return
+        }
+        strategyDirty = draft != server
+    }
+
+    private func validateStrategyDraft(_ draft: StrategySettingsSnapshot) -> [String] {
+        var errors: [String] = []
+        let scanner = draft.scanner
+        let signal = draft.signal
+        let risk = draft.risk
+
+        if !scanner.modes.contains(scanner.defaultMode) {
+            errors.append("기본 스캔 기준은 거래대금 순위/급등률 순위 중 하나여야 합니다.")
+        }
+        if !(1...30).contains(scanner.topN) {
+            errors.append("상위 후보 평가 범위(Top-N)는 1~30 사이여야 합니다.")
+        }
+        if let minTurnover = scanner.minTurnover, minTurnover < 0 {
+            errors.append("최소 거래대금 필터는 0 이상이어야 합니다.")
+        }
+        if let minChange = scanner.minChangePct, minChange < 0 || minChange > 100 {
+            errors.append("최소 등락률 필터는 0~100 범위여야 합니다.")
+        }
+        for mode in ["turnover", "surge"] {
+            guard let weights = scanner.scoreDefinition.weights[mode] else { continue }
+            let total = weights.rank + weights.turnover + weights.changePct
+            if weights.rank < 0 || weights.turnover < 0 || weights.changePct < 0 {
+                errors.append("스캔 점수 가중치는 음수일 수 없습니다.")
+            }
+            if total <= 0 {
+                errors.append("\(mode == "turnover" ? "거래대금" : "급등률") 기준 가중치 합계는 0보다 커야 합니다.")
+            }
+        }
+
+        if !(1...30).contains(signal.topN) {
+            errors.append("Signal Top-N은 1~30 사이여야 합니다.")
+        }
+        if !(1...50).contains(signal.rankJumpThreshold) {
+            errors.append("급상승 임계값은 1~50 범위여야 합니다.")
+        }
+        if !(10...86_400).contains(signal.rankJumpWindowSeconds) {
+            errors.append("급상승 윈도우는 10~86400초 범위여야 합니다.")
+        }
+        if !(0...20).contains(signal.rankHoldTolerance) {
+            errors.append("상위권 유지 편차는 0~20 범위여야 합니다.")
+        }
+        if signal.enabledSignalTypes.isEmpty {
+            errors.append("활성 신호 유형은 최소 1개 이상 선택해야 합니다.")
+        }
+        let unsupportedSignalTypes = signal.enabledSignalTypes.filter { !strategySupportedSignalTypes.contains($0) }
+        if !unsupportedSignalTypes.isEmpty {
+            errors.append("활성 신호 유형에 지원되지 않는 값이 포함되어 있습니다.")
+        }
+
+        if risk.allowedSignalTypes.isEmpty {
+            errors.append("리스크 허용 신호 유형은 최소 1개 이상 선택해야 합니다.")
+        }
+        let unsupportedRiskTypes = risk.allowedSignalTypes.filter { !strategySupportedSignalTypes.contains($0) }
+        if !unsupportedRiskTypes.isEmpty {
+            errors.append("리스크 허용 신호 유형에 지원되지 않는 값이 포함되어 있습니다.")
+        }
+        if !(1...50).contains(risk.maxConcurrentCandidates) {
+            errors.append("최대 동시 후보 수는 1~50 범위여야 합니다.")
+        }
+        if !(1...1_440).contains(risk.cooldownMinutes) {
+            errors.append("재진입 대기 시간은 1~1440분 범위여야 합니다.")
+        }
+        if !(1...1_440).contains(risk.signalWindowMinutes) {
+            errors.append("신호 유효 시간은 1~1440분 범위여야 합니다.")
+        }
+        if !(1...1_440).contains(risk.concurrencyWindowMinutes) {
+            errors.append("동시성 계산 시간창은 1~1440분 범위여야 합니다.")
+        }
+
+        return errors
+    }
+
+    private func buildStrategyUpdatePayload(
+        base: StrategySettingsSnapshot,
+        draft: StrategySettingsSnapshot
+    ) -> StrategySettingsUpdatePayload {
+        let scannerPatch: ScannerSettingsUpdatePayload? = {
+            var hasChange = false
+            let defaultMode: String? = {
+                guard draft.scanner.defaultMode != base.scanner.defaultMode else { return nil }
+                hasChange = true
+                return draft.scanner.defaultMode
+            }()
+            let topN: Int? = {
+                guard draft.scanner.topN != base.scanner.topN else { return nil }
+                hasChange = true
+                return draft.scanner.topN
+            }()
+            let minTurnover: Double? = {
+                guard draft.scanner.minTurnover != base.scanner.minTurnover else { return nil }
+                hasChange = true
+                return draft.scanner.minTurnover
+            }()
+            let minChangePct: Double? = {
+                guard draft.scanner.minChangePct != base.scanner.minChangePct else { return nil }
+                hasChange = true
+                return draft.scanner.minChangePct
+            }()
+
+            let weightsPatch: ScannerWeightsUpdatePayload? = {
+                let turnover = buildWeightPatch(
+                    base: base.scanner.scoreDefinition.weights["turnover"],
+                    draft: draft.scanner.scoreDefinition.weights["turnover"]
+                )
+                let surge = buildWeightPatch(
+                    base: base.scanner.scoreDefinition.weights["surge"],
+                    draft: draft.scanner.scoreDefinition.weights["surge"]
+                )
+                if turnover != nil || surge != nil {
+                    hasChange = true
+                    return ScannerWeightsUpdatePayload(turnover: turnover, surge: surge)
+                }
+                return nil
+            }()
+
+            guard hasChange else { return nil }
+            return ScannerSettingsUpdatePayload(
+                defaultMode: defaultMode,
+                topN: topN,
+                minTurnover: minTurnover,
+                minChangePct: minChangePct,
+                weights: weightsPatch
+            )
+        }()
+
+        let signalPatch: SignalSettingsUpdatePayload? = {
+            var hasChange = false
+            let topN: Int? = {
+                guard draft.signal.topN != base.signal.topN else { return nil }
+                hasChange = true
+                return draft.signal.topN
+            }()
+            let jumpThreshold: Int? = {
+                guard draft.signal.rankJumpThreshold != base.signal.rankJumpThreshold else { return nil }
+                hasChange = true
+                return draft.signal.rankJumpThreshold
+            }()
+            let jumpWindow: Int? = {
+                guard draft.signal.rankJumpWindowSeconds != base.signal.rankJumpWindowSeconds else { return nil }
+                hasChange = true
+                return draft.signal.rankJumpWindowSeconds
+            }()
+            let holdTolerance: Int? = {
+                guard draft.signal.rankHoldTolerance != base.signal.rankHoldTolerance else { return nil }
+                hasChange = true
+                return draft.signal.rankHoldTolerance
+            }()
+            let enabledTypes: [String]? = {
+                guard Set(draft.signal.enabledSignalTypes) != Set(base.signal.enabledSignalTypes) else { return nil }
+                hasChange = true
+                return draft.signal.enabledSignalTypes
+            }()
+
+            guard hasChange else { return nil }
+            return SignalSettingsUpdatePayload(
+                topN: topN,
+                rankJumpThreshold: jumpThreshold,
+                rankJumpWindowSeconds: jumpWindow,
+                rankHoldTolerance: holdTolerance,
+                enabledSignalTypes: enabledTypes
+            )
+        }()
+
+        let riskPatch: RiskSettingsUpdatePayload? = {
+            var hasChange = false
+            let allowed: [String]? = {
+                guard Set(draft.risk.allowedSignalTypes) != Set(base.risk.allowedSignalTypes) else { return nil }
+                hasChange = true
+                return draft.risk.allowedSignalTypes
+            }()
+            let maxConcurrent: Int? = {
+                guard draft.risk.maxConcurrentCandidates != base.risk.maxConcurrentCandidates else { return nil }
+                hasChange = true
+                return draft.risk.maxConcurrentCandidates
+            }()
+            let cooldown: Int? = {
+                guard draft.risk.cooldownMinutes != base.risk.cooldownMinutes else { return nil }
+                hasChange = true
+                return draft.risk.cooldownMinutes
+            }()
+            let signalWindow: Int? = {
+                guard draft.risk.signalWindowMinutes != base.risk.signalWindowMinutes else { return nil }
+                hasChange = true
+                return draft.risk.signalWindowMinutes
+            }()
+            let concurrencyWindow: Int? = {
+                guard draft.risk.concurrencyWindowMinutes != base.risk.concurrencyWindowMinutes else { return nil }
+                hasChange = true
+                return draft.risk.concurrencyWindowMinutes
+            }()
+            let blockWhenHolding: Bool? = {
+                guard draft.risk.blockWhenPositionExists != base.risk.blockWhenPositionExists else { return nil }
+                hasChange = true
+                return draft.risk.blockWhenPositionExists
+            }()
+
+            guard hasChange else { return nil }
+            return RiskSettingsUpdatePayload(
+                allowedSignalTypes: allowed,
+                maxConcurrentCandidates: maxConcurrent,
+                cooldownMinutes: cooldown,
+                signalWindowMinutes: signalWindow,
+                concurrencyWindowMinutes: concurrencyWindow,
+                blockWhenPositionExists: blockWhenHolding
+            )
+        }()
+
+        return StrategySettingsUpdatePayload(
+            scanner: scannerPatch,
+            signal: signalPatch,
+            risk: riskPatch
+        )
+    }
+
+    private func buildWeightPatch(
+        base: ScannerScoreWeightsSnapshot?,
+        draft: ScannerScoreWeightsSnapshot?
+    ) -> ScannerScoreWeightsUpdatePayload? {
+        guard let base, let draft else { return nil }
+        let rank = draft.rank != base.rank ? draft.rank : nil
+        let turnover = draft.turnover != base.turnover ? draft.turnover : nil
+        let changePct = draft.changePct != base.changePct ? draft.changePct : nil
+        if rank == nil && turnover == nil && changePct == nil {
+            return nil
+        }
+        return ScannerScoreWeightsUpdatePayload(rank: rank, turnover: turnover, changePct: changePct)
     }
 
     private func bindWebSocketCallbacks() {

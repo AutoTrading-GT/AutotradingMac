@@ -48,7 +48,7 @@ struct SettingsView: View {
         case .settings:
             return "애플리케이션 환경설정"
         case .stategy:
-            return "현재 운용 기준을 읽기 전용으로 확인하는 공간입니다"
+            return "핵심 운용 파라미터를 안전하게 조정하는 공간입니다"
         }
     }
 
@@ -67,17 +67,19 @@ struct SettingsView: View {
 
     private var strategyContent: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
-            Text("현재 운용 전략을 이해하기 위한 read-only 브리핑 화면입니다.")
+            Text("설명 문구를 유지한 상태에서 핵심 파라미터만 부분 수정할 수 있습니다.")
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, 2)
 
-            if let settings = store.strategySettings {
-                scannerSettingsPanel(settings.scanner)
+            strategyToolbar
+
+            if let draft = store.strategyDraft {
+                scannerSettingsPanel(draft.scanner)
 
                 HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
-                    signalSettingsPanel(settings.signal)
-                    riskSettingsPanel(settings.risk)
+                    signalSettingsPanel(draft.signal)
+                    riskSettingsPanel(draft.risk)
                 }
             } else {
                 settingsPanel(title: "전략 설정 로드 상태") {
@@ -100,9 +102,31 @@ struct SettingsView: View {
                 }
             }
 
-            Text("이 페이지는 조회 전용입니다. 저장/apply 기능은 아직 연결되지 않았습니다.")
-                .font(.caption2)
-                .foregroundStyle(DesignTokens.Colors.textQuaternary)
+            if !store.strategyValidationMessages.isEmpty {
+                settingsPanel(title: "저장 전 확인 필요") {
+                    ForEach(store.strategyValidationMessages, id: \.self) { message in
+                        settingsRow(
+                            icon: "exclamationmark.triangle",
+                            title: "검증",
+                            value: message,
+                            tone: .warning,
+                            multiline: true
+                        )
+                    }
+                }
+            }
+
+            if let error = store.lastStrategySettingsErrorMessage, !error.isEmpty {
+                settingsPanel(title: "최근 저장/조회 결과") {
+                    settingsRow(
+                        icon: "exclamationmark.triangle",
+                        title: "메시지",
+                        value: error,
+                        tone: .warning,
+                        multiline: true
+                    )
+                }
+            }
         }
         .task {
             if store.strategySettings == nil {
@@ -114,7 +138,7 @@ struct SettingsView: View {
     private func scannerSettingsPanel(_ scanner: ScannerSettingsSnapshot) -> some View {
         settingsPanel(
             title: "Scanner Settings",
-            trailing: { StatusBadge(text: "Read-only", tone: .neutral) }
+            trailing: { StatusBadge(text: "Editable", tone: .info) }
         ) {
             settingsRow(
                 icon: "scope",
@@ -138,52 +162,58 @@ struct SettingsView: View {
                 multiline: true
             )
             Divider().opacity(0.25)
-            settingsRow(
-                icon: "line.3.horizontal.decrease.circle",
-                title: "기본 스캔 기준",
-                value: scannerModeLabel(scanner.defaultMode)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("기본 스캔 기준")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                AppSegmentedControl(
+                    options: [
+                        AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
+                        AppSegmentedOption(value: "surge", title: "급등률 순위"),
+                    ],
+                    selection: scannerDefaultModeBinding(),
+                    minSegmentWidth: 120,
+                    height: 34
+                )
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
+            editableIntRow(
+                title: "상위 후보 평가 범위(Top-N)",
+                value: scanner.topN,
+                range: 1...30,
+                step: 1,
+                icon: "number",
+                onChange: { store.updateStrategyScannerTopN($0) }
             )
             settingsRow(
                 title: "지원 스캔 기준",
                 value: scanner.modes.map(scannerModeLabel).joined(separator: " · ")
             )
-            settingsRow(
-                icon: "info.circle",
-                title: "후보 선정 방식",
-                value: "거래대금 순위 기준 또는 급등률 순위 기준 중 선택한 방식으로 상위 후보를 정렬합니다.",
-                tone: .neutral,
-                multiline: true
+            editableDoubleTextRow(
+                title: "최소 거래대금 필터 (원)",
+                icon: "line.3.horizontal.decrease.circle",
+                text: scannerMinTurnoverText,
+                onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
+            )
+            editableDoubleTextRow(
+                title: "최소 등락률 필터 (%)",
+                icon: "percent",
+                text: scannerMinChangePctText,
+                onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
             )
 
-            if let minTurnover = scanner.minTurnover {
-                settingsRow(
-                    title: "최소 거래대금 필터",
-                    value: DisplayFormatters.metricKorean(minTurnover)
-                )
-            }
-            if let minChangePct = scanner.minChangePct {
-                settingsRow(
-                    title: "최소 등락률 필터",
-                    value: DisplayFormatters.percent(minChangePct)
-                )
-            }
-
-            if let turnover = scanner.scoreDefinition.weights["turnover"] {
-                settingsRow(
-                    icon: "chart.bar.xaxis",
-                    title: "거래대금 순위 기준 비중",
-                    value: scannerWeightSummary(weights: turnover),
-                    multiline: true
-                )
-            }
-            if let surge = scanner.scoreDefinition.weights["surge"] {
-                settingsRow(
-                    icon: "chart.line.uptrend.xyaxis",
-                    title: "급등률 순위 기준 비중",
-                    value: scannerWeightSummary(weights: surge),
-                    multiline: true
-                )
-            }
+            scannerWeightEditor(
+                title: "거래대금 순위 기준 비중",
+                mode: "turnover",
+                weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+            )
+            scannerWeightEditor(
+                title: "급등률 순위 기준 비중",
+                mode: "surge",
+                weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
+            )
             ForEach(Array(scanner.scoreDefinition.notes.enumerated()), id: \.offset) { _, note in
                 settingsRow(
                     icon: "info.circle",
@@ -199,7 +229,7 @@ struct SettingsView: View {
     private func signalSettingsPanel(_ signal: SignalSettingsSnapshot) -> some View {
         settingsPanel(
             title: "Signal Settings",
-            trailing: { StatusBadge(text: "Read-only", tone: .neutral) }
+            trailing: { StatusBadge(text: "Editable", tone: .info) }
         ) {
             settingsRow(
                 icon: "dot.scope",
@@ -208,22 +238,57 @@ struct SettingsView: View {
                 tone: .neutral,
                 multiline: true
             )
-            settingsRow(
-                title: "신호 판단 범위",
-                value: "상위 \(signal.topN)위 후보 내에서 신호를 생성합니다."
+            editableIntRow(
+                title: "신호 판단 범위(Top-N)",
+                value: signal.topN,
+                range: 1...30,
+                step: 1,
+                icon: "number",
+                onChange: { store.updateStrategySignalTopN($0) }
             )
-            settingsRow(
-                title: "순위 급상승 조건",
-                value: "\(signal.rankJumpWindowSeconds)초 내 순위가 \(signal.rankJumpThreshold)단계 이상 좋아지면 급상승 신호로 봅니다.",
-                multiline: true
+            editableIntRow(
+                title: "급상승 임계값(순위 단계)",
+                value: signal.rankJumpThreshold,
+                range: 1...50,
+                step: 1,
+                icon: "arrow.up.right",
+                onChange: { store.updateStrategyRankJumpThreshold($0) }
             )
-            settingsRow(
-                title: "상위권 유지 조건",
-                value: "기준 순위 대비 ±\(signal.rankHoldTolerance)단계 이내면 상위권 유지 신호로 봅니다.",
-                multiline: true
+            editableIntRow(
+                title: "급상승 윈도우(초)",
+                value: signal.rankJumpWindowSeconds,
+                range: 10...86_400,
+                step: 10,
+                icon: "timer",
+                onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
             )
+            editableIntRow(
+                title: "상위권 유지 편차",
+                value: signal.rankHoldTolerance,
+                range: 0...20,
+                step: 1,
+                icon: "equal.circle",
+                onChange: { store.updateStrategyRankHoldTolerance($0) }
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("활성 신호 유형")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                ForEach(strategySignalTypeOptions, id: \.self) { type in
+                    Toggle(
+                        localizedSignalType(type),
+                        isOn: signalEnabledBinding(type: type)
+                    )
+                    .toggleStyle(.switch)
+                    .font(.caption)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
             settingsRow(
-                title: "활성 신호 유형",
+                title: "활성 신호 요약",
                 value: signal.enabledSignalTypes.map(localizedSignalType).joined(separator: " · ")
             )
         }
@@ -232,7 +297,7 @@ struct SettingsView: View {
     private func riskSettingsPanel(_ risk: RiskSettingsSnapshot) -> some View {
         settingsPanel(
             title: "Risk Settings",
-            trailing: { StatusBadge(text: "Read-only", tone: .neutral) }
+            trailing: { StatusBadge(text: "Editable", tone: .info) }
         ) {
             settingsRow(
                 icon: "shield",
@@ -241,34 +306,305 @@ struct SettingsView: View {
                 tone: .neutral,
                 multiline: true
             )
-            settingsRow(
-                title: "허용 신호 유형",
-                value: risk.allowedSignalTypes.map(localizedSignalType).joined(separator: " · ")
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("허용 신호 유형")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                ForEach(strategySignalTypeOptions, id: \.self) { type in
+                    Toggle(
+                        localizedSignalType(type),
+                        isOn: riskAllowedBinding(type: type)
+                    )
+                    .toggleStyle(.switch)
+                    .font(.caption)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
+            editableIntRow(
+                title: "최대 동시 후보 수",
+                value: risk.maxConcurrentCandidates,
+                range: 1...50,
+                step: 1,
+                icon: "person.2",
+                onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
             )
-            settingsRow(
-                title: "동시 승인 후보 수",
-                value: "최대 \(risk.maxConcurrentCandidates)종목"
+            editableIntRow(
+                title: "재진입 대기 시간(분)",
+                value: risk.cooldownMinutes,
+                range: 1...1_440,
+                step: 1,
+                icon: "clock.badge.exclamationmark",
+                onChange: { store.updateStrategyCooldownMinutes($0) }
             )
-            settingsRow(
-                title: "재진입 대기 시간",
-                value: "동일 종목은 \(risk.cooldownMinutes)분 동안 재진입을 제한합니다.",
-                multiline: true
+            editableIntRow(
+                title: "신호 유효 시간(분)",
+                value: risk.signalWindowMinutes,
+                range: 1...1_440,
+                step: 1,
+                icon: "hourglass",
+                onChange: { store.updateStrategySignalWindowMinutes($0) }
             )
-            settingsRow(
-                title: "신호 유효 시간",
-                value: "최근 \(risk.signalWindowMinutes)분 이내 신호만 판정에 사용합니다.",
-                multiline: true
+            editableIntRow(
+                title: "동시성 계산 시간창(분)",
+                value: risk.concurrencyWindowMinutes,
+                range: 1...1_440,
+                step: 1,
+                icon: "scope",
+                onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
             )
-            settingsRow(
-                title: "동시성 계산 시간창",
-                value: "최근 \(risk.concurrencyWindowMinutes)분 기준으로 동시 후보 수를 계산합니다.",
-                multiline: true
+            Toggle(
+                "보유 시 신규 진입 차단",
+                isOn: Binding(
+                    get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
+                    set: { store.updateStrategyBlockWhenPositionExists($0) }
+                )
             )
-            settingsRow(
-                title: "보유 시 신규 진입 차단",
-                value: risk.blockWhenPositionExists ? "적용" : "미적용"
-            )
+            .toggleStyle(.switch)
+            .font(.caption)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
         }
+    }
+
+    private var strategyToolbar: some View {
+        settingsPanel(title: "편집 상태") {
+            settingsRow(
+                icon: "square.and.pencil",
+                title: "변경 사항",
+                value: store.strategyDirty ? "변경 사항 있음" : "변경 없음",
+                tone: store.strategyDirty ? .warning : .success
+            )
+            settingsRow(
+                icon: "clock.arrow.circlepath",
+                title: "마지막 반영 시각",
+                value: store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-"
+            )
+            if let policy = store.strategyApplyPolicy, !policy.isEmpty {
+                settingsRow(
+                    icon: "info.circle",
+                    title: "반영 정책",
+                    value: policy,
+                    tone: .neutral,
+                    multiline: true
+                )
+            }
+
+            HStack(spacing: 8) {
+                Button("취소") {
+                    store.cancelStrategyDraftChanges()
+                }
+                .buttonStyle(AppToolButtonStyle())
+                .disabled(!store.strategyDirty || store.strategySaveInFlight)
+
+                Button("기본값 복원") {
+                    store.restoreStrategyDraftDefaults()
+                }
+                .buttonStyle(AppToolButtonStyle())
+                .disabled(store.strategyDefaults == nil || store.strategySaveInFlight)
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await store.saveStrategyDraft()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if store.strategySaveInFlight {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text("저장")
+                    }
+                }
+                .buttonStyle(AppToolButtonStyle())
+                .disabled(!store.strategyDirty || store.strategySaveInFlight)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var strategySignalTypeOptions: [String] {
+        ["new_entry", "rank_jump", "rank_maintained"]
+    }
+
+    private var scannerMinTurnoverText: String {
+        guard let value = store.strategyDraft?.scanner.minTurnover else { return "" }
+        return DisplayFormatters.number(value)
+    }
+
+    private var scannerMinChangePctText: String {
+        guard let value = store.strategyDraft?.scanner.minChangePct else { return "" }
+        return DisplayFormatters.number(value)
+    }
+
+    private func scannerDefaultModeBinding() -> Binding<String> {
+        Binding(
+            get: { store.strategyDraft?.scanner.defaultMode ?? "turnover" },
+            set: { store.updateStrategyScannerDefaultMode($0) }
+        )
+    }
+
+    private func signalEnabledBinding(type: String) -> Binding<Bool> {
+        Binding(
+            get: { store.strategyDraft?.signal.enabledSignalTypes.contains(type) ?? false },
+            set: { store.updateStrategySignalTypeEnabled(type, isEnabled: $0) }
+        )
+    }
+
+    private func riskAllowedBinding(type: String) -> Binding<Bool> {
+        Binding(
+            get: { store.strategyDraft?.risk.allowedSignalTypes.contains(type) ?? false },
+            set: { store.updateStrategyRiskTypeAllowed(type, isAllowed: $0) }
+        )
+    }
+
+    private func scannerWeightBinding(mode: String, key: String, fallback: Double) -> Binding<Double> {
+        Binding(
+            get: {
+                guard let weights = store.strategyDraft?.scanner.scoreDefinition.weights[mode] else { return fallback }
+                switch key {
+                case "rank": return weights.rank
+                case "turnover": return weights.turnover
+                case "change_pct": return weights.changePct
+                default: return fallback
+                }
+            },
+            set: { store.updateStrategyScannerWeight(mode: mode, key: key, value: $0) }
+        )
+    }
+
+    private func scannerWeightEditor(
+        title: String,
+        mode: String,
+        weights: ScannerScoreWeightsSnapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            HStack(spacing: 10) {
+                weightStepper(
+                    label: "순위",
+                    value: scannerWeightBinding(mode: mode, key: "rank", fallback: weights.rank)
+                )
+                weightStepper(
+                    label: "거래대금",
+                    value: scannerWeightBinding(mode: mode, key: "turnover", fallback: weights.turnover)
+                )
+                weightStepper(
+                    label: "등락률",
+                    value: scannerWeightBinding(mode: mode, key: "change_pct", fallback: weights.changePct)
+                )
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func weightStepper(label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            Stepper(
+                value: value,
+                in: 0...100,
+                step: 1
+            ) {
+                Text("\(Int(value.wrappedValue.rounded()))")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func editableIntRow(
+        title: String,
+        value: Int,
+        range: ClosedRange<Int>,
+        step: Int,
+        icon: String? = nil,
+        onChange: @escaping (Int) -> Void
+    ) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .frame(width: 14)
+                }
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+            Spacer()
+            Stepper(
+                value: Binding(
+                    get: { value },
+                    set: { onChange($0) }
+                ),
+                in: range,
+                step: step
+            ) {
+                Text("\(value)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .frame(minWidth: 36, alignment: .trailing)
+            }
+            .labelsHidden()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func editableDoubleTextRow(
+        title: String,
+        icon: String? = nil,
+        text: String,
+        onChange: @escaping (String) -> Void
+    ) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .frame(width: 14)
+                }
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+            Spacer()
+            TextField(
+                "미설정",
+                text: Binding(
+                    get: { text },
+                    set: onChange
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 140)
+            .font(.caption.monospacedDigit())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func parseOptionalDouble(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return nil
+        }
+        let normalized = trimmed.replacingOccurrences(of: ",", with: "")
+        return Double(normalized)
     }
 
     private func scannerWeightSummary(weights: ScannerScoreWeightsSnapshot) -> String {

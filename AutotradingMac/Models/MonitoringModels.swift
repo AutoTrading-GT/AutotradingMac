@@ -343,55 +343,101 @@ struct ScannerRanksResponse: Decodable {
 
 struct StrategySettingsResponseEnvelope: Decodable {
     let data: StrategySettingsSnapshot
+    let defaults: StrategySettingsSnapshot
+    let applyPolicy: String
+    let updatedAt: Date
 }
 
-struct StrategySettingsSnapshot: Decodable {
-    let scanner: ScannerSettingsSnapshot
-    let signal: SignalSettingsSnapshot
-    let risk: RiskSettingsSnapshot
+struct StrategySettingsSnapshot: Decodable, Equatable {
+    var scanner: ScannerSettingsSnapshot
+    var signal: SignalSettingsSnapshot
+    var risk: RiskSettingsSnapshot
 }
 
-struct ScannerSettingsSnapshot: Decodable {
-    let modes: [String]
-    let defaultMode: String
-    let pageStep: Int
-    let maxLimit: Int
-    let candidateLimit: Int
-    let rankingSource: String
+struct ScannerSettingsSnapshot: Decodable, Equatable {
+    var modes: [String]
+    var defaultMode: String
+    var topN: Int
+    var pageStep: Int
+    var maxLimit: Int
+    var candidateLimit: Int
+    var rankingSource: String
+    var minTurnover: Double?
+    var minChangePct: Double?
+    var scoreDefinition: ScannerScoreDefinitionSnapshot
+}
+
+struct ScannerScoreDefinitionSnapshot: Decodable, Equatable {
+    var name: String
+    var summary: String
+    var formulaBasis: String
+    var weights: [String: ScannerScoreWeightsSnapshot]
+    var notes: [String]
+}
+
+struct ScannerScoreWeightsSnapshot: Decodable, Equatable {
+    var rank: Double
+    var turnover: Double
+    var changePct: Double
+}
+
+struct SignalSettingsSnapshot: Decodable, Equatable {
+    var topN: Int
+    var rankJumpThreshold: Int
+    var rankJumpWindowSeconds: Int
+    var rankHoldTolerance: Int
+    var enabledSignalTypes: [String]
+}
+
+struct RiskSettingsSnapshot: Decodable, Equatable {
+    var allowedSignalTypes: [String]
+    var maxConcurrentCandidates: Int
+    var cooldownMinutes: Int
+    var signalWindowMinutes: Int
+    var concurrencyWindowMinutes: Int
+    var blockWhenPositionExists: Bool
+}
+
+struct StrategySettingsUpdatePayload: Encodable {
+    let scanner: ScannerSettingsUpdatePayload?
+    let signal: SignalSettingsUpdatePayload?
+    let risk: RiskSettingsUpdatePayload?
+}
+
+struct ScannerSettingsUpdatePayload: Encodable {
+    let defaultMode: String?
+    let topN: Int?
     let minTurnover: Double?
     let minChangePct: Double?
-    let scoreDefinition: ScannerScoreDefinitionSnapshot
+    let weights: ScannerWeightsUpdatePayload?
 }
 
-struct ScannerScoreDefinitionSnapshot: Decodable {
-    let name: String
-    let summary: String
-    let formulaBasis: String
-    let weights: [String: ScannerScoreWeightsSnapshot]
-    let notes: [String]
+struct ScannerWeightsUpdatePayload: Encodable {
+    let turnover: ScannerScoreWeightsUpdatePayload?
+    let surge: ScannerScoreWeightsUpdatePayload?
 }
 
-struct ScannerScoreWeightsSnapshot: Decodable {
-    let rank: Double
-    let turnover: Double
-    let changePct: Double
+struct ScannerScoreWeightsUpdatePayload: Encodable {
+    let rank: Double?
+    let turnover: Double?
+    let changePct: Double?
 }
 
-struct SignalSettingsSnapshot: Decodable {
-    let topN: Int
-    let rankJumpThreshold: Int
-    let rankJumpWindowSeconds: Int
-    let rankHoldTolerance: Int
-    let enabledSignalTypes: [String]
+struct SignalSettingsUpdatePayload: Encodable {
+    let topN: Int?
+    let rankJumpThreshold: Int?
+    let rankJumpWindowSeconds: Int?
+    let rankHoldTolerance: Int?
+    let enabledSignalTypes: [String]?
 }
 
-struct RiskSettingsSnapshot: Decodable {
-    let allowedSignalTypes: [String]
-    let maxConcurrentCandidates: Int
-    let cooldownMinutes: Int
-    let signalWindowMinutes: Int
-    let concurrencyWindowMinutes: Int
-    let blockWhenPositionExists: Bool
+struct RiskSettingsUpdatePayload: Encodable {
+    let allowedSignalTypes: [String]?
+    let maxConcurrentCandidates: Int?
+    let cooldownMinutes: Int?
+    let signalWindowMinutes: Int?
+    let concurrencyWindowMinutes: Int?
+    let blockWhenPositionExists: Bool?
 }
 
 struct SignalSnapshotItem: Decodable, Identifiable {

@@ -8,7 +8,8 @@ import Foundation
 protocol MonitoringAPIClientProtocol {
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse
     func fetchRuntime() async throws -> RuntimeStatusSnapshot
-    func fetchStrategySettings() async throws -> StrategySettingsSnapshot
+    func fetchStrategySettings() async throws -> StrategySettingsResponseEnvelope
+    func updateStrategySettings(_ payload: StrategySettingsUpdatePayload) async throws -> StrategySettingsResponseEnvelope
     func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse
     func fetchChartSeries(symbol: String, timeframe: ChartTimeframeOption, limit: Int) async throws -> ChartSeriesResponse
     func startEngine() async throws -> EngineControlCommandResponse
@@ -125,7 +126,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         return envelope.data
     }
 
-    func fetchStrategySettings() async throws -> StrategySettingsSnapshot {
+    func fetchStrategySettings() async throws -> StrategySettingsResponseEnvelope {
         var request = URLRequest(url: strategySettingsURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 10
@@ -144,12 +145,39 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         guard (200..<300).contains(http.statusCode) else {
             throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
         }
-        let envelope = try decodeModel(
+        return try decodeModel(
             StrategySettingsResponseEnvelope.self,
             from: data,
             context: "GET /api/monitoring/strategy-settings"
         )
-        return envelope.data
+    }
+
+    func updateStrategySettings(_ payload: StrategySettingsUpdatePayload) async throws -> StrategySettingsResponseEnvelope {
+        var request = URLRequest(url: strategySettingsURL)
+        request.httpMethod = "PATCH"
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try MonitoringCoding.encoder().encode(payload)
+        logRequest(request, context: "strategy-settings.patch")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MonitoringAPIError.invalidResponse
+        }
+        logResponse(
+            context: "strategy-settings.patch",
+            url: request.url,
+            statusCode: http.statusCode,
+            data: data
+        )
+        guard (200..<300).contains(http.statusCode) else {
+            throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
+        }
+        return try decodeModel(
+            StrategySettingsResponseEnvelope.self,
+            from: data,
+            context: "PATCH /api/monitoring/strategy-settings"
+        )
     }
 
     func fetchChartSeries(
