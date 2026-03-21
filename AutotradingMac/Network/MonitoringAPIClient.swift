@@ -8,6 +8,7 @@ import Foundation
 protocol MonitoringAPIClientProtocol {
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse
     func fetchRuntime() async throws -> RuntimeStatusSnapshot
+    func fetchStrategySettings() async throws -> StrategySettingsSnapshot
     func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse
     func fetchChartSeries(symbol: String, timeframe: ChartTimeframeOption, limit: Int) async throws -> ChartSeriesResponse
     func startEngine() async throws -> EngineControlCommandResponse
@@ -39,6 +40,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     private let session: URLSession
     private let snapshotURL: URL
     private let runtimeURL: URL
+    private let strategySettingsURL: URL
     private let engineStartURL: URL
     private let enginePauseURL: URL
     private let engineEmergencyStopURL: URL
@@ -50,6 +52,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         session: URLSession = .shared,
         snapshotURL: URL = AppConfig.snapshotURL,
         runtimeURL: URL = AppConfig.runtimeURL,
+        strategySettingsURL: URL = AppConfig.strategySettingsURL,
         engineStartURL: URL = AppConfig.engineStartURL,
         enginePauseURL: URL = AppConfig.enginePauseURL,
         engineEmergencyStopURL: URL = AppConfig.engineEmergencyStopURL,
@@ -60,6 +63,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
         self.session = session
         self.snapshotURL = snapshotURL
         self.runtimeURL = runtimeURL
+        self.strategySettingsURL = strategySettingsURL
         self.engineStartURL = engineStartURL
         self.enginePauseURL = enginePauseURL
         self.engineEmergencyStopURL = engineEmergencyStopURL
@@ -117,6 +121,33 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
             RuntimeStatusResponseEnvelope.self,
             from: data,
             context: "GET /api/monitoring/runtime"
+        )
+        return envelope.data
+    }
+
+    func fetchStrategySettings() async throws -> StrategySettingsSnapshot {
+        var request = URLRequest(url: strategySettingsURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        logRequest(request, context: "strategy-settings")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw MonitoringAPIError.invalidResponse
+        }
+        logResponse(
+            context: "strategy-settings",
+            url: request.url,
+            statusCode: http.statusCode,
+            data: data
+        )
+        guard (200..<300).contains(http.statusCode) else {
+            throw MonitoringAPIError.httpStatus(http.statusCode, parseErrorDetail(from: data))
+        }
+        let envelope = try decodeModel(
+            StrategySettingsResponseEnvelope.self,
+            from: data,
+            context: "GET /api/monitoring/strategy-settings"
         )
         return envelope.data
     }

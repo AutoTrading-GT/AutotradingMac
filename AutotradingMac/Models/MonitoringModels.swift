@@ -341,6 +341,59 @@ struct ScannerRanksResponse: Decodable {
     let count: Int
 }
 
+struct StrategySettingsResponseEnvelope: Decodable {
+    let data: StrategySettingsSnapshot
+}
+
+struct StrategySettingsSnapshot: Decodable {
+    let scanner: ScannerSettingsSnapshot
+    let signal: SignalSettingsSnapshot
+    let risk: RiskSettingsSnapshot
+}
+
+struct ScannerSettingsSnapshot: Decodable {
+    let modes: [String]
+    let defaultMode: String
+    let pageStep: Int
+    let maxLimit: Int
+    let candidateLimit: Int
+    let rankingSource: String
+    let minTurnover: Double?
+    let minChangePct: Double?
+    let scoreDefinition: ScannerScoreDefinitionSnapshot
+}
+
+struct ScannerScoreDefinitionSnapshot: Decodable {
+    let name: String
+    let summary: String
+    let formulaBasis: String
+    let weights: [String: ScannerScoreWeightsSnapshot]
+    let notes: [String]
+}
+
+struct ScannerScoreWeightsSnapshot: Decodable {
+    let rank: Double
+    let turnover: Double
+    let changePct: Double
+}
+
+struct SignalSettingsSnapshot: Decodable {
+    let topN: Int
+    let rankJumpThreshold: Int
+    let rankJumpWindowSeconds: Int
+    let rankHoldTolerance: Int
+    let enabledSignalTypes: [String]
+}
+
+struct RiskSettingsSnapshot: Decodable {
+    let allowedSignalTypes: [String]
+    let maxConcurrentCandidates: Int
+    let cooldownMinutes: Int
+    let signalWindowMinutes: Int
+    let concurrencyWindowMinutes: Int
+    let blockWhenPositionExists: Bool
+}
+
 struct SignalSnapshotItem: Decodable, Identifiable {
     var id: String { "signal-\(signalId?.description ?? "none")-\(code)-\(createdAt.timeIntervalSince1970)" }
     let signalId: Int?

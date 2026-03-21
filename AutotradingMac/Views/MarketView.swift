@@ -882,6 +882,46 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
         Self.previewSnapshot.runtime
     }
 
+    func fetchStrategySettings() async throws -> StrategySettingsSnapshot {
+        StrategySettingsSnapshot(
+            scanner: ScannerSettingsSnapshot(
+                modes: ["turnover", "surge"],
+                defaultMode: "turnover",
+                pageStep: 10,
+                maxLimit: 30,
+                candidateLimit: 30,
+                rankingSource: "rank_snapshots",
+                minTurnover: nil,
+                minChangePct: nil,
+                scoreDefinition: ScannerScoreDefinitionSnapshot(
+                    name: "후보 우선순위 점수(관찰용)",
+                    summary: "거래대금/등락률/상대순위를 조합한 스캐너 점수입니다.",
+                    formulaBasis: "mode별 가중합",
+                    weights: [
+                        "turnover": ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15),
+                        "surge": ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45),
+                    ],
+                    notes: []
+                )
+            ),
+            signal: SignalSettingsSnapshot(
+                topN: 10,
+                rankJumpThreshold: 3,
+                rankJumpWindowSeconds: 600,
+                rankHoldTolerance: 1,
+                enabledSignalTypes: ["new_entry", "rank_jump", "rank_maintained"]
+            ),
+            risk: RiskSettingsSnapshot(
+                allowedSignalTypes: ["new_entry", "rank_jump"],
+                maxConcurrentCandidates: 3,
+                cooldownMinutes: 10,
+                signalWindowMinutes: 10,
+                concurrencyWindowMinutes: 15,
+                blockWhenPositionExists: true
+            )
+        )
+    }
+
     func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse {
         let normalized = mode.lowercased() == "surge" ? "surge" : "turnover"
         let all = Self.previewSnapshot.marketTopRanks

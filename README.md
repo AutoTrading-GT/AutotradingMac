@@ -63,10 +63,11 @@
   - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`
-  - `design_ref/figma_web_export/src/app/pages/StrategySettings.tsx` 정보구조를 SwiftUI로 반영
-  - 패널: `현재 전략`, `매수 조건`, `매도 조건`, `전략 선택`, `위험 관리`
-  - 표시값은 `StrategyRuntimeConfig`가 읽는 실제 실행 환경값(`PAPER_*`, `RISK_*`, `ORDER_MODE`, fallback: `EXECUTION_MODE`)과 코드 기본값을 사용
-  - `임시 저장`/`적용` 버튼은 현재 placeholder(비활성) 상태
+  - Strategy 1단계는 read-only 브리핑 화면
+  - 데이터 소스: `GET /api/monitoring/strategy-settings`
+  - 섹션: `Scanner Settings`, `Signal Settings`, `Risk Settings`
+  - Scanner 섹션에는 스캔 점수 정의/가중치가 포함되며, 점수는 “후보 우선순위(관찰용)”임을 명시
+  - 저장/적용 버튼은 제거되었고, 조회 전용으로 현재 운용 기준만 표시
 - Scanner 페이지(운영형 2-pane)
   - 상단 헤더: `종목 스캔` + `자동 갱신` + `최근 스캔` 상태, 우측에 스캔 기준 토글 배치
   - 좌측: 후보 리스트(순위/종목명/현재가/등락률/거래대금) 테이블형 정렬
@@ -200,6 +201,7 @@ URL 결정 우선순위:
 22. Dashboard `최근 7일 승률`이 현재 `order_mode` 기준으로 계산되어 mode 전환 시 값이 달라지는지 확인
 23. `order_mode=live` 전환 실패 시 Dev에 `주문 모드 전환 실패`가 표시되고, top bar에는 오류 문구가 표시되지 않는지 확인
 24. `account_mode=live`에서 계좌 조회 실패 시 Dev에 `계좌정보 조회 실패`가 표시되고, Dashboard KPI가 즉시 비워지지 않는지 확인
+25. `Stategy` 페이지에서 `Scanner/Signal/Risk` 섹션이 `/api/monitoring/strategy-settings` 기준 read-only로 표시되고, 저장/적용 버튼이 노출되지 않는지 확인
 
 ## 주의사항
 - 거래 실행/설정 저장 기능은 구현하지 않음 (read-only)

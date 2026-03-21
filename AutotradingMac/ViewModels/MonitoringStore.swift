@@ -9,6 +9,7 @@ import Combine
 @MainActor
 final class MonitoringStore: ObservableObject {
     @Published private(set) var runtime: RuntimeStatusSnapshot?
+    @Published private(set) var strategySettings: StrategySettingsSnapshot?
     @Published private(set) var marketTopRanks: [MarketRankSnapshotItem] = []
     @Published private(set) var recentSignals: [SignalSnapshotItem] = []
     @Published private(set) var recentRiskDecisions: [RiskDecisionSnapshotItem] = []
@@ -29,6 +30,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var connectionState: WebSocketConnectionState = .disconnected
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var lastStrategySettingsErrorMessage: String?
     @Published private(set) var lastOrderModeErrorMessage: String?
     @Published private(set) var lastAccountSummaryErrorMessage: String?
     @Published private(set) var engineActionInFlight: EngineControlAction?
@@ -122,11 +124,25 @@ final class MonitoringStore: ObservableObject {
             snapshotLoaded = false
             scheduleSnapshotRetryIfNeeded()
         }
+        await reloadStrategySettings()
     }
 
     func reconnectWebSocket() {
         webSocketClient.disconnect()
         webSocketClient.connect()
+    }
+
+    func reloadStrategySettings() async {
+        do {
+            let settings = try await apiClient.fetchStrategySettings()
+            strategySettings = settings
+            lastStrategySettingsErrorMessage = nil
+        } catch {
+            lastStrategySettingsErrorMessage = diagnosticsErrorText(
+                prefix: "Strategy settings load failed",
+                error: error
+            )
+        }
     }
 
     func performEngineAction(_ action: EngineControlAction) async {
