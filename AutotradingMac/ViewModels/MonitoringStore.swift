@@ -320,18 +320,6 @@ final class MonitoringStore: ObservableObject {
                 updatedAt: tick?.timestamp ?? rankItem.capturedAt
             )
         }
-        .sorted { lhs, rhs in
-            switch (lhs.rank, rhs.rank) {
-            case let (l?, r?):
-                return l < r
-            case (.some, .none):
-                return true
-            case (.none, .some):
-                return false
-            case (.none, .none):
-                return lhs.code < rhs.code
-            }
-        }
     }
 
     func scannerIsLoading(mode: String) -> Bool {
@@ -479,18 +467,7 @@ final class MonitoringStore: ObservableObject {
         runtime = snapshot.runtime
         updateAccountSummaryDiagnostics(from: runtime)
         marketTopRanks = snapshot.marketTopRanks
-        scannerRankRowsByMode["turnover"] = snapshot.marketTopRanks.sorted { lhs, rhs in
-            switch (lhs.rank, rhs.rank) {
-            case let (l?, r?):
-                return l < r
-            case (.some, .none):
-                return true
-            case (.none, .some):
-                return false
-            case (.none, .none):
-                return lhs.code < rhs.code
-            }
-        }
+        scannerRankRowsByMode["turnover"] = snapshot.marketTopRanks
         scannerLoadedLimitByMode["turnover"] = min(scannerStep, snapshot.marketTopRanks.count)
         scannerHasMoreByMode["turnover"] = snapshot.marketTopRanks.count >= scannerStep
         recentSignals = snapshot.recentSignals
@@ -522,22 +499,12 @@ final class MonitoringStore: ObservableObject {
                 mode: normalizedMode,
                 limit: normalizedLimit
             )
-            scannerRankRowsByMode[normalizedMode] = response.data.sorted { lhs, rhs in
-                let lhsRank = lhs.displayRank ?? lhs.rank
-                let rhsRank = rhs.displayRank ?? rhs.rank
-                switch (lhsRank, rhsRank) {
-                case let (l?, r?):
-                    return l < r
-                case (.some, .none):
-                    return true
-                case (.none, .some):
-                    return false
-                case (.none, .none):
-                    return lhs.code < rhs.code
-                }
-            }
+            // Scanner endpoint는 이미 mode별 정렬/순위를 계산한다.
+            // 앱은 응답 순서를 그대로 유지한다(재정렬 금지).
+            scannerRankRowsByMode[normalizedMode] = response.data
             scannerLoadedLimitByMode[normalizedMode] = response.limit
-            scannerHasMoreByMode[normalizedMode] = response.hasMore
+            let inferredHasMore = response.data.count >= normalizedLimit && normalizedLimit < scannerMaxLimit
+            scannerHasMoreByMode[normalizedMode] = response.hasMore || inferredHasMore
             if normalizedMode == "turnover" {
                 marketTopRanks = response.data
             }
@@ -693,7 +660,6 @@ final class MonitoringStore: ObservableObject {
     }
 
     private func applyMarketRank(payload: MarketRankSnapshotPayload) {
-        let mode = normalizeScannerMode(payload.rankingMode ?? "turnover")
         let incoming = MarketRankSnapshotItem(
             code: payload.code,
             symbol: payload.symbol,
@@ -702,7 +668,7 @@ final class MonitoringStore: ObservableObject {
             metric: payload.metric,
             price: payload.payload?["price"]?.doubleValue,
             changePct: payload.payload?["change_pct"]?.doubleValue,
-            rankingMode: mode,
+            rankingMode: normalizeScannerMode(payload.rankingMode ?? "turnover"),
             source: payload.source,
             capturedAt: payload.timestamp
         )
@@ -723,27 +689,9 @@ final class MonitoringStore: ObservableObject {
                 return lhs.code < rhs.code
             }
         }
-        if var modeRows = scannerRankRowsByMode[mode] {
-            if let index = modeRows.firstIndex(where: { $0.code == incoming.code }) {
-                modeRows[index] = incoming
-            } else {
-                modeRows.insert(incoming, at: 0)
-            }
-            modeRows.sort { lhs, rhs in
-                switch (lhs.rank, rhs.rank) {
-                case let (l?, r?):
-                    return l < r
-                case (.some, .none):
-                    return true
-                case (.none, .some):
-                    return false
-                case (.none, .none):
-                    return lhs.code < rhs.code
-                }
-            }
-            let loadedLimit = scannerLoadedLimitByMode[mode] ?? scannerStep
-            scannerRankRowsByMode[mode] = Array(modeRows.prefix(max(loadedLimit, scannerStep)))
-        }
+        // Scanner 리스트는 `/api/monitoring/scanner/ranks` 응답을 단일 truth source로 사용한다.
+        // WS market.rank_snapshot(delta)로 scanner rows를 직접 갱신하면 limit 단계 로딩 순서가 깨질 수 있어
+        // scannerRankRowsByMode는 여기서 갱신하지 않는다.
         ensureSelectedScannerCode()
     }
 
