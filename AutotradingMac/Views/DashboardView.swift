@@ -145,7 +145,7 @@ struct DashboardView: View {
                 VStack(spacing: 0) {
                     ForEach(scannerItems) { item in
                         dashboardRow {
-                            HStack(spacing: 10) {
+                            HStack(alignment: .center, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.name)
                                         .font(.subheadline.weight(.medium))
@@ -154,8 +154,12 @@ struct DashboardView: View {
                                         .font(.caption2)
                                         .foregroundStyle(DesignTokens.Colors.textQuaternary)
                                 }
-                                Spacer(minLength: 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(minHeight: DashboardScannerColumns.rowMinHeight, alignment: .center)
+
                                 scoreBadge(item.score)
+                                    .frame(width: DashboardScannerColumns.scoreWidth, alignment: .center)
+
                                 VStack(alignment: .trailing, spacing: 1) {
                                     Text(DisplayFormatters.number(item.price))
                                         .font(.subheadline.monospacedDigit())
@@ -163,11 +167,14 @@ struct DashboardView: View {
                                         .font(.caption2.monospacedDigit())
                                         .foregroundStyle(trendForValue(item.changePct).color)
                                 }
+                                .frame(width: DashboardScannerColumns.priceChangeWidth, alignment: .trailing)
+
                                 Text(item.metricText)
                                     .font(.caption.monospacedDigit())
                                     .foregroundStyle(DesignTokens.Colors.textTertiary)
-                                    .frame(minWidth: 72, alignment: .trailing)
+                                    .frame(width: DashboardScannerColumns.metricWidth, alignment: .trailing)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
@@ -610,6 +617,13 @@ struct DashboardView: View {
             return .neutral
         }
     }
+}
+
+private enum DashboardScannerColumns {
+    static let rowMinHeight: CGFloat = 32
+    static let scoreWidth: CGFloat = 42
+    static let priceChangeWidth: CGFloat = 112
+    static let metricWidth: CGFloat = 80
 }
 
 private struct ScannerItem: Identifiable {
