@@ -61,17 +61,56 @@ struct ChartView: View {
 
     @ViewBuilder
     private func chartContent(code: String) -> some View {
+        let row = marketRow(for: code)
         let series = store.chartSeries(for: code, timeframe: store.selectedChartTimeframe)
         let points = series?.points ?? []
         let loading = store.isChartLoading(for: code, timeframe: store.selectedChartTimeframe)
         let errorMessage = store.chartErrorMessage(for: code, timeframe: store.selectedChartTimeframe)
-        let trend = trendDirection(points: points)
+        let changeMetrics = TimeframeChangeCalculator.calculate(
+            points: points,
+            fallbackCurrentPrice: row?.price,
+            fallbackChangePercent: row?.changePct
+        )
+        let trend = TrendDirection.from(changePercent: changeMetrics.changePercent)
         let metrics = chartMetrics(points: points)
+        let displayName = (row?.symbol.isEmpty == false && row?.symbol != "-") ? row?.symbol ?? code : code
 
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(displayName)
+                        .font(DesignTokens.Typography.sectionTitle)
+                    Text("\(code) · \(store.selectedChartTimeframe.title)")
+                        .font(DesignTokens.Typography.caption)
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(DisplayFormatters.krw(changeMetrics.currentPrice ?? row?.price))
+                        .font(.title3.monospacedDigit().weight(.semibold))
+                    HStack(spacing: 6) {
+                        if trend == .up {
+                            Image(systemName: "arrow.up.right")
+                        } else if trend == .down {
+                            Image(systemName: "arrow.down.right")
+                        }
+                        Text(DisplayFormatters.signedPercent(changeMetrics.changePercent))
+                        Text("(\(DisplayFormatters.signedNumber(changeMetrics.changeValue)))")
+                    }
+                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(trend.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(trend == .up ? DesignTokens.Colors.profit.opacity(0.15) : (trend == .down ? DesignTokens.Colors.loss.opacity(0.15) : DesignTokens.Colors.surface2))
+                    )
+                }
+            }
+
             HStack {
-                Text("\(code) · \(store.selectedChartTimeframe.title)")
-                    .font(DesignTokens.Typography.sectionTitle)
                 Spacer()
                 Text(series?.source ?? "source: -")
                     .font(DesignTokens.Typography.caption)
@@ -133,12 +172,8 @@ struct ChartView: View {
         )
     }
 
-    private func trendDirection(points: [ChartPoint]) -> TrendDirection {
-        guard points.count >= 2 else { return .unknown }
-        let prev = points[points.count - 2].close
-        let last = points[points.count - 1].close
-        guard prev != 0 else { return .unknown }
-        return TrendDirection.from(changePercent: ((last - prev) / prev) * 100.0)
+    private func marketRow(for code: String) -> MarketRow? {
+        store.marketRows.first(where: { $0.code == code })
     }
 
     private func chartMetrics(points: [ChartPoint]) -> ChartMetrics {

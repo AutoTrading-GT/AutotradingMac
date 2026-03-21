@@ -238,10 +238,19 @@ struct MarketView: View {
     private func detailPanel(for candidate: ScannerCandidate) -> some View {
         let series = store.chartSeries(for: candidate.code, timeframe: store.selectedChartTimeframe)
         let chartPoints = series?.points ?? []
-        let trend = chartTrend(points: chartPoints, fallbackChangePct: candidate.row.changePct)
+        let changeMetrics = TimeframeChangeCalculator.calculate(
+            points: chartPoints,
+            fallbackCurrentPrice: candidate.row.price,
+            fallbackChangePercent: candidate.row.changePct
+        )
+        let trend = TrendDirection.from(changePercent: changeMetrics.changePercent)
         let signal = latestSignal(for: candidate.code)
         let holding = isHolding(code: candidate.code)
-        let metrics = chartMetrics(from: chartPoints, currentPrice: candidate.row.price, changePct: candidate.row.changePct)
+        let metrics = chartMetrics(
+            from: chartPoints,
+            fallbackCurrentPrice: changeMetrics.currentPrice ?? candidate.row.price,
+            fallbackChangePct: changeMetrics.changePercent ?? candidate.row.changePct
+        )
         let score = candidate.score
         let scoreTone: StatusTone = score >= 75 ? .success : (score >= 50 ? .warning : .neutral)
         let isLoadingChart = store.isChartLoading(for: candidate.code, timeframe: store.selectedChartTimeframe)
@@ -269,7 +278,7 @@ struct MarketView: View {
                 }
 
                 HStack(alignment: .center, spacing: 10) {
-                    Text(DisplayFormatters.krw(candidate.row.price))
+                    Text(DisplayFormatters.krw(changeMetrics.currentPrice ?? candidate.row.price))
                         .font(.title2.monospacedDigit().weight(.semibold))
 
                     HStack(spacing: 6) {
@@ -278,8 +287,8 @@ struct MarketView: View {
                         } else if trend == .down {
                             Image(systemName: "arrow.down.right")
                         }
-                        Text("\(DisplayFormatters.signedPercent(candidate.row.changePct))")
-                        Text("(\(DisplayFormatters.signedNumber(changeValue(for: candidate.row))))")
+                        Text("\(DisplayFormatters.signedPercent(changeMetrics.changePercent))")
+                        Text("(\(DisplayFormatters.signedNumber(changeMetrics.changeValue)))")
                     }
                     .font(.subheadline.monospacedDigit().weight(.semibold))
                     .foregroundStyle(trend.color)
@@ -479,17 +488,17 @@ struct MarketView: View {
         }
     }
 
-    private func chartMetrics(from points: [ChartPoint], currentPrice: Double?, changePct: Double?) -> ScannerChartMetrics {
+    private func chartMetrics(from points: [ChartPoint], fallbackCurrentPrice: Double?, fallbackChangePct: Double?) -> ScannerChartMetrics {
         let open = points.first?.open
         let high = points.map(\.high).max()
         let low = points.map(\.low).min()
-        let current = currentPrice ?? points.last?.close
+        let current = fallbackCurrentPrice ?? points.last?.close
 
         let prevClose: Double?
         if points.count >= 2 {
             prevClose = points[points.count - 2].close
-        } else if let current, let changePct {
-            let denominator = 1.0 + (changePct / 100.0)
+        } else if let current, let fallbackChangePct {
+            let denominator = 1.0 + (fallbackChangePct / 100.0)
             if abs(denominator) > 0.0001 {
                 prevClose = current / denominator
             } else {
@@ -520,31 +529,12 @@ struct MarketView: View {
         )
     }
 
-    private func chartTrend(points: [ChartPoint], fallbackChangePct: Double?) -> TrendDirection {
-        if points.count >= 2 {
-            let prev = points[points.count - 2].close
-            let last = points[points.count - 1].close
-            if prev != 0 {
-                return TrendDirection.from(changePercent: ((last - prev) / prev) * 100.0)
-            }
-        }
-        return TrendDirection.from(changePercent: fallbackChangePct)
-    }
-
     private func latestSignal(for code: String) -> String? {
         store.recentSignals.first(where: { $0.code == code })?.signalType
     }
 
     private func isHolding(code: String) -> Bool {
         store.currentPositions.contains(where: { $0.code == code && $0.qty > 0 })
-    }
-
-    private func changeValue(for row: MarketRow) -> Double? {
-        guard let price = row.price, let changePct = row.changePct else { return nil }
-        let denominator = 1.0 + (changePct / 100.0)
-        guard abs(denominator) > 0.0001 else { return nil }
-        let previousClose = price / denominator
-        return price - previousClose
     }
 
     private var lastScanRelativeText: String {
