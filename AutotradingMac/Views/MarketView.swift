@@ -344,7 +344,11 @@ struct MarketView: View {
             Divider().opacity(0.5)
 
             ZStack {
-                ScannerLineChartView(points: chartPoints, trend: trend)
+                TimeSeriesLineChartView(
+                    points: chartPoints,
+                    timeframe: store.selectedChartTimeframe,
+                    lineColor: trend.color
+                )
                     .frame(minHeight: 220, maxHeight: .infinity)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 12)
@@ -729,71 +733,6 @@ private struct ScannerCandidateRowView: View {
         default:
             return DesignTokens.Colors.borderMedium
         }
-    }
-}
-
-private struct ScannerLineChartView: View {
-    let points: [ChartPoint]
-    let trend: TrendDirection
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let minValue = points.map(\.close).min() ?? 0
-            let maxValue = points.map(\.close).max() ?? 0
-            let range = max(maxValue - minValue, 0.0001)
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(DesignTokens.Colors.surface1)
-
-                Path { path in
-                    for index in 1...4 {
-                        let y = size.height * CGFloat(Double(index) / 5.0)
-                        path.move(to: CGPoint(x: 0, y: y))
-                        path.addLine(to: CGPoint(x: size.width, y: y))
-                    }
-                }
-                .stroke(DesignTokens.Colors.borderMedium, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-
-                if points.count > 1 {
-                    areaPath(size: size, minValue: minValue, range: range)
-                        .fill(
-                            LinearGradient(
-                                colors: [trend.color.opacity(0.3), trend.color.opacity(0.02)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    linePath(size: size, minValue: minValue, range: range)
-                        .stroke(trend.color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                }
-            }
-        }
-    }
-
-    private func linePath(size: CGSize, minValue: Double, range: Double) -> Path {
-        Path { path in
-            for (index, point) in points.enumerated() {
-                let x = size.width * CGFloat(Double(index) / Double(max(points.count - 1, 1)))
-                let yRatio = (point.close - minValue) / range
-                let y = size.height * (1 - CGFloat(yRatio))
-                if index == 0 {
-                    path.move(to: CGPoint(x: x, y: y))
-                } else {
-                    path.addLine(to: CGPoint(x: x, y: y))
-                }
-            }
-        }
-    }
-
-    private func areaPath(size: CGSize, minValue: Double, range: Double) -> Path {
-        var path = linePath(size: size, minValue: minValue, range: range)
-        path.addLine(to: CGPoint(x: size.width, y: size.height))
-        path.addLine(to: CGPoint(x: 0, y: size.height))
-        path.closeSubpath()
-        return path
     }
 }
 
