@@ -65,12 +65,19 @@
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`
   - Strategy 2단계는 “설명 + 핵심 파라미터 부분 편집” 화면
+  - 레이아웃(개편):
+    - 상단: 페이지 요약
+    - 본문 2열: 좌측 `Scanner/Signal`, 우측 `Risk/도움말`
+    - 하단 고정 action bar: 변경 상태 + 반영 정책 + `취소/기본값 복원/저장`
   - 데이터 소스: `GET /api/monitoring/strategy-settings`
   - 저장 API: `PATCH /api/monitoring/strategy-settings`
   - 응답 메타(`defaults`, `apply_policy`, `updated_at`)를 함께 사용
   - 편집 흐름: `server snapshot`과 `local draft` 분리, `취소`/`기본값 복원`/`저장` 제공
   - 저장 전 로컬 검증 + 서버 검증(`422 detail`) 메시지 표시
   - 섹션: `Scanner Settings`, `Signal Settings`, `Risk Settings`
+  - 설명 문구 노출 정책:
+    - 기본 화면은 한 줄 요약 중심
+    - 장문 설명은 섹션 `도움말` 토글로 필요 시 확장
   - Scanner 섹션은 “스캔 점수 = 관찰용 후보 우선순위”를 중심으로 설명하며, 실전 매수 확률 점수로 오해되지 않게 안내
   - 내부 구현 용어는 사용자 문구로 번역해 노출
     - `turnover/surge` -> `거래대금 순위/급등률 순위`

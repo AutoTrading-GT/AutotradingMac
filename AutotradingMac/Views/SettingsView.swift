@@ -8,6 +8,9 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: MonitoringStore
     let mode: SettingsPageMode
+    @State private var showScannerHelp = false
+    @State private var showSignalHelp = false
+    @State private var showRiskHelp = false
 
     var body: some View {
         ScrollView {
@@ -22,15 +25,43 @@ struct SettingsView: View {
             }
             .padding(DesignTokens.Layout.pagePadding)
         }
+        .safeAreaInset(edge: .bottom) {
+            if mode == .stategy {
+                strategyActionBar
+                    .padding(.horizontal, DesignTokens.Layout.pagePadding)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                DesignTokens.Colors.bgBase.opacity(0),
+                                DesignTokens.Colors.bgBase.opacity(0.88),
+                                DesignTokens.Colors.bgBase,
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+        }
     }
 
     private var pageHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(pageTitle)
-                .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(pageTitle)
+                    .font(.title3.weight(.semibold))
+                if mode == .stategy {
+                    StatusBadge(
+                        text: store.strategyDirty ? "편집 중" : "저장값 기준",
+                        tone: store.strategyDirty ? .warning : .neutral
+                    )
+                }
+            }
             Text(pageSubtitle)
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .lineLimit(2)
         }
     }
 
@@ -48,7 +79,7 @@ struct SettingsView: View {
         case .settings:
             return "애플리케이션 환경설정"
         case .stategy:
-            return "핵심 운용 파라미터를 안전하게 조정하는 공간입니다"
+            return "핵심 운용 기준을 빠르게 조정하고, 자세한 설명은 필요할 때만 확인합니다."
         }
     }
 
@@ -67,19 +98,24 @@ struct SettingsView: View {
 
     private var strategyContent: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
-            Text("설명 문구를 유지한 상태에서 핵심 파라미터만 부분 수정할 수 있습니다.")
+            Text("핵심 파라미터는 바로 조정하고, 상세 배경은 도움말에서 확인하세요.")
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, 2)
 
-            strategyToolbar
-
             if let draft = store.strategyDraft {
-                scannerSettingsPanel(draft.scanner)
-
                 HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
-                    signalSettingsPanel(draft.signal)
-                    riskSettingsPanel(draft.risk)
+                    VStack(spacing: DesignTokens.Layout.sectionGap) {
+                        scannerSettingsPanel(draft.scanner)
+                        signalSettingsPanel(draft.signal)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                    VStack(spacing: DesignTokens.Layout.sectionGap) {
+                        riskSettingsPanel(draft.risk)
+                        strategyHelpPanel
+                    }
+                    .frame(width: 360, alignment: .topLeading)
                 }
             } else {
                 settingsPanel(title: "전략 설정 로드 상태") {
@@ -136,296 +172,406 @@ struct SettingsView: View {
     }
 
     private func scannerSettingsPanel(_ scanner: ScannerSettingsSnapshot) -> some View {
-        settingsPanel(
-            title: "Scanner Settings",
-            trailing: { StatusBadge(text: "Editable", tone: .info) }
-        ) {
-            settingsRow(
+        settingsPanel(title: "Scanner Settings") {
+            strategySectionSummary(
                 icon: "scope",
-                title: "무엇을 위한 기준인가요?",
-                value: "시장 종목 후보를 빠르게 훑고 우선순위를 정하기 위한 스캐너 기준입니다.",
-                tone: .neutral,
-                multiline: true
+                summary: "후보를 빠르게 훑고 우선순위를 정하는 기준",
+                helpBinding: $showScannerHelp
             )
-            settingsRow(
-                icon: "text.alignleft",
-                title: "스캔 점수",
-                value: scanner.scoreDefinition.summary,
-                tone: .neutral,
-                multiline: true
-            )
-            settingsRow(
-                icon: "chart.bar.doc.horizontal",
-                title: "점수 반영 요소",
-                value: "순위, 거래대금, 등락률을 함께 반영해 후보를 우선순위로 정렬합니다.",
-                tone: .neutral,
-                multiline: true
-            )
-            Divider().opacity(0.25)
-            VStack(alignment: .leading, spacing: 10) {
-                Text("기본 스캔 기준")
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                AppSegmentedControl(
-                    options: [
-                        AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
-                        AppSegmentedOption(value: "surge", title: "급등률 순위"),
-                    ],
-                    selection: scannerDefaultModeBinding(),
-                    minSegmentWidth: 120,
-                    height: 34
+            if showScannerHelp {
+                strategyHelpText(
+                    "스캔 점수는 실전 매수 확률 점수가 아니라, 순위/거래대금/등락률을 조합한 후보 우선순위 점수입니다."
                 )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-
-            editableIntRow(
-                title: "상위 후보 평가 범위(Top-N)",
-                value: scanner.topN,
-                range: 1...30,
-                step: 1,
-                icon: "number",
-                onChange: { store.updateStrategyScannerTopN($0) }
-            )
-            settingsRow(
-                title: "지원 스캔 기준",
-                value: scanner.modes.map(scannerModeLabel).joined(separator: " · ")
-            )
-            editableDoubleTextRow(
-                title: "최소 거래대금 필터 (원)",
-                icon: "line.3.horizontal.decrease.circle",
-                text: scannerMinTurnoverText,
-                onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
-            )
-            editableDoubleTextRow(
-                title: "최소 등락률 필터 (%)",
-                icon: "percent",
-                text: scannerMinChangePctText,
-                onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
-            )
-
-            scannerWeightEditor(
-                title: "거래대금 순위 기준 비중",
-                mode: "turnover",
-                weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
-            )
-            scannerWeightEditor(
-                title: "급등률 순위 기준 비중",
-                mode: "surge",
-                weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
-            )
-            ForEach(Array(scanner.scoreDefinition.notes.enumerated()), id: \.offset) { _, note in
-                settingsRow(
-                    icon: "info.circle",
-                    title: "참고",
-                    value: localizedScannerNote(note),
-                    tone: .neutral,
-                    multiline: true
+            strategyGroup(title: "기본 기준") {
+                strategySegmentControlRow(
+                    title: "기본 스캔 기준",
+                    control: AnyView(
+                        AppSegmentedControl(
+                            options: [
+                                AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
+                                AppSegmentedOption(value: "surge", title: "급등률 순위"),
+                            ],
+                            selection: scannerDefaultModeBinding(),
+                            minSegmentWidth: 128,
+                            height: 34
+                        )
+                    )
+                )
+                compactNumberControl(
+                    title: "상위 후보 평가 범위(Top-N)",
+                    value: scanner.topN,
+                    range: 1...30,
+                    step: 1,
+                    onChange: { store.updateStrategyScannerTopN($0) }
+                )
+            }
+            strategyGroup(title: "필터") {
+                editableDoubleTextRow(
+                    title: "최소 거래대금 (원)",
+                    icon: "line.3.horizontal.decrease.circle",
+                    text: scannerMinTurnoverText,
+                    onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
+                )
+                editableDoubleTextRow(
+                    title: "최소 등락률 (%)",
+                    icon: "percent",
+                    text: scannerMinChangePctText,
+                    onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
+                )
+            }
+            strategyGroup(title: "가중치") {
+                scannerWeightEditor(
+                    title: "거래대금 순위 기준",
+                    mode: "turnover",
+                    weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+                )
+                scannerWeightEditor(
+                    title: "급등률 순위 기준",
+                    mode: "surge",
+                    weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
                 )
             }
         }
     }
 
     private func signalSettingsPanel(_ signal: SignalSettingsSnapshot) -> some View {
-        settingsPanel(
-            title: "Signal Settings",
-            trailing: { StatusBadge(text: "Editable", tone: .info) }
-        ) {
-            settingsRow(
+        settingsPanel(title: "Signal Settings") {
+            strategySectionSummary(
                 icon: "dot.scope",
-                title: "무엇을 위한 기준인가요?",
-                value: "스캐너 후보 중 어떤 종목을 실제 관찰 신호로 올릴지 판단하는 기준입니다.",
-                tone: .neutral,
-                multiline: true
+                summary: "후보 중 실제 관찰 신호로 올릴 대상을 거르는 기준",
+                helpBinding: $showSignalHelp
             )
-            editableIntRow(
-                title: "신호 판단 범위(Top-N)",
-                value: signal.topN,
-                range: 1...30,
-                step: 1,
-                icon: "number",
-                onChange: { store.updateStrategySignalTopN($0) }
-            )
-            editableIntRow(
-                title: "급상승 임계값(순위 단계)",
-                value: signal.rankJumpThreshold,
-                range: 1...50,
-                step: 1,
-                icon: "arrow.up.right",
-                onChange: { store.updateStrategyRankJumpThreshold($0) }
-            )
-            editableIntRow(
-                title: "급상승 윈도우(초)",
-                value: signal.rankJumpWindowSeconds,
-                range: 10...86_400,
-                step: 10,
-                icon: "timer",
-                onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
-            )
-            editableIntRow(
-                title: "상위권 유지 편차",
-                value: signal.rankHoldTolerance,
-                range: 0...20,
-                step: 1,
-                icon: "equal.circle",
-                onChange: { store.updateStrategyRankHoldTolerance($0) }
-            )
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("활성 신호 유형")
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                ForEach(strategySignalTypeOptions, id: \.self) { type in
-                    Toggle(
-                        localizedSignalType(type),
-                        isOn: signalEnabledBinding(type: type)
-                    )
-                    .toggleStyle(.switch)
-                    .font(.caption)
-                }
+            if showSignalHelp {
+                strategyHelpText("신호 판단 범위와 급상승/유지 조건, 활성 신호 유형을 조정합니다.")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-
-            settingsRow(
-                title: "활성 신호 요약",
-                value: signal.enabledSignalTypes.map(localizedSignalType).joined(separator: " · ")
-            )
+            strategyGroup(title: "신호 판단 범위") {
+                compactNumberControl(
+                    title: "신호 판단 범위(Top-N)",
+                    value: signal.topN,
+                    range: 1...30,
+                    step: 1,
+                    onChange: { store.updateStrategySignalTopN($0) }
+                )
+            }
+            strategyGroup(title: "급상승/유지 조건") {
+                compactNumberControl(
+                    title: "급상승 임계값(순위 단계)",
+                    value: signal.rankJumpThreshold,
+                    range: 1...50,
+                    step: 1,
+                    onChange: { store.updateStrategyRankJumpThreshold($0) }
+                )
+                compactNumberControl(
+                    title: "급상승 윈도우(초)",
+                    value: signal.rankJumpWindowSeconds,
+                    range: 10...86_400,
+                    step: 10,
+                    onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
+                )
+                compactNumberControl(
+                    title: "상위권 유지 편차",
+                    value: signal.rankHoldTolerance,
+                    range: 0...20,
+                    step: 1,
+                    onChange: { store.updateStrategyRankHoldTolerance($0) }
+                )
+            }
+            strategyGroup(title: "활성 신호 유형") {
+                strategySignalToggleGrid(
+                    selected: signal.enabledSignalTypes,
+                    binding: signalEnabledBinding
+                )
+            }
         }
     }
 
     private func riskSettingsPanel(_ risk: RiskSettingsSnapshot) -> some View {
-        settingsPanel(
-            title: "Risk Settings",
-            trailing: { StatusBadge(text: "Editable", tone: .info) }
-        ) {
-            settingsRow(
+        settingsPanel(title: "Risk Settings") {
+            strategySectionSummary(
                 icon: "shield",
-                title: "무엇을 위한 기준인가요?",
-                value: "신호가 나와도 보수적으로 걸러서 과도한 진입을 막는 안전 기준입니다.",
-                tone: .neutral,
-                multiline: true
+                summary: "신호가 나와도 과도한 진입을 보수적으로 제한하는 기준",
+                helpBinding: $showRiskHelp
             )
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("허용 신호 유형")
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                ForEach(strategySignalTypeOptions, id: \.self) { type in
-                    Toggle(
-                        localizedSignalType(type),
-                        isOn: riskAllowedBinding(type: type)
-                    )
-                    .toggleStyle(.switch)
-                    .font(.caption)
-                }
+            if showRiskHelp {
+                strategyHelpText("허용 신호, 동시 후보 수, 시간 제한을 통해 진입 리스크를 제어합니다.")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-
-            editableIntRow(
-                title: "최대 동시 후보 수",
-                value: risk.maxConcurrentCandidates,
-                range: 1...50,
-                step: 1,
-                icon: "person.2",
-                onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
-            )
-            editableIntRow(
-                title: "재진입 대기 시간(분)",
-                value: risk.cooldownMinutes,
-                range: 1...1_440,
-                step: 1,
-                icon: "clock.badge.exclamationmark",
-                onChange: { store.updateStrategyCooldownMinutes($0) }
-            )
-            editableIntRow(
-                title: "신호 유효 시간(분)",
-                value: risk.signalWindowMinutes,
-                range: 1...1_440,
-                step: 1,
-                icon: "hourglass",
-                onChange: { store.updateStrategySignalWindowMinutes($0) }
-            )
-            editableIntRow(
-                title: "동시성 계산 시간창(분)",
-                value: risk.concurrencyWindowMinutes,
-                range: 1...1_440,
-                step: 1,
-                icon: "scope",
-                onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
-            )
-            Toggle(
-                "보유 시 신규 진입 차단",
-                isOn: Binding(
-                    get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
-                    set: { store.updateStrategyBlockWhenPositionExists($0) }
+            strategyGroup(title: "허용 신호") {
+                strategySignalToggleGrid(
+                    selected: risk.allowedSignalTypes,
+                    binding: riskAllowedBinding
                 )
-            )
-            .toggleStyle(.switch)
-            .font(.caption)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            }
+            strategyGroup(title: "동시 후보 제한") {
+                compactNumberControl(
+                    title: "최대 동시 후보 수",
+                    value: risk.maxConcurrentCandidates,
+                    range: 1...50,
+                    step: 1,
+                    onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
+                )
+                Toggle(
+                    "보유 시 신규 진입 차단",
+                    isOn: Binding(
+                        get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
+                        set: { store.updateStrategyBlockWhenPositionExists($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .tint(DesignTokens.Colors.warning)
+                .font(.caption)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+            strategyGroup(title: "재진입/시간 제한") {
+                compactNumberControl(
+                    title: "재진입 대기 시간(분)",
+                    value: risk.cooldownMinutes,
+                    range: 1...1_440,
+                    step: 1,
+                    onChange: { store.updateStrategyCooldownMinutes($0) }
+                )
+                compactNumberControl(
+                    title: "신호 유효 시간(분)",
+                    value: risk.signalWindowMinutes,
+                    range: 1...1_440,
+                    step: 1,
+                    onChange: { store.updateStrategySignalWindowMinutes($0) }
+                )
+                compactNumberControl(
+                    title: "동시성 계산 시간창(분)",
+                    value: risk.concurrencyWindowMinutes,
+                    range: 1...1_440,
+                    step: 1,
+                    onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
+                )
+            }
         }
     }
 
-    private var strategyToolbar: some View {
-        settingsPanel(title: "편집 상태") {
+    private var strategyHelpPanel: some View {
+        settingsPanel(title: "도움말") {
             settingsRow(
-                icon: "square.and.pencil",
-                title: "변경 사항",
-                value: store.strategyDirty ? "변경 사항 있음" : "변경 없음",
-                tone: store.strategyDirty ? .warning : .success
+                icon: "info.circle",
+                title: "스캔 점수",
+                value: "실전 매수 확률 점수가 아니라 후보 우선순위 점수입니다.",
+                tone: .neutral,
+                multiline: true
             )
             settingsRow(
                 icon: "clock.arrow.circlepath",
-                title: "마지막 반영 시각",
-                value: store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-"
+                title: "반영 시점",
+                value: "저장된 값은 다음 평가 사이클부터 적용됩니다.",
+                tone: .neutral,
+                multiline: true
             )
-            if let policy = store.strategyApplyPolicy, !policy.isEmpty {
-                settingsRow(
-                    icon: "info.circle",
-                    title: "반영 정책",
-                    value: policy,
-                    tone: .neutral,
-                    multiline: true
-                )
+            settingsRow(
+                icon: "exclamationmark.shield",
+                title: "안전 원칙",
+                value: "값 변경 후 저장 전에는 서버 설정이 바뀌지 않습니다.",
+                tone: .neutral,
+                multiline: true
+            )
+        }
+    }
+
+    private var strategyActionBar: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    StatusBadge(
+                        text: store.strategyDirty ? "변경 사항 있음" : "변경 없음",
+                        tone: store.strategyDirty ? .warning : .success
+                    )
+                    Text(store.strategyApplyPolicy ?? "저장된 값은 다음 평가 사이클부터 반영됩니다.")
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .lineLimit(1)
+                }
+                Text("마지막 반영: \(store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-")")
+                    .font(.caption2)
+                    .foregroundStyle(DesignTokens.Colors.textQuaternary)
             }
+            Spacer(minLength: 12)
+            Button("취소") {
+                store.cancelStrategyDraftChanges()
+            }
+            .buttonStyle(AppToolButtonStyle())
+            .disabled(!store.strategyDirty || store.strategySaveInFlight)
 
+            Button("기본값 복원") {
+                store.restoreStrategyDraftDefaults()
+            }
+            .buttonStyle(AppToolButtonStyle())
+            .disabled(store.strategyDefaults == nil || store.strategySaveInFlight)
+
+            Button {
+                Task {
+                    await store.saveStrategyDraft()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if store.strategySaveInFlight {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text("저장")
+                }
+            }
+            .buttonStyle(AppToolButtonStyle())
+            .disabled(!store.strategyDirty || store.strategySaveInFlight)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .appToolbarChrome(cornerRadius: DesignTokens.Radius.xl)
+    }
+
+    private func strategySectionSummary(
+        icon: String,
+        summary: String,
+        helpBinding: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .frame(width: 14)
+            Text(summary)
+                .font(.caption)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            Spacer()
+            Button {
+                helpBinding.wrappedValue.toggle()
+            } label: {
+                Label(
+                    helpBinding.wrappedValue ? "도움말 닫기" : "도움말",
+                    systemImage: "questionmark.circle"
+                )
+                .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(AppToolButtonStyle())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func strategyHelpText(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundStyle(DesignTokens.Colors.textTertiary)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 8)
+    }
+
+    private func strategyGroup<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+            content()
+        }
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(DesignTokens.Colors.surface1.opacity(0.55))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.9), lineWidth: 0.9)
+        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+    }
+
+    private func strategySegmentControlRow(
+        title: String,
+        control: AnyView
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            control
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func compactNumberControl(
+        title: String,
+        value: Int,
+        range: ClosedRange<Int>,
+        step: Int,
+        onChange: @escaping (Int) -> Void
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            Spacer(minLength: 8)
             HStack(spacing: 8) {
-                Button("취소") {
-                    store.cancelStrategyDraftChanges()
+                Button {
+                    let next = max(range.lowerBound, value - step)
+                    guard next != value else { return }
+                    onChange(next)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(AppToolButtonStyle())
-                .disabled(!store.strategyDirty || store.strategySaveInFlight)
+                .disabled(value <= range.lowerBound)
 
-                Button("기본값 복원") {
-                    store.restoreStrategyDraftDefaults()
-                }
-                .buttonStyle(AppToolButtonStyle())
-                .disabled(store.strategyDefaults == nil || store.strategySaveInFlight)
-
-                Spacer()
+                Text("\(value)")
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .frame(width: 44)
 
                 Button {
-                    Task {
-                        await store.saveStrategyDraft()
-                    }
+                    let next = min(range.upperBound, value + step)
+                    guard next != value else { return }
+                    onChange(next)
                 } label: {
-                    HStack(spacing: 6) {
-                        if store.strategySaveInFlight {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text("저장")
-                    }
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(AppToolButtonStyle())
-                .disabled(!store.strategyDirty || store.strategySaveInFlight)
+                .disabled(value >= range.upperBound)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .appSurfaceStyle(cornerRadius: DesignTokens.Radius.md)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private func strategySignalToggleGrid(
+        selected: [String],
+        binding: (String) -> Binding<Bool>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(strategySignalTypeOptions, id: \.self) { type in
+                HStack(spacing: 8) {
+                    Toggle(localizedSignalType(type), isOn: binding(type))
+                        .toggleStyle(.switch)
+                        .tint(DesignTokens.Colors.accent)
+                        .font(.caption)
+                    Spacer()
+                    if selected.contains(type) {
+                        StatusBadge(text: "활성", tone: .success)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
     }
 
     private var strategySignalTypeOptions: [String] {
@@ -511,57 +657,37 @@ struct SettingsView: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Stepper(
-                value: value,
-                in: 0...100,
-                step: 1
-            ) {
+            HStack(spacing: 6) {
+                Button {
+                    value.wrappedValue = max(0, value.wrappedValue - 1)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(AppToolButtonStyle())
+                .disabled(value.wrappedValue <= 0)
+
                 Text("\(Int(value.wrappedValue.rounded()))")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .frame(minWidth: 30)
+
+                Button {
+                    value.wrappedValue = min(100, value.wrappedValue + 1)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(AppToolButtonStyle())
+                .disabled(value.wrappedValue >= 100)
             }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .appSurfaceStyle(cornerRadius: DesignTokens.Radius.md)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func editableIntRow(
-        title: String,
-        value: Int,
-        range: ClosedRange<Int>,
-        step: Int,
-        icon: String? = nil,
-        onChange: @escaping (Int) -> Void
-    ) -> some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.caption)
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        .frame(width: 14)
-                }
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-            Spacer()
-            Stepper(
-                value: Binding(
-                    get: { value },
-                    set: { onChange($0) }
-                ),
-                in: range,
-                step: step
-            ) {
-                Text("\(value)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .frame(minWidth: 36, alignment: .trailing)
-            }
-            .labelsHidden()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
     }
 
     private func editableDoubleTextRow(
@@ -590,7 +716,17 @@ struct SettingsView: View {
                     set: onChange
                 )
             )
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .fill(DesignTokens.Colors.surface1.opacity(0.85))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.95), lineWidth: 0.9)
+            )
             .frame(width: 140)
             .font(.caption.monospacedDigit())
         }
@@ -607,24 +743,6 @@ struct SettingsView: View {
         return Double(normalized)
     }
 
-    private func scannerWeightSummary(weights: ScannerScoreWeightsSnapshot) -> String {
-        let rank = Int(weights.rank.rounded())
-        let turnover = Int(weights.turnover.rounded())
-        let change = Int(weights.changePct.rounded())
-        return "순위 \(rank) · 거래대금 \(turnover) · 등락률 \(change) (가중치)"
-    }
-
-    private func scannerModeLabel(_ mode: String) -> String {
-        switch mode.lowercased() {
-        case "turnover":
-            return "거래대금 순위"
-        case "surge":
-            return "급등률 순위"
-        default:
-            return mode
-        }
-    }
-
     private func localizedSignalType(_ type: String) -> String {
         switch type.lowercased() {
         case "new_entry":
@@ -636,12 +754,6 @@ struct SettingsView: View {
         default:
             return type
         }
-    }
-
-    private func localizedScannerNote(_ note: String) -> String {
-        note
-            .replacingOccurrences(of: "turnover", with: "거래대금 순위")
-            .replacingOccurrences(of: "surge", with: "급등률 순위")
     }
 
     private var apiConnectionPanel: some View {
@@ -710,7 +822,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(title)
-                    .font(.headline)
+                    .font(DesignTokens.Typography.sectionTitle)
                 Spacer()
                 trailing()
             }
@@ -726,11 +838,7 @@ struct SettingsView: View {
             .padding(.vertical, 6)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(DesignTokens.Colors.bgPanel, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-        )
+        .appPanelStyle(cornerRadius: DesignTokens.Radius.xl)
     }
 
     @ViewBuilder
