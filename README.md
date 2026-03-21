@@ -97,6 +97,9 @@
     - 변화값: `현재값 - 기준값`
     - 변화율: `(변화값 / 기준값) * 100`
   - points가 없거나 기준값이 0이면 기존 서버 변화값(`price/change_pct`)으로 fallback
+  - 개발 검증용 기준 라인 표시: `TF/source/basis/first/last`
+    - basis는 `/api/chart?...&debug=true`의 `aggregation_basis` 사용
+    - first/last는 debug 메타(`first_point_ts`, `last_point_ts`) 우선, 없으면 points에서 계산
   - 차트는 `/api/chart/{symbol}` 실데이터를 사용하며 KIS 원본 응답은 앱에서 직접 해석하지 않음
   - `5분`은 서버 집계 봉을 그대로 사용
   - 우측 상세는 단일 패널에서 요약/상태배지/차트/보조지표를 연속된 흐름으로 표시
@@ -107,6 +110,7 @@
   - Scanner와 동일한 `selectedScannerCode`/`selectedChartTimeframe` 상태를 공유
   - 동일 `/api/chart/{symbol}` 응답으로 라인 차트 + 시가/고가/저가/전일종가/변동성 표시
   - 상단 가격/등락 배지는 Scanner와 동일한 timeframe 기준 공통 계산 로직을 사용
+  - 개발 검증용 기준 라인(`TF/source/basis/first/last`)과 변화율 기준 문구를 표시
   - 로딩/빈데이터/에러 상태를 별도 표현
   - 차트 요청 안정화:
     - 선택/타임프레임 변경 시 debounce(300ms) 적용

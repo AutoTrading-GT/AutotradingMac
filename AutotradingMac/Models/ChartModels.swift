@@ -32,7 +32,30 @@ struct ChartSeriesResponse: Decodable {
     let timeframe: ChartTimeframeOption
     let source: String
     let timezone: String
+    let aggregationBasis: String?
+    let firstPointTs: Date?
+    let lastPointTs: Date?
     let points: [ChartPoint]
+
+    init(
+        symbol: String,
+        timeframe: ChartTimeframeOption,
+        source: String,
+        timezone: String,
+        aggregationBasis: String? = nil,
+        firstPointTs: Date? = nil,
+        lastPointTs: Date? = nil,
+        points: [ChartPoint]
+    ) {
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.source = source
+        self.timezone = timezone
+        self.aggregationBasis = aggregationBasis
+        self.firstPointTs = firstPointTs
+        self.lastPointTs = lastPointTs
+        self.points = points
+    }
 }
 
 struct ChartPoint: Decodable, Identifiable {
@@ -53,4 +76,3 @@ struct ChartMetrics {
     let prevClose: Double?
     let volatility: Double?
 }
-

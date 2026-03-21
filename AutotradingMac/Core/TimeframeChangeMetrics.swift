@@ -18,6 +18,9 @@ enum TimeframeChangeCalculator {
         fallbackCurrentPrice: Double?,
         fallbackChangePercent: Double?
     ) -> TimeframeChangeMetrics {
+        // Primary rule: whole selected timeframe window.
+        // base = first.open (fallback first.close), current = last.close
+        // delta = current - base, pct = delta / base * 100
         if let first = points.first, let last = points.last {
             let base = first.open != 0 ? first.open : first.close
             let current = last.close
@@ -33,6 +36,7 @@ enum TimeframeChangeCalculator {
             }
         }
 
+        // Fallback rule: server snapshot price/change_pct when chart window is unavailable.
         if
             let current = fallbackCurrentPrice,
             let changePercent = fallbackChangePercent

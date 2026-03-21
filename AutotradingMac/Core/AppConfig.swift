@@ -14,6 +14,7 @@ enum AppConfig {
     private static let websocketEnvKey = "AUTOTRADING_BACKEND_WS_URL"
     private static let explicitBackendBaseURLString: String? = nil
     private static let explicitWebSocketURLString: String? = nil
+    private static let includeChartDebugMeta = true
     private static let effectiveBackendResolution = resolveBackendBaseURL()
 
     static var backendBaseURL: URL {
@@ -77,6 +78,7 @@ enum AppConfig {
         components?.queryItems = [
             URLQueryItem(name: "timeframe", value: timeframe.rawValue),
             URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "debug", value: includeChartDebugMeta ? "true" : "false"),
         ]
         return components?.url ?? apiEndpoint("chart/\(sanitized)")
     }
