@@ -97,9 +97,6 @@
     - 변화값: `현재값 - 기준값`
     - 변화율: `(변화값 / 기준값) * 100`
   - points가 없거나 기준값이 0이면 기존 서버 변화값(`price/change_pct`)으로 fallback
-  - 개발 검증용 기준 라인 표시: `TF/source/basis/first/last`
-    - basis는 `/api/chart?...&debug=true`의 `aggregation_basis` 사용
-    - first/last는 debug 메타(`first_point_ts`, `last_point_ts`) 우선, 없으면 points에서 계산
   - 차트는 `/api/chart/{symbol}` 실데이터를 사용하며 KIS 원본 응답은 앱에서 직접 해석하지 않음
   - `5분`은 서버 집계 봉을 그대로 사용
   - 우측 상세는 단일 패널에서 요약/상태배지/차트/보조지표를 연속된 흐름으로 표시
@@ -115,7 +112,6 @@
   - Scanner와 동일한 `selectedScannerCode`/`selectedChartTimeframe` 상태를 공유
   - 동일 `/api/chart/{symbol}` 응답으로 라인 차트 + 시가/고가/저가/전일종가/변동성 표시
   - 상단 가격/등락 배지는 Scanner와 동일한 timeframe 기준 공통 계산 로직을 사용
-  - 개발 검증용 기준 라인(`TF/source/basis/first/last`)과 변화율 기준 문구를 표시
   - 차트 1단계 표시(Scanner와 동일):
     - x축 시간축, y축 가격축
     - 현재가 라벨
@@ -128,6 +124,11 @@
   - 에러 문구 분리:
     - `KIS 토큰 획득 실패`
     - `차트 데이터 조회 실패`
+  - Scanner/Chart/Dev 공통 컨트롤 스타일 적용:
+    - 스캔 기준/타임프레임 선택은 동일 커스텀 segmented control 사용
+    - Chart 종목 선택은 공통 menu selector 스타일 사용
+    - Dev `Reload Snapshot`/`Reconnect WS`는 보조 도구 버튼 스타일로 통일
+  - Chart 하단 요약 영역은 Scanner와 동일한 공통 컴포넌트(`ChartMetricSummaryRow`)로 렌더링
 
 ## Dashboard 레이아웃(현재)
 - 상단 KPI 4카드

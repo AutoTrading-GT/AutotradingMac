@@ -116,13 +116,13 @@ struct MarketView: View {
 
             Spacer(minLength: 12)
 
-            Picker("", selection: $scanMode) {
-                ForEach(ScannerMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 236)
+            AppSegmentedControl(
+                options: scannerModeOptions,
+                selection: $scanMode,
+                minSegmentWidth: 104,
+                height: 34
+            )
+            .frame(width: 252)
         }
             .padding(.horizontal, DesignTokens.Layout.panelInnerPadding)
             .padding(.vertical, 9)
@@ -316,18 +316,16 @@ struct MarketView: View {
                     .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
-                HStack {
-                    Picker("", selection: chartTimeframe) {
-                        ForEach(ChartTimeframeOption.allCases) { timeframe in
-                            Text(timeframe.title).tag(timeframe)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 260)
-                }
+                AppSegmentedControl(
+                    options: chartTimeframeOptions,
+                    selection: chartTimeframe,
+                    minSegmentWidth: 48,
+                    height: 34
+                )
+                .frame(width: 252)
             }
             .padding(.horizontal, 14)
-            .padding(.top, 10)
+            .padding(.vertical, 10)
 
             Divider().opacity(0.5)
 
@@ -363,7 +361,7 @@ struct MarketView: View {
             }
 
             Divider().opacity(0.5)
-            chartSupportInfoRow(metrics: metrics)
+            ChartMetricSummaryRow(items: chartSummaryItems(metrics))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
         }
@@ -377,32 +375,22 @@ struct MarketView: View {
         )
     }
 
-    private func chartSupportInfoRow(metrics: ScannerChartMetrics) -> some View {
-        HStack(spacing: 0) {
-            chartSupportInfoItem(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: DesignTokens.Colors.textPrimary)
-            Divider()
-            chartSupportInfoItem(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: DesignTokens.Colors.profit.opacity(0.92))
-            Divider()
-            chartSupportInfoItem(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: DesignTokens.Colors.loss.opacity(0.92))
-            Divider()
-            chartSupportInfoItem(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: DesignTokens.Colors.textPrimary)
-            Divider()
-            chartSupportInfoItem(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: DesignTokens.Colors.textSecondary)
-        }
-        .padding(.vertical, 4)
+    private var scannerModeOptions: [AppSegmentedOption<ScannerMode>] {
+        ScannerMode.allCases.map { .init(value: $0, title: $0.title) }
     }
 
-    private func chartSupportInfoItem(title: String, value: String, valueColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(valueColor)
-        }
-        .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private var chartTimeframeOptions: [AppSegmentedOption<ChartTimeframeOption>] {
+        ChartTimeframeOption.allCases.map { .init(value: $0, title: $0.title) }
+    }
+
+    private func chartSummaryItems(_ metrics: ScannerChartMetrics) -> [ChartMetricSummaryItem] {
+        [
+            .init(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: DesignTokens.Colors.textPrimary),
+            .init(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: DesignTokens.Colors.profit.opacity(0.92)),
+            .init(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: DesignTokens.Colors.loss.opacity(0.92)),
+            .init(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: DesignTokens.Colors.textPrimary),
+            .init(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: DesignTokens.Colors.textSecondary),
+        ]
     }
 
     private var candidates: [ScannerCandidate] {

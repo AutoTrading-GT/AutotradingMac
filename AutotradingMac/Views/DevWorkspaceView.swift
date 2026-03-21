@@ -72,9 +72,13 @@ struct DevWorkspaceView: View {
                 Button("Reload Snapshot") {
                     Task { await store.reloadSnapshot() }
                 }
+                .buttonStyle(AppToolButtonStyle())
+
                 Button("Reconnect WS") {
                     store.reconnectWebSocket()
                 }
+                .buttonStyle(AppToolButtonStyle())
+
                 Text("마지막 갱신: \(DisplayFormatters.dateTime(store.lastUpdatedAt))")
                     .font(.caption)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
@@ -166,14 +170,14 @@ struct DevWorkspaceView: View {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .padding(.vertical, 6)
                 .background(
-                    Capsule(style: .continuous)
-                        .fill(selected ? DesignTokens.Colors.accentMuted : DesignTokens.Colors.surface2)
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                        .fill(selected ? DesignTokens.Colors.accentMuted.opacity(0.95) : DesignTokens.Colors.surface1.opacity(0.8))
                 )
                 .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(selected ? DesignTokens.Colors.accent : DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                        .stroke(selected ? DesignTokens.Colors.accent.opacity(0.82) : DesignTokens.Colors.borderSubtle.opacity(0.9), lineWidth: 0.9)
                 )
         }
         .buttonStyle(.plain)

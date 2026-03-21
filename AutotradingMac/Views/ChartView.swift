@@ -37,25 +37,23 @@ struct ChartView: View {
                 .font(DesignTokens.Typography.title)
 
             if !store.marketRows.isEmpty {
-                Picker("종목", selection: selectedSymbolBinding) {
-                    ForEach(store.marketRows) { row in
-                        Text(row.symbol.isEmpty || row.symbol == "-" ? row.code : "\(row.symbol) (\(row.code))")
-                            .tag(Optional(row.code))
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 280)
+                AppMenuSelector(
+                    options: symbolOptions,
+                    selection: selectedSymbolBinding,
+                    selectedTitle: selectedSymbolTitle,
+                    width: 292
+                )
             }
 
             Spacer()
 
-            Picker("", selection: timeframeBinding) {
-                ForEach(ChartTimeframeOption.allCases) { timeframe in
-                    Text(timeframe.title).tag(timeframe)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 240)
+            AppSegmentedControl(
+                options: timeframeOptions,
+                selection: timeframeBinding,
+                minSegmentWidth: 48,
+                height: 34
+            )
+            .frame(width: 252)
         }
     }
 
@@ -137,7 +135,9 @@ struct ChartView: View {
                 }
             }
 
-            chartSupportInfoRow(metrics: metrics)
+            ChartMetricSummaryRow(items: chartSummaryItems(metrics))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
         }
         .padding(DesignTokens.Layout.panelInnerPadding)
         .appPanelStyle()
@@ -173,6 +173,25 @@ struct ChartView: View {
         store.marketRows.first(where: { $0.code == code })
     }
 
+    private var symbolOptions: [AppMenuOption<String?>] {
+        store.marketRows.map { row in
+            let title = row.symbol.isEmpty || row.symbol == "-" ? row.code : "\(row.symbol) (\(row.code))"
+            return AppMenuOption(value: Optional(row.code), title: title)
+        }
+    }
+
+    private var selectedSymbolTitle: String {
+        guard let code = selectedCode else { return "종목 선택" }
+        if let row = marketRow(for: code) {
+            return row.symbol.isEmpty || row.symbol == "-" ? code : "\(row.symbol) (\(code))"
+        }
+        return code
+    }
+
+    private var timeframeOptions: [AppSegmentedOption<ChartTimeframeOption>] {
+        ChartTimeframeOption.allCases.map { .init(value: $0, title: $0.title) }
+    }
+
     private func chartMetrics(points: [ChartPoint]) -> ChartMetrics {
         let open = points.first?.open
         let high = points.map(\.high).max()
@@ -199,32 +218,14 @@ struct ChartView: View {
         )
     }
 
-    private func chartSupportInfoRow(metrics: ChartMetrics) -> some View {
-        HStack(spacing: 0) {
-            supportInfoItem(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: DesignTokens.Colors.textPrimary)
-            Divider()
-            supportInfoItem(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: DesignTokens.Colors.profit.opacity(0.92))
-            Divider()
-            supportInfoItem(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: DesignTokens.Colors.loss.opacity(0.92))
-            Divider()
-            supportInfoItem(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: DesignTokens.Colors.textPrimary)
-            Divider()
-            supportInfoItem(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: DesignTokens.Colors.textSecondary)
-        }
-        .padding(.vertical, 2)
-    }
-
-    private func supportInfoItem(title: String, value: String, valueColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Text(value)
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(valueColor)
-        }
-        .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func chartSummaryItems(_ metrics: ChartMetrics) -> [ChartMetricSummaryItem] {
+        [
+            .init(title: "시가", value: DisplayFormatters.krw(metrics.open), valueColor: DesignTokens.Colors.textPrimary),
+            .init(title: "고가", value: DisplayFormatters.krw(metrics.high), valueColor: DesignTokens.Colors.profit.opacity(0.92)),
+            .init(title: "저가", value: DisplayFormatters.krw(metrics.low), valueColor: DesignTokens.Colors.loss.opacity(0.92)),
+            .init(title: "전일종가", value: DisplayFormatters.krw(metrics.prevClose), valueColor: DesignTokens.Colors.textPrimary),
+            .init(title: "변동성", value: DisplayFormatters.percent(metrics.volatility), valueColor: DesignTokens.Colors.textSecondary),
+        ]
     }
 }
 
