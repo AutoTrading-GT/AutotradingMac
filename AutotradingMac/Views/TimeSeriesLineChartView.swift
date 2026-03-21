@@ -115,76 +115,80 @@ struct TimeSeriesLineChartView: View {
 
     @ViewBuilder
     private func currentPriceGuide(chart: ChartGeometry) -> some View {
-        guard let current = points.last?.close else { return }
-        let y = chart.yPosition(for: current)
-        Path { path in
-            path.move(to: CGPoint(x: chart.plotRect.minX, y: y))
-            path.addLine(to: CGPoint(x: chart.plotRect.maxX, y: y))
+        if let current = points.last?.close {
+            let y = chart.yPosition(for: current)
+            Path { path in
+                path.move(to: CGPoint(x: chart.plotRect.minX, y: y))
+                path.addLine(to: CGPoint(x: chart.plotRect.maxX, y: y))
+            }
+            .stroke(
+                lineColor.opacity(0.32),
+                style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+            )
         }
-        .stroke(
-            lineColor.opacity(0.32),
-            style: StrokeStyle(lineWidth: 1, dash: [3, 3])
-        )
     }
 
     @ViewBuilder
     private func lastPointMarker(chart: ChartGeometry) -> some View {
-        guard let last = points.last else { return }
-        let index = points.count - 1
-        let x = chart.xPosition(for: index)
-        let y = chart.yPosition(for: last.close)
-        Circle()
-            .fill(lineColor)
-            .frame(width: 6, height: 6)
-            .position(x: x, y: y)
+        if let last = points.last {
+            let index = points.count - 1
+            let x = chart.xPosition(for: index)
+            let y = chart.yPosition(for: last.close)
+            Circle()
+                .fill(lineColor)
+                .frame(width: 6, height: 6)
+                .position(x: x, y: y)
+        }
     }
 
     @ViewBuilder
     private func currentPriceLabel(chart: ChartGeometry) -> some View {
-        guard let current = points.last?.close else { return }
-        let y = chart.yPosition(for: current)
-        let clampedY = min(max(y, chart.plotRect.minY + 10), chart.plotRect.maxY - 10)
-        Text("현재 \(DisplayFormatters.integer(Int(current.rounded())))")
-            .font(.caption2.monospacedDigit().weight(.semibold))
-            .foregroundStyle(lineColor)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(DesignTokens.Colors.surface2.opacity(0.92))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(lineColor.opacity(0.35), lineWidth: 1)
-            )
-            .position(x: chart.plotRect.maxX + 34, y: clampedY)
+        if let current = points.last?.close {
+            let y = chart.yPosition(for: current)
+            let clampedY = min(max(y, chart.plotRect.minY + 10), chart.plotRect.maxY - 10)
+            Text("현재 \(DisplayFormatters.integer(Int(current.rounded())))")
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(lineColor)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(DesignTokens.Colors.surface2.opacity(0.92))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(lineColor.opacity(0.35), lineWidth: 1)
+                )
+                .position(x: chart.plotRect.maxX + 34, y: clampedY)
+        }
     }
 
     @ViewBuilder
     private func highLowMarkers(chart: ChartGeometry) -> some View {
-        guard let highIndex = chart.highIndex, let lowIndex = chart.lowIndex else { return }
-        let highX = chart.xPosition(for: highIndex)
-        let lowX = chart.xPosition(for: lowIndex)
-        let highY = chart.yPosition(for: points[highIndex].high)
-        let lowY = chart.yPosition(for: points[lowIndex].low)
-        let verticalDistance = abs(highY - lowY)
-        let highYOffset: CGFloat = verticalDistance < 28 ? -20 : -14
-        let lowYOffset: CGFloat = verticalDistance < 28 ? 20 : 14
+        if let highIndex = chart.highIndex, let lowIndex = chart.lowIndex {
+            let highX = chart.xPosition(for: highIndex)
+            let lowX = chart.xPosition(for: lowIndex)
+            let highY = chart.yPosition(for: points[highIndex].high)
+            let lowY = chart.yPosition(for: points[lowIndex].low)
+            let verticalDistance = abs(highY - lowY)
+            let highYOffset: CGFloat = verticalDistance < 28 ? -20 : -14
+            let lowYOffset: CGFloat = verticalDistance < 28 ? 20 : 14
 
-        marker(
-            title: "고 \(DisplayFormatters.integer(Int(points[highIndex].high.rounded())))",
-            x: highX,
-            y: highY + highYOffset,
-            tone: DesignTokens.Colors.profit.opacity(0.92),
-            chart: chart
-        )
-        marker(
-            title: "저 \(DisplayFormatters.integer(Int(points[lowIndex].low.rounded())))",
-            x: lowX,
-            y: lowY + lowYOffset,
-            tone: DesignTokens.Colors.loss.opacity(0.92),
-            chart: chart
-        )
+            marker(
+                title: "고 \(DisplayFormatters.integer(Int(points[highIndex].high.rounded())))",
+                x: highX,
+                y: highY + highYOffset,
+                tone: DesignTokens.Colors.profit.opacity(0.92),
+                chart: chart
+            )
+            marker(
+                title: "저 \(DisplayFormatters.integer(Int(points[lowIndex].low.rounded())))",
+                x: lowX,
+                y: lowY + lowYOffset,
+                tone: DesignTokens.Colors.loss.opacity(0.92),
+                chart: chart
+            )
+        }
     }
 
     @ViewBuilder
