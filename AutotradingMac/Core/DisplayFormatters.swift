@@ -121,6 +121,6 @@ enum DisplayFormatters {
             return "\(sign)\(jo)조 \(String(format: "%04d", remainderEok))억"
         }
 
-        return "\(sign)\(String(format: "%06.1f", roundedEokOneDecimal))억"
+        return "\(sign)\(String(format: "%.1f", roundedEokOneDecimal))억"
     }
 }
