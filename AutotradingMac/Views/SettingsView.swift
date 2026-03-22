@@ -243,7 +243,7 @@ struct SettingsView: View {
                     onChange: { store.updateStrategyBasicMaxHoldingMinutes($0) }
                 )
                 Toggle(
-                    "장 마감 시 전체 청산",
+                    "장 마감 5분 전 전체 청산",
                     isOn: Binding(
                         get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? basic.exit.forceCloseOnMarketClose },
                         set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
