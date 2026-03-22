@@ -496,6 +496,7 @@ struct BasicRiskSettingsSnapshot: Decodable, Equatable {
         case positionSizePct
         case dailyTradeLimitEnabled
         case dailyTradeLimitCount
+        case maxConcurrentPositions
         // Legacy compatibility keys.
         case positionSizeValue
         case dailyTradeLimit
