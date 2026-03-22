@@ -344,8 +344,43 @@ struct ScannerRanksResponse: Decodable {
 struct StrategySettingsResponseEnvelope: Decodable {
     let data: StrategySettingsSnapshot
     let defaults: StrategySettingsSnapshot
+    let applyStatus: StrategyApplyStatusSnapshot?
     let applyPolicy: String
     let updatedAt: Date
+
+    init(
+        data: StrategySettingsSnapshot,
+        defaults: StrategySettingsSnapshot,
+        applyStatus: StrategyApplyStatusSnapshot? = nil,
+        applyPolicy: String,
+        updatedAt: Date
+    ) {
+        self.data = data
+        self.defaults = defaults
+        self.applyStatus = applyStatus
+        self.applyPolicy = applyPolicy
+        self.updatedAt = updatedAt
+    }
+}
+
+struct StrategyApplyStatusSnapshot: Decodable {
+    let savedVersion: Int
+    let savedAt: Date
+    let lastAppliedAt: Date?
+    let groups: [String: StrategyApplyGroupStatusSnapshot]
+}
+
+struct StrategyApplyGroupStatusSnapshot: Decodable {
+    let configuredValue: [String: JSONValue]
+    let effectiveValue: [String: JSONValue]
+    let effectiveFrom: Date?
+    let appliedStatus: String
+    let appliedVersion: Int?
+    let targetVersion: Int
+    let appliedBy: String?
+    let wiredFields: [String]
+    let notWiredFields: [String]
+    let note: String?
 }
 
 struct StrategySettingsSnapshot: Decodable, Equatable {

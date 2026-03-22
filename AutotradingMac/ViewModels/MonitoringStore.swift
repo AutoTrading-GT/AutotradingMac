@@ -14,6 +14,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var strategyDraft: StrategySettingsSnapshot?
     @Published private(set) var strategyApplyPolicy: String?
     @Published private(set) var strategyUpdatedAt: Date?
+    @Published private(set) var strategyApplyStatus: StrategyApplyStatusSnapshot?
     @Published private(set) var strategyDirty = false
     @Published private(set) var strategySaveInFlight = false
     @Published private(set) var strategyValidationMessages: [String] = []
@@ -721,6 +722,14 @@ final class MonitoringStore: ObservableObject {
         return errors
     }
 
+    var strategyLastAppliedAt: Date? {
+        strategyApplyStatus?.lastAppliedAt
+    }
+
+    func strategyGroupApplyStatus(_ group: String) -> StrategyApplyGroupStatusSnapshot? {
+        strategyApplyStatus?.groups[group]
+    }
+
     private func applyStrategySettingsEnvelope(
         _ envelope: StrategySettingsResponseEnvelope,
         preserveDirtyDraft: Bool
@@ -733,6 +742,7 @@ final class MonitoringStore: ObservableObject {
         strategyDefaults = defaults
         strategyApplyPolicy = envelope.applyPolicy
         strategyUpdatedAt = envelope.updatedAt
+        strategyApplyStatus = envelope.applyStatus
         if !preserveDirtyDraft {
             strategyDraft = data
             strategyValidationMessages = []

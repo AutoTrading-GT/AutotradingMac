@@ -184,6 +184,35 @@ struct SettingsView: View {
                 title: "반영 정책",
                 value: store.strategyApplyPolicy ?? "저장 후 다음 평가 사이클부터 반영"
             )
+            settingsRow(
+                icon: "tray.and.arrow.down",
+                title: "마지막 저장",
+                value: store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-"
+            )
+            settingsRow(
+                icon: "checkmark.circle",
+                title: "마지막 적용",
+                value: store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "아직 적용 이력 없음",
+                tone: .neutral
+            )
+            settingsRow(
+                icon: "figure.walk.motion",
+                title: "진입 전략 반영",
+                value: strategyGroupStatusText("entry"),
+                tone: strategyGroupStatusTone("entry")
+            )
+            settingsRow(
+                icon: "flag.checkered",
+                title: "청산 전략 반영",
+                value: strategyGroupStatusText("exit"),
+                tone: strategyGroupStatusTone("exit")
+            )
+            settingsRow(
+                icon: "shield",
+                title: "리스크 전략 반영",
+                value: strategyGroupStatusText("risk"),
+                tone: strategyGroupStatusTone("risk")
+            )
         }
     }
 
@@ -550,7 +579,9 @@ struct SettingsView: View {
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                         .lineLimit(1)
                 }
-                Text("마지막 반영: \(store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-")")
+                Text(
+                    "저장: \(store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-")  |  적용: \(store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "-")"
+                )
                     .font(.caption2)
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
             }
@@ -953,6 +984,40 @@ struct SettingsView: View {
             return "급등률 중심"
         default:
             return mode
+        }
+    }
+
+    private func strategyGroupStatusText(_ group: String) -> String {
+        guard let status = store.strategyGroupApplyStatus(group) else {
+            return "상태 정보 없음"
+        }
+        switch status.appliedStatus.lowercased() {
+        case "applied":
+            return "반영 완료"
+        case "pending_next_cycle":
+            return "다음 평가 사이클 반영 대기"
+        case "partial":
+            return "부분 반영 (\(status.notWiredFields.count)개 항목 미연결)"
+        case "not_wired":
+            return "저장 전용(엔진 미연결)"
+        default:
+            return status.appliedStatus
+        }
+    }
+
+    private func strategyGroupStatusTone(_ group: String) -> StatusTone {
+        guard let status = store.strategyGroupApplyStatus(group) else { return .neutral }
+        switch status.appliedStatus.lowercased() {
+        case "applied":
+            return .success
+        case "pending_next_cycle":
+            return .warning
+        case "partial":
+            return .warning
+        case "not_wired":
+            return .neutral
+        default:
+            return .neutral
         }
     }
 

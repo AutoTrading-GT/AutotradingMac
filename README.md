@@ -72,13 +72,17 @@
     - 하단 고정 action bar: 변경 상태 + 반영 정책 + `취소/기본값 복원/저장`
   - 데이터 소스: `GET /api/monitoring/strategy-settings`
   - 저장 API: `PATCH /api/monitoring/strategy-settings`
-  - 응답 메타(`defaults`, `apply_policy`, `updated_at`)를 함께 사용
+  - 응답 메타(`defaults`, `apply_status`, `apply_policy`, `updated_at`)를 함께 사용
   - 편집 흐름: `server snapshot`과 `local draft` 분리, `취소`/`기본값 복원`/`저장` 제공
   - 저장 전 로컬 검증 + 서버 검증(`422 detail`) 메시지 표시
   - Basic 편집 항목:
     - 진입: 후보 선정 방식, 관찰 Top-N, 주요 진입 신호 유형
     - 청산: 목표 수익률, 손절 기준, 최대 보유시간, 장 마감 5분 전 전체 청산
     - 리스크: 최대 손실 한도, 포지션 크기 정책, 일일 거래 제한, 동시 보유 제한
+  - 반영 상태 표시:
+    - `마지막 저장`과 `마지막 적용` 시각을 분리 표기
+    - 그룹별 상태(`applied/pending_next_cycle/partial/not_wired`)를 요약 카드에 표시
+    - 저장 성공과 실제 엔진 반영 완료를 구분해 표시
   - Advanced 섹션: 기존 `Scanner Settings`, `Signal Settings`, `Risk Settings` 상세 튜닝
   - 설명 문구 노출 정책:
     - 기본 화면은 한 줄 요약 중심
