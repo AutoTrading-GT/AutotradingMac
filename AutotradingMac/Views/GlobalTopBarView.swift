@@ -46,24 +46,6 @@ struct GlobalTopBarView: View {
                 separatorPill
 
                 toolbarInfoPill(
-                    icon: "shippingbox.fill",
-                    title: "주문 모드",
-                    value: orderModeText,
-                    tone: orderModeTone
-                )
-
-                separatorPill
-
-                toolbarInfoPill(
-                    icon: "creditcard.fill",
-                    title: "계좌 기준",
-                    value: accountModeText,
-                    tone: accountModeTone
-                )
-
-                separatorPill
-
-                toolbarInfoPill(
                     icon: "clock.fill",
                     title: "",
                     value: marketStatusText,
@@ -75,7 +57,7 @@ struct GlobalTopBarView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11, weight: .semibold))
-                    Text(lastUpdatedRelativeText)
+                    Text("새로고침 \(lastUpdatedRelativeText)")
                         .lineLimit(1)
                 }
                 .font(DesignTokens.Typography.caption)
@@ -91,26 +73,14 @@ struct GlobalTopBarView: View {
                         .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
                 )
 
-                if let controlFeedbackText {
-                    HStack(spacing: 6) {
-                        Image(systemName: controlFeedbackIcon)
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(controlFeedbackText)
-                            .lineLimit(1)
-                    }
-                    .font(DesignTokens.Typography.caption)
-                    .foregroundStyle(controlFeedbackColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(DesignTokens.Colors.surface1)
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-                    )
-                }
+                separatorPill
+
+                toolbarInfoPill(
+                    icon: "shippingbox.fill",
+                    title: "주문/계좌 모드",
+                    value: modeContextText,
+                    tone: modeContextTone
+                )
             }
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -217,6 +187,9 @@ struct GlobalTopBarView: View {
         let state = store.runtime?.engineState?.lowercased()
         switch state {
         case "running":
+            if store.runtime?.marketClosedIdle == true {
+                return "실행 중(장종료 대기)"
+            }
             return "실행 중"
         case "paused":
             return "일시정지"
@@ -234,6 +207,9 @@ struct GlobalTopBarView: View {
     private var automationStatusTone: StatusTone {
         switch store.runtime?.engineState?.lowercased() {
         case "running":
+            if store.runtime?.marketClosedIdle == true {
+                return .warning
+            }
             return .success
         case "paused":
             return .warning
@@ -258,15 +234,24 @@ struct GlobalTopBarView: View {
         (store.runtime?.accountMode ?? "paper").uppercased()
     }
 
-    private var orderModeTone: StatusTone {
-        (store.runtime?.orderMode ?? "paper").lowercased() == "live" ? .warning : .info
+    private var modeContextText: String {
+        "\(orderModeText) / \(accountModeText)"
     }
 
-    private var accountModeTone: StatusTone {
-        (store.runtime?.accountMode ?? "paper").lowercased() == "live" ? .warning : .info
+    private var modeContextTone: StatusTone {
+        let orderLive = (store.runtime?.orderMode ?? "paper").lowercased() == "live"
+        let accountLive = (store.runtime?.accountMode ?? "paper").lowercased() == "live"
+        if orderLive || accountLive {
+            return .warning
+        }
+        return .info
     }
 
     private var marketStatusText: String {
+        if store.runtime?.marketTradingActive == false {
+            return "장 종료"
+        }
+
         let now = Date()
         let seoul = TimeZone(identifier: "Asia/Seoul") ?? .current
         var calendar = Calendar(identifier: .gregorian)
@@ -318,27 +303,6 @@ struct GlobalTopBarView: View {
         return "\(delta / 3600)시간 전"
     }
 
-    private var controlFeedbackText: String? {
-        guard let message = store.engineActionResultMessage else {
-            return nil
-        }
-        let normalized = message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if normalized == "engine started"
-            || normalized == "engine paused"
-            || normalized.contains("account mode")
-            || normalized.contains("order mode") {
-            return nil
-        }
-        return message
-    }
-
-    private var controlFeedbackIcon: String {
-        return "checkmark.circle.fill"
-    }
-
-    private var controlFeedbackColor: Color {
-        return DesignTokens.Colors.successMuted
-    }
 }
 
 private enum TopBarActionTone {

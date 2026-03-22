@@ -66,6 +66,10 @@ struct RuntimeStatusSnapshot: Decodable {
     var appStatus: String
     var orderMode: String
     var accountMode: String
+    var marketTradingActive: Bool?
+    var marketClosedIdle: Bool?
+    var strategyRunState: String?
+    var riskRunState: String?
     var executionMode: String?
     var engineState: String?
     var engineAvailableActions: [String]?
@@ -93,6 +97,10 @@ struct RuntimeStatusSnapshot: Decodable {
         appStatus: String,
         orderMode: String,
         accountMode: String,
+        marketTradingActive: Bool?,
+        marketClosedIdle: Bool?,
+        strategyRunState: String?,
+        riskRunState: String?,
         executionMode: String?,
         engineState: String?,
         engineAvailableActions: [String]?,
@@ -119,6 +127,10 @@ struct RuntimeStatusSnapshot: Decodable {
         self.appStatus = appStatus
         self.orderMode = orderMode
         self.accountMode = accountMode
+        self.marketTradingActive = marketTradingActive
+        self.marketClosedIdle = marketClosedIdle
+        self.strategyRunState = strategyRunState
+        self.riskRunState = riskRunState
         self.executionMode = executionMode
         self.engineState = engineState
         self.engineAvailableActions = engineAvailableActions
@@ -147,6 +159,10 @@ struct RuntimeStatusSnapshot: Decodable {
         appStatus: "degraded",
         orderMode: "paper",
         accountMode: "paper",
+        marketTradingActive: nil,
+        marketClosedIdle: nil,
+        strategyRunState: nil,
+        riskRunState: nil,
         executionMode: "paper",
         engineState: nil,
         engineAvailableActions: [],
@@ -175,6 +191,10 @@ struct RuntimeStatusSnapshot: Decodable {
         case appStatus
         case orderMode
         case accountMode
+        case marketTradingActive
+        case marketClosedIdle
+        case strategyRunState
+        case riskRunState
         case executionMode
         case engineState
         case engineAvailableActions
@@ -208,6 +228,10 @@ struct RuntimeStatusSnapshot: Decodable {
             ?? "paper"
         accountMode = container.decodeStringFlexible(forKey: .accountMode)
             ?? "paper"
+        marketTradingActive = container.decodeBoolFlexible(forKey: .marketTradingActive)
+        marketClosedIdle = container.decodeBoolFlexible(forKey: .marketClosedIdle)
+        strategyRunState = container.decodeStringFlexible(forKey: .strategyRunState)
+        riskRunState = container.decodeStringFlexible(forKey: .riskRunState)
         engineState = container.decodeStringFlexible(forKey: .engineState)
         engineAvailableActions = try container.decodeIfPresent([String].self, forKey: .engineAvailableActions)
         engineTransitioningAction = container.decodeStringFlexible(forKey: .engineTransitioningAction)

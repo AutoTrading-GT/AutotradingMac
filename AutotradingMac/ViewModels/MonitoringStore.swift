@@ -1359,6 +1359,18 @@ final class MonitoringStore: ObservableObject {
         if let accountMode = payload.details?["account_mode"]?.stringValue {
             runtime.accountMode = accountMode
         }
+        if let marketTradingActive = payload.details?["market_trading_active"]?.boolValue {
+            runtime.marketTradingActive = marketTradingActive
+        }
+        if let marketClosedIdle = payload.details?["market_closed_idle"]?.boolValue {
+            runtime.marketClosedIdle = marketClosedIdle
+        }
+        if let strategyRunState = payload.details?["strategy_run_state"]?.stringValue {
+            runtime.strategyRunState = strategyRunState
+        }
+        if let riskRunState = payload.details?["risk_run_state"]?.stringValue {
+            runtime.riskRunState = riskRunState
+        }
         if let executionMode = payload.details?["execution_mode"]?.stringValue {
             runtime.executionMode = executionMode
         }
