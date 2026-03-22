@@ -54,6 +54,14 @@ struct ChartView: View {
                 height: 34
             )
             .frame(width: 252)
+
+            if showsClosedIntradayHint {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DesignTokens.Colors.textSecondary.opacity(0.9))
+                    .help(MarketSessionResolver.intradayClosedTooltip)
+                    .accessibilityLabel("휴장 안내")
+            }
         }
     }
 
@@ -190,6 +198,13 @@ struct ChartView: View {
 
     private var timeframeOptions: [AppSegmentedOption<ChartTimeframeOption>] {
         ChartTimeframeOption.allCases.map { .init(value: $0, title: $0.title) }
+    }
+
+    private var showsClosedIntradayHint: Bool {
+        MarketSessionResolver.shouldShowClosedIntradayHint(
+            timeframe: store.selectedChartTimeframe,
+            runtime: store.runtime
+        )
     }
 
     private func chartMetrics(points: [ChartPoint]) -> ChartMetrics {

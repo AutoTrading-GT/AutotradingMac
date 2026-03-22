@@ -124,3 +124,79 @@ enum DisplayFormatters {
         return "\(sign)\(String(format: "%.1f", roundedEokOneDecimal))억"
     }
 }
+
+enum MarketSessionResolver {
+    static let intradayClosedTooltip = "휴장 중입니다. 분봉 차트는 마지막 거래일 기준으로 표시됩니다."
+
+    static func shouldShowClosedIntradayHint(
+        timeframe: ChartTimeframeOption,
+        runtime: RuntimeStatusSnapshot?,
+        now: Date = Date()
+    ) -> Bool {
+        guard timeframe == .minute1 || timeframe == .minute5 else {
+            return false
+        }
+        return !isMarketOpen(runtime: runtime, now: now)
+    }
+
+    private static func isMarketOpen(runtime: RuntimeStatusSnapshot?, now: Date) -> Bool {
+        if let runtimeValue = runtimeMarketOpen(runtime) {
+            return runtimeValue
+        }
+        return calendarFallbackIsOpen(now: now)
+    }
+
+    private static func runtimeMarketOpen(_ runtime: RuntimeStatusSnapshot?) -> Bool? {
+        guard let worker = runtime?.workers.workers["market_data"] else {
+            return nil
+        }
+
+        if let isOpen = worker["is_market_open"]?.boolValue {
+            return isOpen
+        }
+
+        let rawStatus =
+            worker["market_status"]?.stringValue ??
+            worker["market_session_status"]?.stringValue ??
+            worker["session_status"]?.stringValue ??
+            worker["trading_session_status"]?.stringValue
+
+        guard let rawStatus else {
+            return nil
+        }
+        let normalized = rawStatus.lowercased()
+        if normalized.contains("open") || normalized.contains("trading") || normalized.contains("장중") {
+            return true
+        }
+        if normalized.contains("close") || normalized.contains("closed") || normalized.contains("휴장") || normalized.contains("마감") {
+            return false
+        }
+        return nil
+    }
+
+    private static func calendarFallbackIsOpen(now: Date) -> Bool {
+        let seoul = TimeZone(identifier: "Asia/Seoul") ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = seoul
+
+        let weekday = calendar.component(.weekday, from: now)
+        if weekday == 1 || weekday == 7 {
+            return false
+        }
+
+        let open = marketDate(hour: 9, minute: 0, base: now, calendar: calendar)
+        let close = marketDate(hour: 15, minute: 30, base: now, calendar: calendar)
+        return now >= open && now < close
+    }
+
+    private static func marketDate(hour: Int, minute: Int, base: Date, calendar: Calendar) -> Date {
+        let components = calendar.dateComponents([.year, .month, .day], from: base)
+        return calendar.date(from: DateComponents(
+            year: components.year,
+            month: components.month,
+            day: components.day,
+            hour: hour,
+            minute: minute
+        )) ?? base
+    }
+}

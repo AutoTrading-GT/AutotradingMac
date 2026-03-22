@@ -316,13 +316,23 @@ struct MarketView: View {
                     .font(DesignTokens.Typography.caption)
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
-                AppSegmentedControl(
-                    options: chartTimeframeOptions,
-                    selection: chartTimeframe,
-                    minSegmentWidth: 48,
-                    height: 34
-                )
-                .frame(width: 252)
+                HStack(spacing: 6) {
+                    AppSegmentedControl(
+                        options: chartTimeframeOptions,
+                        selection: chartTimeframe,
+                        minSegmentWidth: 48,
+                        height: 34
+                    )
+                    .frame(width: 252)
+
+                    if showsClosedIntradayHint {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DesignTokens.Colors.textSecondary.opacity(0.9))
+                            .help(MarketSessionResolver.intradayClosedTooltip)
+                            .accessibilityLabel("휴장 안내")
+                    }
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -381,6 +391,13 @@ struct MarketView: View {
 
     private var chartTimeframeOptions: [AppSegmentedOption<ChartTimeframeOption>] {
         ChartTimeframeOption.allCases.map { .init(value: $0, title: $0.title) }
+    }
+
+    private var showsClosedIntradayHint: Bool {
+        MarketSessionResolver.shouldShowClosedIntradayHint(
+            timeframe: store.selectedChartTimeframe,
+            runtime: store.runtime
+        )
     }
 
     private func chartSummaryItems(_ metrics: ScannerChartMetrics) -> [ChartMetricSummaryItem] {
