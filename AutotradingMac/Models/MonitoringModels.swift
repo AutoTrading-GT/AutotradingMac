@@ -355,6 +355,34 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
     var signal: SignalSettingsSnapshot
     var risk: RiskSettingsSnapshot
 
+    init(
+        basic: BasicStrategySettingsSnapshot,
+        advanced: AdvancedStrategySettingsSnapshot,
+        scanner: ScannerSettingsSnapshot,
+        signal: SignalSettingsSnapshot,
+        risk: RiskSettingsSnapshot
+    ) {
+        self.basic = basic
+        self.advanced = advanced
+        self.scanner = scanner
+        self.signal = signal
+        self.risk = risk
+    }
+
+    init(
+        scanner: ScannerSettingsSnapshot,
+        signal: SignalSettingsSnapshot,
+        risk: RiskSettingsSnapshot
+    ) {
+        self.init(
+            basic: .derived(scanner: scanner, signal: signal, risk: risk),
+            advanced: AdvancedStrategySettingsSnapshot(scanner: scanner, signal: signal, risk: risk),
+            scanner: scanner,
+            signal: signal,
+            risk: risk
+        )
+    }
+
     enum CodingKeys: String, CodingKey {
         case basic
         case advanced
