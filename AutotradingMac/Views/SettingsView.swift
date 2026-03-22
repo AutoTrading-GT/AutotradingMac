@@ -554,7 +554,7 @@ struct SettingsView: View {
 
     private func strategySignalToggleGrid(
         selected: [String],
-        binding: (String) -> Binding<Bool>
+        binding: @escaping (String) -> Binding<Bool>
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(strategySignalTypeOptions, id: \.self) { type in
