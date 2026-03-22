@@ -83,7 +83,7 @@
     - 포지션 크기는 단일 입력 `전체 자산 대비 비율(%)`로 고정
     - 일일 거래 제한은 `제한 사용(toggle) + 최대 거래 횟수(number)`로 분리
     - 제한 미사용 상태는 `무제한` 의미이며 sentinel 값(-1)은 UI에 노출하지 않음
-    - 엔진 반영은 `max_concurrent_positions`, `daily_trade_limit_enabled`, `daily_trade_limit_count`를 우선 적용
+    - 엔진 반영은 `max_concurrent_positions`, `daily_trade_limit_enabled`, `daily_trade_limit_count`, `position_size_pct`를 적용
   - 반영 상태 표시:
     - `마지막 저장`과 `마지막 적용` 시각을 분리 표기
     - 그룹별 상태(`applied/pending_next_cycle/partial/not_wired`)를 요약 카드에 표시
