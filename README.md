@@ -83,12 +83,12 @@
     - 포지션 크기는 단일 입력 `전체 자산 대비 비율(%)`로 고정
     - 일일 거래 제한은 `제한 사용(toggle) + 최대 거래 횟수(number)`로 분리
     - 제한 미사용 상태는 `무제한` 의미이며 sentinel 값(-1)은 UI에 노출하지 않음
-    - 엔진 반영은 `max_concurrent_positions`, `daily_trade_limit_enabled`, `daily_trade_limit_count`, `position_size_pct`를 적용
+    - 엔진 반영은 `max_concurrent_positions`, `daily_trade_limit_enabled`, `daily_trade_limit_count`, `position_size_pct`, `max_loss_limit_pct`를 적용
   - 반영 상태 표시:
     - `마지막 저장`과 `마지막 적용` 시각을 분리 표기
     - 그룹별 상태(`applied/pending_next_cycle/partial/not_wired`)를 요약 카드에 표시
     - 저장 성공과 실제 엔진 반영 완료를 구분해 표시
-    - 리스크 요약에 `일일 거래 제한 상태`(오늘 사용/남은 횟수)를 함께 표시
+    - 리스크 요약에 `일일 거래 제한 상태`(오늘 사용/남은 횟수)와 `일일 손실 한도 상태`(오늘 손익/손실률/한도 도달 여부)를 함께 표시
   - Advanced 섹션: 기존 `Scanner Settings`, `Signal Settings`, `Risk Settings` 상세 튜닝
   - 설명 문구 노출 정책:
     - 기본 화면은 한 줄 요약 중심

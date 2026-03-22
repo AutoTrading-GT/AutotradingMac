@@ -219,6 +219,12 @@ struct SettingsView: View {
                 value: riskDailyTradeLimitRuntimeText,
                 tone: strategyGroupStatusTone("risk")
             )
+            settingsRow(
+                icon: "chart.line.downtrend.xyaxis",
+                title: "일일 손실 한도 상태",
+                value: riskDailyLossRuntimeText,
+                tone: riskDailyLossRuntimeTone
+            )
         }
     }
 
@@ -1051,6 +1057,42 @@ struct SettingsView: View {
             return "오늘 \(todayUsed)/\(limit)회 사용"
         }
         return "최대 \(limit)회"
+    }
+
+    private var riskDailyLossRuntimeText: String {
+        let configuredRisk = store.strategyDraft?.basic.risk
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+
+        let maxLossLimitPct = effective?["max_loss_limit_pct"]?.doubleValue
+            ?? configuredRisk?.maxLossLimitPct
+            ?? 0.0
+        let todayLossPct = effective?["today_loss_pct"]?.doubleValue
+        let todayTotalPnl = effective?["today_total_pnl"]?.doubleValue
+        let reached = effective?["daily_loss_limit_reached"]?.boolValue ?? false
+
+        let limitText = DisplayFormatters.percent(maxLossLimitPct)
+        if let todayLossPct {
+            let lossText = DisplayFormatters.percent(todayLossPct)
+            if let todayTotalPnl {
+                let pnlText = DisplayFormatters.currency(todayTotalPnl)
+                let state = reached ? "한도 도달" : "정상"
+                return "오늘 손익 \(pnlText), 손실률 \(lossText) / 한도 \(limitText) (\(state))"
+            }
+            let state = reached ? "한도 도달" : "정상"
+            return "오늘 손실률 \(lossText) / 한도 \(limitText) (\(state))"
+        }
+        return "한도 \(limitText) · 오늘 손실률 계산 대기"
+    }
+
+    private var riskDailyLossRuntimeTone: StatusTone {
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+        if (effective?["daily_loss_limit_reached"]?.boolValue ?? false) {
+            return .danger
+        }
+        if effective?["today_loss_pct"]?.doubleValue == nil {
+            return .warning
+        }
+        return .neutral
     }
 
     private var apiConnectionPanel: some View {
