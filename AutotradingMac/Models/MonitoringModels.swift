@@ -349,6 +349,87 @@ struct StrategySettingsResponseEnvelope: Decodable {
 }
 
 struct StrategySettingsSnapshot: Decodable, Equatable {
+    var basic: BasicStrategySettingsSnapshot
+    var advanced: AdvancedStrategySettingsSnapshot
+    var scanner: ScannerSettingsSnapshot
+    var signal: SignalSettingsSnapshot
+    var risk: RiskSettingsSnapshot
+
+    enum CodingKeys: String, CodingKey {
+        case basic
+        case advanced
+        case scanner
+        case signal
+        case risk
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        scanner = try container.decode(ScannerSettingsSnapshot.self, forKey: .scanner)
+        signal = try container.decode(SignalSettingsSnapshot.self, forKey: .signal)
+        risk = try container.decode(RiskSettingsSnapshot.self, forKey: .risk)
+        basic = (try? container.decode(BasicStrategySettingsSnapshot.self, forKey: .basic))
+            ?? .derived(scanner: scanner, signal: signal, risk: risk)
+        advanced = (try? container.decode(AdvancedStrategySettingsSnapshot.self, forKey: .advanced))
+            ?? AdvancedStrategySettingsSnapshot(scanner: scanner, signal: signal, risk: risk)
+    }
+}
+
+struct BasicStrategySettingsSnapshot: Decodable, Equatable {
+    var entry: BasicEntrySettingsSnapshot
+    var exit: BasicExitSettingsSnapshot
+    var risk: BasicRiskSettingsSnapshot
+
+    static func derived(
+        scanner: ScannerSettingsSnapshot,
+        signal: SignalSettingsSnapshot,
+        risk: RiskSettingsSnapshot
+    ) -> BasicStrategySettingsSnapshot {
+        BasicStrategySettingsSnapshot(
+            entry: BasicEntrySettingsSnapshot(
+                selectionMode: scanner.defaultMode,
+                topN: signal.topN,
+                enabledSignalTypes: signal.enabledSignalTypes
+            ),
+            exit: BasicExitSettingsSnapshot(
+                targetProfitPct: 3.0,
+                stopLossPct: 2.0,
+                maxHoldingMinutes: 60,
+                forceCloseOnMarketClose: false
+            ),
+            risk: BasicRiskSettingsSnapshot(
+                maxLossLimitPct: 5.0,
+                positionSizingMode: "fixed_amount",
+                positionSizeValue: 1_000_000.0,
+                dailyTradeLimit: 10,
+                maxConcurrentPositions: risk.maxConcurrentCandidates
+            )
+        )
+    }
+}
+
+struct BasicEntrySettingsSnapshot: Decodable, Equatable {
+    var selectionMode: String
+    var topN: Int
+    var enabledSignalTypes: [String]
+}
+
+struct BasicExitSettingsSnapshot: Decodable, Equatable {
+    var targetProfitPct: Double
+    var stopLossPct: Double
+    var maxHoldingMinutes: Int
+    var forceCloseOnMarketClose: Bool
+}
+
+struct BasicRiskSettingsSnapshot: Decodable, Equatable {
+    var maxLossLimitPct: Double
+    var positionSizingMode: String
+    var positionSizeValue: Double
+    var dailyTradeLimit: Int
+    var maxConcurrentPositions: Int
+}
+
+struct AdvancedStrategySettingsSnapshot: Decodable, Equatable {
     var scanner: ScannerSettingsSnapshot
     var signal: SignalSettingsSnapshot
     var risk: RiskSettingsSnapshot
@@ -399,6 +480,41 @@ struct RiskSettingsSnapshot: Decodable, Equatable {
 }
 
 struct StrategySettingsUpdatePayload: Encodable {
+    let basic: BasicStrategySettingsUpdatePayload?
+    let advanced: AdvancedStrategySettingsUpdatePayload?
+    let scanner: ScannerSettingsUpdatePayload?
+    let signal: SignalSettingsUpdatePayload?
+    let risk: RiskSettingsUpdatePayload?
+}
+
+struct BasicStrategySettingsUpdatePayload: Encodable {
+    let entry: BasicEntrySettingsUpdatePayload?
+    let exit: BasicExitSettingsUpdatePayload?
+    let risk: BasicRiskSettingsUpdatePayload?
+}
+
+struct BasicEntrySettingsUpdatePayload: Encodable {
+    let selectionMode: String?
+    let topN: Int?
+    let enabledSignalTypes: [String]?
+}
+
+struct BasicExitSettingsUpdatePayload: Encodable {
+    let targetProfitPct: Double?
+    let stopLossPct: Double?
+    let maxHoldingMinutes: Int?
+    let forceCloseOnMarketClose: Bool?
+}
+
+struct BasicRiskSettingsUpdatePayload: Encodable {
+    let maxLossLimitPct: Double?
+    let positionSizingMode: String?
+    let positionSizeValue: Double?
+    let dailyTradeLimit: Int?
+    let maxConcurrentPositions: Int?
+}
+
+struct AdvancedStrategySettingsUpdatePayload: Encodable {
     let scanner: ScannerSettingsUpdatePayload?
     let signal: SignalSettingsUpdatePayload?
     let risk: RiskSettingsUpdatePayload?

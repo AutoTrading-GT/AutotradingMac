@@ -67,6 +67,8 @@ final class MonitoringStore: ObservableObject {
     private let scannerStep = 10
     private let scannerMaxLimit = 30
     private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained"]
+    private let strategySelectionModes = ["turnover", "surge"]
+    private let strategyPositionSizingModes = ["fixed_amount", "fixed_qty"]
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -159,11 +161,28 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
+    func updateStrategyBasicSelectionMode(_ mode: String) {
+        mutateStrategyDraft { draft in
+            draft.scanner.defaultMode = mode
+            draft.basic.entry.selectionMode = mode
+        }
+    }
+
     func updateStrategyScannerTopN(_ value: Int) {
         mutateStrategyDraft { draft in
             let normalized = min(max(value, 1), 30)
             draft.scanner.topN = normalized
             draft.signal.topN = normalized
+            draft.basic.entry.topN = normalized
+        }
+    }
+
+    func updateStrategyBasicTopN(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 1), 30)
+            draft.scanner.topN = normalized
+            draft.signal.topN = normalized
+            draft.basic.entry.topN = normalized
         }
     }
 
@@ -232,7 +251,12 @@ final class MonitoringStore: ObservableObject {
                 current.remove(type)
             }
             draft.signal.enabledSignalTypes = strategySupportedSignalTypes.filter(current.contains)
+            draft.basic.entry.enabledSignalTypes = draft.signal.enabledSignalTypes
         }
+    }
+
+    func updateStrategyBasicSignalTypeEnabled(_ type: String, isEnabled: Bool) {
+        updateStrategySignalTypeEnabled(type, isEnabled: isEnabled)
     }
 
     func updateStrategyRiskTypeAllowed(_ type: String, isAllowed: Bool) {
@@ -250,6 +274,64 @@ final class MonitoringStore: ObservableObject {
     func updateStrategyMaxConcurrentCandidates(_ value: Int) {
         mutateStrategyDraft { draft in
             draft.risk.maxConcurrentCandidates = min(max(value, 1), 50)
+            draft.basic.risk.maxConcurrentPositions = draft.risk.maxConcurrentCandidates
+        }
+    }
+
+    func updateStrategyBasicTargetProfitPct(_ value: Double) {
+        mutateStrategyDraft { draft in
+            draft.basic.exit.targetProfitPct = min(max(value, 0), 100)
+        }
+    }
+
+    func updateStrategyBasicStopLossPct(_ value: Double) {
+        mutateStrategyDraft { draft in
+            draft.basic.exit.stopLossPct = min(max(value, 0.1), 100)
+        }
+    }
+
+    func updateStrategyBasicMaxHoldingMinutes(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.basic.exit.maxHoldingMinutes = min(max(value, 1), 10_080)
+        }
+    }
+
+    func updateStrategyBasicForceCloseOnMarketClose(_ value: Bool) {
+        mutateStrategyDraft { draft in
+            draft.basic.exit.forceCloseOnMarketClose = value
+        }
+    }
+
+    func updateStrategyBasicMaxLossLimitPct(_ value: Double) {
+        mutateStrategyDraft { draft in
+            draft.basic.risk.maxLossLimitPct = min(max(value, 0), 100)
+        }
+    }
+
+    func updateStrategyBasicPositionSizingMode(_ value: String) {
+        mutateStrategyDraft { draft in
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            draft.basic.risk.positionSizingMode = strategyPositionSizingModes.contains(normalized) ? normalized : "fixed_amount"
+        }
+    }
+
+    func updateStrategyBasicPositionSizeValue(_ value: Double) {
+        mutateStrategyDraft { draft in
+            draft.basic.risk.positionSizeValue = max(1, value)
+        }
+    }
+
+    func updateStrategyBasicDailyTradeLimit(_ value: Int) {
+        mutateStrategyDraft { draft in
+            draft.basic.risk.dailyTradeLimit = min(max(value, 1), 1_000)
+        }
+    }
+
+    func updateStrategyBasicMaxConcurrentPositions(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 1), 50)
+            draft.basic.risk.maxConcurrentPositions = normalized
+            draft.risk.maxConcurrentCandidates = normalized
         }
     }
 
@@ -643,15 +725,23 @@ final class MonitoringStore: ObservableObject {
         _ envelope: StrategySettingsResponseEnvelope,
         preserveDirtyDraft: Bool
     ) {
-        strategySettings = envelope.data
-        strategyDefaults = envelope.defaults
+        var data = envelope.data
+        var defaults = envelope.defaults
+        normalizeStrategyDraft(&data)
+        normalizeStrategyDraft(&defaults)
+        strategySettings = data
+        strategyDefaults = defaults
         strategyApplyPolicy = envelope.applyPolicy
         strategyUpdatedAt = envelope.updatedAt
         if !preserveDirtyDraft {
-            strategyDraft = envelope.data
+            strategyDraft = data
             strategyValidationMessages = []
             strategyDirty = false
         } else {
+            if var draft = strategyDraft {
+                normalizeStrategyDraft(&draft)
+                strategyDraft = draft
+            }
             recalculateStrategyDirty()
         }
     }
@@ -659,9 +749,22 @@ final class MonitoringStore: ObservableObject {
     private func mutateStrategyDraft(_ mutate: (inout StrategySettingsSnapshot) -> Void) {
         guard var draft = strategyDraft ?? strategySettings else { return }
         mutate(&draft)
+        normalizeStrategyDraft(&draft)
         strategyDraft = draft
         strategyValidationMessages = validateStrategyDraft(draft)
         recalculateStrategyDirty()
+    }
+
+    private func normalizeStrategyDraft(_ draft: inout StrategySettingsSnapshot) {
+        // Keep linked fields consistent across legacy(top-level), basic, and advanced sections.
+        draft.advanced.scanner = draft.scanner
+        draft.advanced.signal = draft.signal
+        draft.advanced.risk = draft.risk
+
+        draft.basic.entry.selectionMode = draft.scanner.defaultMode
+        draft.basic.entry.topN = draft.signal.topN
+        draft.basic.entry.enabledSignalTypes = draft.signal.enabledSignalTypes
+        draft.basic.risk.maxConcurrentPositions = draft.risk.maxConcurrentCandidates
     }
 
     private func recalculateStrategyDirty() {
@@ -677,8 +780,9 @@ final class MonitoringStore: ObservableObject {
         let scanner = draft.scanner
         let signal = draft.signal
         let risk = draft.risk
+        let basic = draft.basic
 
-        if !scanner.modes.contains(scanner.defaultMode) {
+        if !strategySelectionModes.contains(scanner.defaultMode) {
             errors.append("기본 스캔 기준은 거래대금 순위/급등률 순위 중 하나여야 합니다.")
         }
         if !(1...30).contains(scanner.topN) {
@@ -741,6 +845,58 @@ final class MonitoringStore: ObservableObject {
             errors.append("동시성 계산 시간창은 1~1440분 범위여야 합니다.")
         }
 
+        if !strategySelectionModes.contains(basic.entry.selectionMode) {
+            errors.append("진입 전략의 후보 선정 방식이 올바르지 않습니다.")
+        }
+        if !(1...30).contains(basic.entry.topN) {
+            errors.append("진입 전략의 관찰 후보 수는 1~30 범위여야 합니다.")
+        }
+        if basic.entry.enabledSignalTypes.isEmpty {
+            errors.append("진입 전략의 주요 진입 신호는 최소 1개 이상 선택해야 합니다.")
+        }
+        if basic.entry.enabledSignalTypes.contains(where: { !strategySupportedSignalTypes.contains($0) }) {
+            errors.append("진입 전략의 주요 진입 신호에 지원되지 않는 값이 포함되어 있습니다.")
+        }
+
+        if basic.exit.targetProfitPct < 0 || basic.exit.targetProfitPct > 100 {
+            errors.append("목표 수익률은 0~100% 범위여야 합니다.")
+        }
+        if basic.exit.stopLossPct <= 0 || basic.exit.stopLossPct > 100 {
+            errors.append("손절 기준은 0% 초과 ~ 100% 이하 범위여야 합니다.")
+        }
+        if !(1...10_080).contains(basic.exit.maxHoldingMinutes) {
+            errors.append("보유 시간 제한은 1~10080분 범위여야 합니다.")
+        }
+
+        if basic.risk.maxLossLimitPct < 0 || basic.risk.maxLossLimitPct > 100 {
+            errors.append("최대 손실 한도는 0~100% 범위여야 합니다.")
+        }
+        if !strategyPositionSizingModes.contains(basic.risk.positionSizingMode) {
+            errors.append("포지션 크기 관리 방식은 고정 금액/고정 수량 중 하나여야 합니다.")
+        }
+        if basic.risk.positionSizeValue <= 0 {
+            errors.append("포지션 크기 값은 0보다 커야 합니다.")
+        }
+        if !(1...1_000).contains(basic.risk.dailyTradeLimit) {
+            errors.append("일일 거래 횟수 제한은 1~1000 범위여야 합니다.")
+        }
+        if !(1...50).contains(basic.risk.maxConcurrentPositions) {
+            errors.append("동시 보유 종목 수 제한은 1~50 범위여야 합니다.")
+        }
+
+        if basic.entry.selectionMode != scanner.defaultMode {
+            errors.append("진입 전략의 후보 선정 방식과 고급 스캐너 기본 기준이 일치해야 합니다.")
+        }
+        if basic.entry.topN != signal.topN {
+            errors.append("진입 전략 후보 수와 Signal Top-N이 일치해야 합니다.")
+        }
+        if Set(basic.entry.enabledSignalTypes) != Set(signal.enabledSignalTypes) {
+            errors.append("진입 신호 유형과 Signal 활성 신호 유형이 일치해야 합니다.")
+        }
+        if basic.risk.maxConcurrentPositions != risk.maxConcurrentCandidates {
+            errors.append("리스크 동시 보유 제한과 고급 Risk 동시 후보 수가 일치해야 합니다.")
+        }
+
         return errors
     }
 
@@ -748,6 +904,121 @@ final class MonitoringStore: ObservableObject {
         base: StrategySettingsSnapshot,
         draft: StrategySettingsSnapshot
     ) -> StrategySettingsUpdatePayload {
+        let basicPatch: BasicStrategySettingsUpdatePayload? = {
+            var hasChange = false
+            let entryPatch: BasicEntrySettingsUpdatePayload? = {
+                var entryChanged = false
+                let selectionMode: String? = {
+                    guard draft.basic.entry.selectionMode != base.basic.entry.selectionMode else { return nil }
+                    entryChanged = true
+                    hasChange = true
+                    return draft.basic.entry.selectionMode
+                }()
+                let topN: Int? = {
+                    guard draft.basic.entry.topN != base.basic.entry.topN else { return nil }
+                    entryChanged = true
+                    hasChange = true
+                    return draft.basic.entry.topN
+                }()
+                let enabledTypes: [String]? = {
+                    guard Set(draft.basic.entry.enabledSignalTypes) != Set(base.basic.entry.enabledSignalTypes) else { return nil }
+                    entryChanged = true
+                    hasChange = true
+                    return draft.basic.entry.enabledSignalTypes
+                }()
+                guard entryChanged else { return nil }
+                return BasicEntrySettingsUpdatePayload(
+                    selectionMode: selectionMode,
+                    topN: topN,
+                    enabledSignalTypes: enabledTypes
+                )
+            }()
+
+            let exitPatch: BasicExitSettingsUpdatePayload? = {
+                var exitChanged = false
+                let targetProfitPct: Double? = {
+                    guard draft.basic.exit.targetProfitPct != base.basic.exit.targetProfitPct else { return nil }
+                    exitChanged = true
+                    hasChange = true
+                    return draft.basic.exit.targetProfitPct
+                }()
+                let stopLossPct: Double? = {
+                    guard draft.basic.exit.stopLossPct != base.basic.exit.stopLossPct else { return nil }
+                    exitChanged = true
+                    hasChange = true
+                    return draft.basic.exit.stopLossPct
+                }()
+                let maxHoldingMinutes: Int? = {
+                    guard draft.basic.exit.maxHoldingMinutes != base.basic.exit.maxHoldingMinutes else { return nil }
+                    exitChanged = true
+                    hasChange = true
+                    return draft.basic.exit.maxHoldingMinutes
+                }()
+                let forceCloseOnMarketClose: Bool? = {
+                    guard draft.basic.exit.forceCloseOnMarketClose != base.basic.exit.forceCloseOnMarketClose else { return nil }
+                    exitChanged = true
+                    hasChange = true
+                    return draft.basic.exit.forceCloseOnMarketClose
+                }()
+                guard exitChanged else { return nil }
+                return BasicExitSettingsUpdatePayload(
+                    targetProfitPct: targetProfitPct,
+                    stopLossPct: stopLossPct,
+                    maxHoldingMinutes: maxHoldingMinutes,
+                    forceCloseOnMarketClose: forceCloseOnMarketClose
+                )
+            }()
+
+            let riskPatch: BasicRiskSettingsUpdatePayload? = {
+                var riskChanged = false
+                let maxLossLimitPct: Double? = {
+                    guard draft.basic.risk.maxLossLimitPct != base.basic.risk.maxLossLimitPct else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.maxLossLimitPct
+                }()
+                let positionSizingMode: String? = {
+                    guard draft.basic.risk.positionSizingMode != base.basic.risk.positionSizingMode else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.positionSizingMode
+                }()
+                let positionSizeValue: Double? = {
+                    guard draft.basic.risk.positionSizeValue != base.basic.risk.positionSizeValue else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.positionSizeValue
+                }()
+                let dailyTradeLimit: Int? = {
+                    guard draft.basic.risk.dailyTradeLimit != base.basic.risk.dailyTradeLimit else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.dailyTradeLimit
+                }()
+                let maxConcurrentPositions: Int? = {
+                    guard draft.basic.risk.maxConcurrentPositions != base.basic.risk.maxConcurrentPositions else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.maxConcurrentPositions
+                }()
+                guard riskChanged else { return nil }
+                return BasicRiskSettingsUpdatePayload(
+                    maxLossLimitPct: maxLossLimitPct,
+                    positionSizingMode: positionSizingMode,
+                    positionSizeValue: positionSizeValue,
+                    dailyTradeLimit: dailyTradeLimit,
+                    maxConcurrentPositions: maxConcurrentPositions
+                )
+            }()
+
+            guard hasChange else { return nil }
+            return BasicStrategySettingsUpdatePayload(
+                entry: entryPatch,
+                exit: exitPatch,
+                risk: riskPatch
+            )
+        }()
+
         let scannerPatch: ScannerSettingsUpdatePayload? = {
             var hasChange = false
             let defaultMode: String? = {
@@ -879,10 +1150,18 @@ final class MonitoringStore: ObservableObject {
             )
         }()
 
-        return StrategySettingsUpdatePayload(
+        let advancedPatch = AdvancedStrategySettingsUpdatePayload(
             scanner: scannerPatch,
             signal: signalPatch,
             risk: riskPatch
+        )
+
+        return StrategySettingsUpdatePayload(
+            basic: basicPatch,
+            advanced: (scannerPatch != nil || signalPatch != nil || riskPatch != nil) ? advancedPatch : nil,
+            scanner: nil,
+            signal: nil,
+            risk: nil
         )
     }
 

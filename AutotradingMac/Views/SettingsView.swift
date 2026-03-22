@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showScannerHelp = false
     @State private var showSignalHelp = false
     @State private var showRiskHelp = false
+    @State private var showAdvancedSettings = false
 
     var body: some View {
         ScrollView {
@@ -79,7 +80,7 @@ struct SettingsView: View {
         case .settings:
             return "애플리케이션 환경설정"
         case .stategy:
-            return "핵심 운용 기준을 빠르게 조정하고, 자세한 설명은 필요할 때만 확인합니다."
+            return "Basic Strategy에서 핵심 운용 기준을 조정하고, Advanced Settings에서 세부 튜닝을 관리합니다."
         }
     }
 
@@ -98,25 +99,15 @@ struct SettingsView: View {
 
     private var strategyContent: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
-            Text("핵심 파라미터는 바로 조정하고, 상세 배경은 도움말에서 확인하세요.")
+            Text("먼저 Basic Strategy에서 진입/청산/리스크 핵심을 설정하고, 상세 튜닝은 Advanced Settings에서 조정하세요.")
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, 2)
 
             if let draft = store.strategyDraft {
-                HStack(alignment: .top, spacing: DesignTokens.Layout.sectionGap) {
-                    VStack(spacing: DesignTokens.Layout.sectionGap) {
-                        scannerSettingsPanel(draft.scanner)
-                        signalSettingsPanel(draft.signal)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                    VStack(spacing: DesignTokens.Layout.sectionGap) {
-                        riskSettingsPanel(draft.risk)
-                        strategyHelpPanel
-                    }
-                    .frame(width: 360, alignment: .topLeading)
-                }
+                strategyOverviewPanel(draft)
+                basicStrategyPanel(draft.basic)
+                advancedSettingsPanel(draft)
             } else {
                 settingsPanel(title: "전략 설정 로드 상태") {
                     if let error = store.lastStrategySettingsErrorMessage, !error.isEmpty {
@@ -167,6 +158,177 @@ struct SettingsView: View {
         .task {
             if store.strategySettings == nil {
                 await store.reloadStrategySettings()
+            }
+        }
+    }
+
+    private func strategyOverviewPanel(_ draft: StrategySettingsSnapshot) -> some View {
+        settingsPanel(title: "현재 전략 요약") {
+            settingsRow(
+                icon: "scope",
+                title: "후보 선정",
+                value: localizedScannerMode(draft.basic.entry.selectionMode)
+            )
+            settingsRow(
+                icon: "target",
+                title: "청산 기준",
+                value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct / 100.0)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct / 100.0))"
+            )
+            settingsRow(
+                icon: "shield",
+                title: "리스크 한도",
+                value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct / 100.0)), 동시 보유 \(draft.basic.risk.maxConcurrentPositions)종목"
+            )
+            settingsRow(
+                icon: "clock.badge.exclamationmark",
+                title: "반영 정책",
+                value: store.strategyApplyPolicy ?? "저장 후 다음 평가 사이클부터 반영"
+            )
+        }
+    }
+
+    private func basicStrategyPanel(_ basic: BasicStrategySettingsSnapshot) -> some View {
+        settingsPanel(title: "Basic Strategy") {
+            strategyGroup(title: "진입 전략") {
+                strategySegmentControlRow(
+                    title: "후보 선정 방식",
+                    control: AnyView(
+                        AppSegmentedControl(
+                            options: [
+                                AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
+                                AppSegmentedOption(value: "surge", title: "급등률 중심"),
+                            ],
+                            selection: Binding(
+                                get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
+                                set: { store.updateStrategyBasicSelectionMode($0) }
+                            ),
+                            minSegmentWidth: 140,
+                            height: 34
+                        )
+                    )
+                )
+                compactNumberControl(
+                    title: "관찰 후보 수(Top-N)",
+                    value: basic.entry.topN,
+                    range: 1...30,
+                    step: 1,
+                    onChange: { store.updateStrategyBasicTopN($0) }
+                )
+                strategyGroup(title: "주요 진입 신호 유형") {
+                    strategySignalToggleGrid(
+                        selected: basic.entry.enabledSignalTypes,
+                        binding: basicSignalEnabledBinding
+                    )
+                }
+            }
+
+            strategyGroup(title: "청산 전략") {
+                editableDoubleTextRow(
+                    title: "목표 수익률 (%)",
+                    icon: "arrow.up.circle",
+                    text: basicTargetProfitText,
+                    onChange: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
+                )
+                editableDoubleTextRow(
+                    title: "손절 기준 (%)",
+                    icon: "arrow.down.circle",
+                    text: basicStopLossText,
+                    onChange: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
+                )
+                compactNumberControl(
+                    title: "보유 시간 제한(분)",
+                    value: basic.exit.maxHoldingMinutes,
+                    range: 1...10_080,
+                    step: 1,
+                    onChange: { store.updateStrategyBasicMaxHoldingMinutes($0) }
+                )
+                Toggle(
+                    "장 마감 시 전체 청산",
+                    isOn: Binding(
+                        get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? basic.exit.forceCloseOnMarketClose },
+                        set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .tint(DesignTokens.Colors.warning)
+                .font(.caption)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+
+            strategyGroup(title: "리스크 관리") {
+                editableDoubleTextRow(
+                    title: "최대 손실 한도 (%)",
+                    icon: "shield.lefthalf.filled.badge.checkmark",
+                    text: basicMaxLossLimitText,
+                    onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
+                )
+                strategySegmentControlRow(
+                    title: "포지션 크기 관리",
+                    control: AnyView(
+                        AppSegmentedControl(
+                            options: [
+                                AppSegmentedOption(value: "fixed_amount", title: "고정 금액"),
+                                AppSegmentedOption(value: "fixed_qty", title: "고정 수량"),
+                            ],
+                            selection: Binding(
+                                get: { store.strategyDraft?.basic.risk.positionSizingMode ?? basic.risk.positionSizingMode },
+                                set: { store.updateStrategyBasicPositionSizingMode($0) }
+                            ),
+                            minSegmentWidth: 128,
+                            height: 34
+                        )
+                    )
+                )
+                editableDoubleTextRow(
+                    title: "포지션 크기 값",
+                    icon: "number",
+                    text: basicPositionSizeValueText,
+                    onChange: { store.updateStrategyBasicPositionSizeValue(parseOptionalDouble($0) ?? 1) }
+                )
+                compactNumberControl(
+                    title: "일일 거래 횟수 제한",
+                    value: basic.risk.dailyTradeLimit,
+                    range: 1...1_000,
+                    step: 1,
+                    onChange: { store.updateStrategyBasicDailyTradeLimit($0) }
+                )
+                compactNumberControl(
+                    title: "동시 보유 종목 수 제한",
+                    value: basic.risk.maxConcurrentPositions,
+                    range: 1...50,
+                    step: 1,
+                    onChange: { store.updateStrategyBasicMaxConcurrentPositions($0) }
+                )
+            }
+        }
+    }
+
+    private func advancedSettingsPanel(_ draft: StrategySettingsSnapshot) -> some View {
+        settingsPanel(title: "Advanced Settings") {
+            HStack(spacing: 10) {
+                Text("스캐너 가중치/신호 임계값/리스크 시간창 같은 상세 튜닝 파라미터입니다.")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Spacer()
+                Button {
+                    showAdvancedSettings.toggle()
+                } label: {
+                    Label(
+                        showAdvancedSettings ? "Advanced 숨기기" : "Advanced 펼치기",
+                        systemImage: showAdvancedSettings ? "chevron.up" : "chevron.down"
+                    )
+                }
+                .buttonStyle(AppToolButtonStyle())
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
+            if showAdvancedSettings {
+                scannerSettingsPanel(draft.advanced.scanner)
+                signalSettingsPanel(draft.advanced.signal)
+                riskSettingsPanel(draft.advanced.risk)
+                strategyHelpPanel
             }
         }
     }
@@ -588,6 +750,26 @@ struct SettingsView: View {
         return DisplayFormatters.number(value)
     }
 
+    private var basicTargetProfitText: String {
+        guard let value = store.strategyDraft?.basic.exit.targetProfitPct else { return "" }
+        return DisplayFormatters.number(value)
+    }
+
+    private var basicStopLossText: String {
+        guard let value = store.strategyDraft?.basic.exit.stopLossPct else { return "" }
+        return DisplayFormatters.number(value)
+    }
+
+    private var basicMaxLossLimitText: String {
+        guard let value = store.strategyDraft?.basic.risk.maxLossLimitPct else { return "" }
+        return DisplayFormatters.number(value)
+    }
+
+    private var basicPositionSizeValueText: String {
+        guard let value = store.strategyDraft?.basic.risk.positionSizeValue else { return "" }
+        return DisplayFormatters.number(value)
+    }
+
     private func scannerDefaultModeBinding() -> Binding<String> {
         Binding(
             get: { store.strategyDraft?.scanner.defaultMode ?? "turnover" },
@@ -599,6 +781,13 @@ struct SettingsView: View {
         Binding(
             get: { store.strategyDraft?.signal.enabledSignalTypes.contains(type) ?? false },
             set: { store.updateStrategySignalTypeEnabled(type, isEnabled: $0) }
+        )
+    }
+
+    private func basicSignalEnabledBinding(type: String) -> Binding<Bool> {
+        Binding(
+            get: { store.strategyDraft?.basic.entry.enabledSignalTypes.contains(type) ?? false },
+            set: { store.updateStrategyBasicSignalTypeEnabled(type, isEnabled: $0) }
         )
     }
 
@@ -753,6 +942,17 @@ struct SettingsView: View {
             return "상위권 유지"
         default:
             return type
+        }
+    }
+
+    private func localizedScannerMode(_ mode: String) -> String {
+        switch mode.lowercased() {
+        case "turnover":
+            return "거래대금 중심"
+        case "surge":
+            return "급등률 중심"
+        default:
+            return mode
         }
     }
 
