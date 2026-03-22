@@ -8,12 +8,23 @@ import SwiftUI
 struct LogsView: View {
     @EnvironmentObject private var store: MonitoringStore
     @State private var selectedLogID: String?
+    @State private var modeFilter: LogsModeFilter = .all
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
-            Text("좌측에서 최근 이벤트를 선택하고, 우측 패널에서 상세 정보를 확인합니다.")
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            HStack(spacing: 10) {
+                Text("좌측에서 최근 이벤트를 선택하고, 우측 패널에서 상세 정보를 확인합니다.")
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Spacer(minLength: 8)
+                AppSegmentedControl(
+                    options: LogsModeFilter.options,
+                    selection: $modeFilter,
+                    minSegmentWidth: 62,
+                    height: 30
+                )
+                .frame(width: 290)
+            }
 
             if logEntries.isEmpty {
                 ContentUnavailableView("No recent events", systemImage: "tray")
@@ -95,7 +106,7 @@ struct LogsView: View {
         selectedLogID = logEntries.first?.id
     }
 
-    private var logEntries: [LogEntry] {
+    private var allLogEntries: [LogEntry] {
         var rows: [LogEntry] = []
 
         rows.append(
@@ -116,6 +127,7 @@ struct LogsView: View {
                         confidence: signal.confidence
                     ),
                     status: signal.signalType,
+                    executionMode: normalizeExecutionMode(signal.executionMode ?? signal.orderMode),
                     source: "strategy",
                     iconName: "dot.radiowaves.left.and.right",
                     iconTone: .info,
@@ -148,6 +160,7 @@ struct LogsView: View {
                         signalType: risk.signalType
                     ),
                     status: risk.decision,
+                    executionMode: normalizeExecutionMode(risk.executionMode ?? risk.orderMode),
                     source: "risk",
                     iconName: risk.decision.lowercased() == "blocked" ? "exclamationmark.shield" : "checkmark.shield",
                     iconTone: risk.decision.lowercased() == "blocked" ? .danger : .success,
@@ -183,6 +196,7 @@ struct LogsView: View {
                         status: order.status
                     ),
                     status: order.status,
+                    executionMode: normalizeExecutionMode(order.executionMode ?? order.orderMode),
                     source: order.orderMode ?? order.executionMode ?? "execution",
                     iconName: order.status.lowercased() == "rejected" ? "xmark.circle" : "shippingbox",
                     iconTone: .fromStatus(order.status),
@@ -219,6 +233,7 @@ struct LogsView: View {
                         price: fill.filledPrice
                     ),
                     status: fill.side,
+                    executionMode: normalizeExecutionMode(fill.executionMode ?? fill.orderMode),
                     source: fill.orderMode ?? fill.executionMode ?? "execution",
                     iconName: "checkmark.circle.fill",
                     iconTone: .success,
@@ -251,6 +266,7 @@ struct LogsView: View {
                         pnl: position.unrealizedPnl
                     ),
                     status: position.side,
+                    executionMode: "unknown",
                     source: position.markPriceSource ?? "execution",
                     iconName: "briefcase",
                     iconTone: .fromStatus(position.side),
@@ -285,6 +301,7 @@ struct LogsView: View {
                         realizedPnl: closed.realizedPnl
                     ),
                     status: closed.reason,
+                    executionMode: normalizeExecutionMode(closed.executionMode ?? closed.orderMode),
                     source: "execution",
                     iconName: "flag.checkered",
                     iconTone: toneForPnL(closed.realizedPnl),
@@ -305,6 +322,21 @@ struct LogsView: View {
             .sorted(by: { $0.timestamp > $1.timestamp })
             .prefix(120)
             .map { $0 }
+    }
+
+    private var logEntries: [LogEntry] {
+        allLogEntries.filter { entry in
+            switch modeFilter {
+            case .all:
+                return true
+            case .paper:
+                return entry.executionMode == "paper"
+            case .live:
+                return entry.executionMode == "live"
+            case .unknown:
+                return entry.executionMode == "unknown"
+            }
+        }
     }
 
     private func instrumentTitle(symbol: String?, code: String?) -> String {
@@ -338,6 +370,14 @@ struct LogsView: View {
         if value > 0 { return .success }
         if value < 0 { return .danger }
         return .neutral
+    }
+
+    private func normalizeExecutionMode(_ raw: String?) -> String {
+        let normalized = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized == "paper" || normalized == "live" {
+            return normalized
+        }
+        return "unknown"
     }
 
     private func signalFeedMessage(instrumentName: String, signalType: String, confidence: Double?) -> String {
@@ -524,6 +564,7 @@ private struct LogEntry: Identifiable {
     let summary: String
     let feedMessage: String
     let status: String?
+    let executionMode: String
     let source: String
     let iconName: String
     let iconTone: StatusTone
@@ -551,6 +592,8 @@ private struct LogFeedRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            StatusBadge(text: entry.executionMode.uppercased(), tone: modeTone(entry.executionMode))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
@@ -576,6 +619,17 @@ private struct LogFeedRow: View {
     private func displayTime(_ value: Date) -> String {
         let full = DisplayFormatters.dateTime(value)
         return String(full.suffix(8))
+    }
+
+    private func modeTone(_ mode: String) -> StatusTone {
+        switch mode {
+        case "paper":
+            return .info
+        case "live":
+            return .warning
+        default:
+            return .neutral
+        }
     }
 }
 
@@ -604,6 +658,7 @@ private struct LogDetailPanel: View {
                     detailRow(label: "symbol", value: symbol)
                 }
                 detailRow(label: "source", value: entry.source)
+                detailRow(label: "execution_mode", value: entry.executionMode.uppercased())
                 if let status = entry.status {
                     detailRow(label: "status", value: status)
                 }
@@ -634,6 +689,22 @@ private struct LogDetailPanel: View {
                 .fixedSize(horizontal: false, vertical: multiline)
                 .textSelection(.enabled)
         }
+    }
+}
+
+private enum LogsModeFilter: String, Hashable {
+    case all
+    case paper
+    case live
+    case unknown
+
+    static var options: [AppSegmentedOption<LogsModeFilter>] {
+        [
+            .init(value: .all, title: "전체"),
+            .init(value: .paper, title: "PAPER"),
+            .init(value: .live, title: "LIVE"),
+            .init(value: .unknown, title: "UNKNOWN"),
+        ]
     }
 }
 

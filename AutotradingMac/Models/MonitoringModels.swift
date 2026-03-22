@@ -703,6 +703,8 @@ struct SignalSnapshotItem: Decodable, Identifiable {
     let symbol: String?
     let signalType: String
     let confidence: Double?
+    let orderMode: String?
+    let executionMode: String?
     let sourceSnapshotId: Int?
     let previousSnapshotId: Int?
     let createdAt: Date
@@ -719,6 +721,8 @@ struct RiskDecisionSnapshotItem: Decodable, Identifiable {
     let decision: String
     let blocked: Bool?
     let reason: String
+    let orderMode: String?
+    let executionMode: String?
     let signalId: Int?
     let signalType: String?
     let relatedSignalReference: String?

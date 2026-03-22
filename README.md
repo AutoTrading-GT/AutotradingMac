@@ -54,8 +54,11 @@
   - Dev tools(개발): 연결 상태, `Reload Snapshot`, `Reconnect WS`
 - Logs 페이지(운영형 2-pane)
   - 좌측: 로그 피드(`시간 + 아이콘 + 한 줄 핵심 메시지`)
+  - 좌측 각 행에 mode 배지(`PAPER`/`LIVE`/`UNKNOWN`) 표시
+  - 상단 mode 필터(`전체`/`PAPER`/`LIVE`/`UNKNOWN`) 지원
   - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
+  - 우측 상세에 `execution_mode`를 명시해 mode 혼선을 줄임
   - 로그 미선택 시 우측 empty state 표시
   - 리스트 행은 저대비 선택 강조 + 얇은 보더 중심으로 정리해 과한 웹 카드 느낌을 축소
 - Settings 페이지(운영형 2x2 패널)
