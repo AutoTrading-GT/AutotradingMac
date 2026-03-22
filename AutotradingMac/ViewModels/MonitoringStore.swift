@@ -1461,6 +1461,8 @@ final class MonitoringStore: ObservableObject {
             symbol: payload.symbol,
             signalType: payload.signalType,
             confidence: payload.confidence,
+            orderMode: runtime?.orderMode,
+            executionMode: runtime?.executionMode ?? runtime?.orderMode,
             sourceSnapshotId: payload.sourceSnapshotId,
             previousSnapshotId: payload.previousSnapshotId,
             createdAt: payload.timestamp
@@ -1477,6 +1479,8 @@ final class MonitoringStore: ObservableObject {
             decision: payload.decision,
             blocked: payload.decision.lowercased() == "blocked",
             reason: payload.reason,
+            orderMode: runtime?.orderMode,
+            executionMode: runtime?.executionMode ?? runtime?.orderMode,
             signalId: payload.signalId,
             signalType: payload.signalType,
             relatedSignalReference: payload.relatedSignalReference,
