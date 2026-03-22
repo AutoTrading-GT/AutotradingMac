@@ -317,6 +317,10 @@ struct MarketView: View {
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Spacer()
                 HStack(spacing: 6) {
+                    if showsClosedIntradayHint {
+                        ClosedIntradayHintIcon()
+                    }
+
                     AppSegmentedControl(
                         options: chartTimeframeOptions,
                         selection: chartTimeframe,
@@ -324,14 +328,6 @@ struct MarketView: View {
                         height: 34
                     )
                     .frame(width: 252)
-
-                    if showsClosedIntradayHint {
-                        Image(systemName: "questionmark.circle")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(DesignTokens.Colors.textSecondary.opacity(0.9))
-                            .help(MarketSessionResolver.intradayClosedTooltip)
-                            .accessibilityLabel("휴장 안내")
-                    }
                 }
             }
             .padding(.horizontal, 14)

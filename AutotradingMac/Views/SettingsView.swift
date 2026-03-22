@@ -1074,7 +1074,7 @@ struct SettingsView: View {
         if let todayLossPct {
             let lossText = DisplayFormatters.percent(todayLossPct)
             if let todayTotalPnl {
-                let pnlText = DisplayFormatters.currency(todayTotalPnl)
+                let pnlText = DisplayFormatters.krw(todayTotalPnl)
                 let state = reached ? "한도 도달" : "정상"
                 return "오늘 손익 \(pnlText), 손실률 \(lossText) / 한도 \(limitText) (\(state))"
             }

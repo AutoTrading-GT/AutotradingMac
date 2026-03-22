@@ -47,6 +47,10 @@ struct ChartView: View {
 
             Spacer()
 
+            if showsClosedIntradayHint {
+                ClosedIntradayHintIcon()
+            }
+
             AppSegmentedControl(
                 options: timeframeOptions,
                 selection: timeframeBinding,
@@ -54,14 +58,6 @@ struct ChartView: View {
                 height: 34
             )
             .frame(width: 252)
-
-            if showsClosedIntradayHint {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(DesignTokens.Colors.textSecondary.opacity(0.9))
-                    .help(MarketSessionResolver.intradayClosedTooltip)
-                    .accessibilityLabel("휴장 안내")
-            }
         }
     }
 
