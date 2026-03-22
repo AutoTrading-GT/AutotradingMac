@@ -519,8 +519,13 @@ struct BasicRiskSettingsSnapshot: Decodable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         maxLossLimitPct = container.decodeDoubleFlexible(forKey: .maxLossLimitPct) ?? 5.0
+        let legacyPositionSize = container.decodeDoubleFlexible(forKey: .positionSizeValue)
+        let normalizedLegacyPositionSize: Double? = {
+            guard let legacyPositionSize else { return nil }
+            return (legacyPositionSize > 0 && legacyPositionSize <= 100) ? legacyPositionSize : nil
+        }()
         positionSizePct = container.decodeDoubleFlexible(forKey: .positionSizePct)
-            ?? container.decodeDoubleFlexible(forKey: .positionSizeValue)
+            ?? normalizedLegacyPositionSize
             ?? 10.0
 
         if let enabled = container.decodeBoolFlexible(forKey: .dailyTradeLimitEnabled) {

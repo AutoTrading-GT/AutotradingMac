@@ -213,6 +213,12 @@ struct SettingsView: View {
                 value: strategyGroupStatusText("risk"),
                 tone: strategyGroupStatusTone("risk")
             )
+            settingsRow(
+                icon: "number.circle",
+                title: "일일 거래 제한 상태",
+                value: riskDailyTradeLimitRuntimeText,
+                tone: strategyGroupStatusTone("risk")
+            )
         }
     }
 
@@ -1020,6 +1026,31 @@ struct SettingsView: View {
         default:
             return .neutral
         }
+    }
+
+    private var riskDailyTradeLimitRuntimeText: String {
+        let configuredRisk = store.strategyDraft?.basic.risk
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+
+        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+            ?? configuredRisk?.dailyTradeLimitEnabled
+            ?? false
+        let limit = effective?["daily_trade_limit_count"]?.intValue
+            ?? configuredRisk?.dailyTradeLimitCount
+            ?? 0
+        let todayUsed = effective?["today_trade_count"]?.intValue
+        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+
+        if !enabled {
+            return "무제한"
+        }
+        if let todayUsed, let remaining {
+            return "오늘 \(todayUsed)/\(limit)회 사용, 남은 \(remaining)회"
+        }
+        if let todayUsed {
+            return "오늘 \(todayUsed)/\(limit)회 사용"
+        }
+        return "최대 \(limit)회"
     }
 
     private var apiConnectionPanel: some View {
