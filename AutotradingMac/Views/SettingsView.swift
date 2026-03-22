@@ -172,12 +172,12 @@ struct SettingsView: View {
             settingsRow(
                 icon: "target",
                 title: "청산 기준",
-                value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct / 100.0)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct / 100.0))"
+                value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct))"
             )
             settingsRow(
                 icon: "shield",
                 title: "리스크 한도",
-                value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct / 100.0)), 동시 보유 \(draft.basic.risk.maxConcurrentPositions)종목"
+                value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)), 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct)), 일일 거래 \(draft.basic.risk.dailyTradeLimitEnabled ? \"최대 \\(draft.basic.risk.dailyTradeLimitCount)회\" : \"무제한\")"
             )
             settingsRow(
                 icon: "clock.badge.exclamationmark",
@@ -292,36 +292,37 @@ struct SettingsView: View {
                     text: basicMaxLossLimitText,
                     onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
                 )
-                strategySegmentControlRow(
-                    title: "포지션 크기 관리",
-                    control: AnyView(
-                        AppSegmentedControl(
-                            options: [
-                                AppSegmentedOption(value: "fixed_amount", title: "고정 금액"),
-                                AppSegmentedOption(value: "fixed_qty", title: "고정 수량"),
-                            ],
-                            selection: Binding(
-                                get: { store.strategyDraft?.basic.risk.positionSizingMode ?? basic.risk.positionSizingMode },
-                                set: { store.updateStrategyBasicPositionSizingMode($0) }
-                            ),
-                            minSegmentWidth: 128,
-                            height: 34
-                        )
+                editableDoubleTextRow(
+                    title: "1회 포지션 크기 (전체 자산 대비 %)",
+                    icon: "number",
+                    text: basicPositionSizePctText,
+                    onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
+                )
+                Toggle(
+                    "일일 거래 횟수 제한 사용",
+                    isOn: Binding(
+                        get: { store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled },
+                        set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
                     )
                 )
-                editableDoubleTextRow(
-                    title: "포지션 크기 값",
-                    icon: "number",
-                    text: basicPositionSizeValueText,
-                    onChange: { store.updateStrategyBasicPositionSizeValue(parseOptionalDouble($0) ?? 1) }
-                )
+                .toggleStyle(.switch)
+                .tint(DesignTokens.Colors.warning)
+                .font(.caption)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+
                 compactNumberControl(
-                    title: "일일 거래 횟수 제한",
-                    value: basic.risk.dailyTradeLimit,
+                    title: "최대 거래 횟수",
+                    value: basic.risk.dailyTradeLimitCount,
                     range: 1...1_000,
                     step: 1,
-                    onChange: { store.updateStrategyBasicDailyTradeLimit($0) }
+                    onChange: { store.updateStrategyBasicDailyTradeLimitCount($0) }
                 )
+                .disabled(!(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled))
+                .opacity((store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled) ? 1.0 : 0.45)
+                if !(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled) {
+                    strategyHelpText("일일 거래 횟수 제한이 꺼져 있어 무제한으로 동작합니다.")
+                }
                 compactNumberControl(
                     title: "동시 보유 종목 수 제한",
                     value: basic.risk.maxConcurrentPositions,
@@ -796,8 +797,8 @@ struct SettingsView: View {
         return DisplayFormatters.number(value)
     }
 
-    private var basicPositionSizeValueText: String {
-        guard let value = store.strategyDraft?.basic.risk.positionSizeValue else { return "" }
+    private var basicPositionSizePctText: String {
+        guard let value = store.strategyDraft?.basic.risk.positionSizePct else { return "" }
         return DisplayFormatters.number(value)
     }
 

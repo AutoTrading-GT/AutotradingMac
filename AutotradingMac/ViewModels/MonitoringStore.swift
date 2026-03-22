@@ -69,7 +69,6 @@ final class MonitoringStore: ObservableObject {
     private let scannerMaxLimit = 30
     private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained"]
     private let strategySelectionModes = ["turnover", "surge"]
-    private let strategyPositionSizingModes = ["fixed_amount", "fixed_qty"]
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -309,22 +308,24 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
-    func updateStrategyBasicPositionSizingMode(_ value: String) {
+    func updateStrategyBasicPositionSizePct(_ value: Double) {
         mutateStrategyDraft { draft in
-            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            draft.basic.risk.positionSizingMode = strategyPositionSizingModes.contains(normalized) ? normalized : "fixed_amount"
+            draft.basic.risk.positionSizePct = min(max(value, 0.1), 100)
         }
     }
 
-    func updateStrategyBasicPositionSizeValue(_ value: Double) {
+    func updateStrategyBasicDailyTradeLimitEnabled(_ enabled: Bool) {
         mutateStrategyDraft { draft in
-            draft.basic.risk.positionSizeValue = max(1, value)
+            draft.basic.risk.dailyTradeLimitEnabled = enabled
+            if draft.basic.risk.dailyTradeLimitCount < 1 {
+                draft.basic.risk.dailyTradeLimitCount = 1
+            }
         }
     }
 
-    func updateStrategyBasicDailyTradeLimit(_ value: Int) {
+    func updateStrategyBasicDailyTradeLimitCount(_ value: Int) {
         mutateStrategyDraft { draft in
-            draft.basic.risk.dailyTradeLimit = min(max(value, 1), 1_000)
+            draft.basic.risk.dailyTradeLimitCount = min(max(value, 1), 1_000)
         }
     }
 
@@ -881,14 +882,11 @@ final class MonitoringStore: ObservableObject {
         if basic.risk.maxLossLimitPct < 0 || basic.risk.maxLossLimitPct > 100 {
             errors.append("최대 손실 한도는 0~100% 범위여야 합니다.")
         }
-        if !strategyPositionSizingModes.contains(basic.risk.positionSizingMode) {
-            errors.append("포지션 크기 관리 방식은 고정 금액/고정 수량 중 하나여야 합니다.")
+        if basic.risk.positionSizePct <= 0 || basic.risk.positionSizePct > 100 {
+            errors.append("포지션 크기 비율은 0% 초과 ~ 100% 이하 범위여야 합니다.")
         }
-        if basic.risk.positionSizeValue <= 0 {
-            errors.append("포지션 크기 값은 0보다 커야 합니다.")
-        }
-        if !(1...1_000).contains(basic.risk.dailyTradeLimit) {
-            errors.append("일일 거래 횟수 제한은 1~1000 범위여야 합니다.")
+        if !(1...1_000).contains(basic.risk.dailyTradeLimitCount) {
+            errors.append("최대 거래 횟수는 1~1000 범위여야 합니다.")
         }
         if !(1...50).contains(basic.risk.maxConcurrentPositions) {
             errors.append("동시 보유 종목 수 제한은 1~50 범위여야 합니다.")
@@ -987,23 +985,23 @@ final class MonitoringStore: ObservableObject {
                     hasChange = true
                     return draft.basic.risk.maxLossLimitPct
                 }()
-                let positionSizingMode: String? = {
-                    guard draft.basic.risk.positionSizingMode != base.basic.risk.positionSizingMode else { return nil }
+                let positionSizePct: Double? = {
+                    guard draft.basic.risk.positionSizePct != base.basic.risk.positionSizePct else { return nil }
                     riskChanged = true
                     hasChange = true
-                    return draft.basic.risk.positionSizingMode
+                    return draft.basic.risk.positionSizePct
                 }()
-                let positionSizeValue: Double? = {
-                    guard draft.basic.risk.positionSizeValue != base.basic.risk.positionSizeValue else { return nil }
+                let dailyTradeLimitEnabled: Bool? = {
+                    guard draft.basic.risk.dailyTradeLimitEnabled != base.basic.risk.dailyTradeLimitEnabled else { return nil }
                     riskChanged = true
                     hasChange = true
-                    return draft.basic.risk.positionSizeValue
+                    return draft.basic.risk.dailyTradeLimitEnabled
                 }()
-                let dailyTradeLimit: Int? = {
-                    guard draft.basic.risk.dailyTradeLimit != base.basic.risk.dailyTradeLimit else { return nil }
+                let dailyTradeLimitCount: Int? = {
+                    guard draft.basic.risk.dailyTradeLimitCount != base.basic.risk.dailyTradeLimitCount else { return nil }
                     riskChanged = true
                     hasChange = true
-                    return draft.basic.risk.dailyTradeLimit
+                    return draft.basic.risk.dailyTradeLimitCount
                 }()
                 let maxConcurrentPositions: Int? = {
                     guard draft.basic.risk.maxConcurrentPositions != base.basic.risk.maxConcurrentPositions else { return nil }
@@ -1014,9 +1012,9 @@ final class MonitoringStore: ObservableObject {
                 guard riskChanged else { return nil }
                 return BasicRiskSettingsUpdatePayload(
                     maxLossLimitPct: maxLossLimitPct,
-                    positionSizingMode: positionSizingMode,
-                    positionSizeValue: positionSizeValue,
-                    dailyTradeLimit: dailyTradeLimit,
+                    positionSizePct: positionSizePct,
+                    dailyTradeLimitEnabled: dailyTradeLimitEnabled,
+                    dailyTradeLimitCount: dailyTradeLimitCount,
                     maxConcurrentPositions: maxConcurrentPositions
                 )
             }()

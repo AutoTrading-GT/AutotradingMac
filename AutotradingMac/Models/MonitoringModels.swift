@@ -462,9 +462,9 @@ struct BasicStrategySettingsSnapshot: Decodable, Equatable {
             ),
             risk: BasicRiskSettingsSnapshot(
                 maxLossLimitPct: 5.0,
-                positionSizingMode: "fixed_amount",
-                positionSizeValue: 1_000_000.0,
-                dailyTradeLimit: 10,
+                positionSizePct: 10.0,
+                dailyTradeLimitEnabled: true,
+                dailyTradeLimitCount: 10,
                 maxConcurrentPositions: risk.maxConcurrentCandidates
             )
         )
@@ -486,10 +486,57 @@ struct BasicExitSettingsSnapshot: Decodable, Equatable {
 
 struct BasicRiskSettingsSnapshot: Decodable, Equatable {
     var maxLossLimitPct: Double
-    var positionSizingMode: String
-    var positionSizeValue: Double
-    var dailyTradeLimit: Int
+    var positionSizePct: Double
+    var dailyTradeLimitEnabled: Bool
+    var dailyTradeLimitCount: Int
     var maxConcurrentPositions: Int
+
+    enum CodingKeys: String, CodingKey {
+        case maxLossLimitPct
+        case positionSizePct
+        case dailyTradeLimitEnabled
+        case dailyTradeLimitCount
+        // Legacy compatibility keys.
+        case positionSizeValue
+        case dailyTradeLimit
+    }
+
+    init(
+        maxLossLimitPct: Double,
+        positionSizePct: Double,
+        dailyTradeLimitEnabled: Bool,
+        dailyTradeLimitCount: Int,
+        maxConcurrentPositions: Int
+    ) {
+        self.maxLossLimitPct = maxLossLimitPct
+        self.positionSizePct = positionSizePct
+        self.dailyTradeLimitEnabled = dailyTradeLimitEnabled
+        self.dailyTradeLimitCount = dailyTradeLimitCount
+        self.maxConcurrentPositions = maxConcurrentPositions
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        maxLossLimitPct = container.decodeDoubleFlexible(forKey: .maxLossLimitPct) ?? 5.0
+        positionSizePct = container.decodeDoubleFlexible(forKey: .positionSizePct)
+            ?? container.decodeDoubleFlexible(forKey: .positionSizeValue)
+            ?? 10.0
+
+        if let enabled = container.decodeBoolFlexible(forKey: .dailyTradeLimitEnabled) {
+            dailyTradeLimitEnabled = enabled
+        } else if let legacyLimit = container.decodeIntFlexible(forKey: .dailyTradeLimit) {
+            dailyTradeLimitEnabled = legacyLimit >= 0
+        } else {
+            dailyTradeLimitEnabled = true
+        }
+
+        dailyTradeLimitCount = container.decodeIntFlexible(forKey: .dailyTradeLimitCount)
+            ?? {
+                let legacy = container.decodeIntFlexible(forKey: .dailyTradeLimit) ?? 10
+                return max(1, legacy)
+            }()
+        maxConcurrentPositions = container.decodeIntFlexible(forKey: .maxConcurrentPositions) ?? 3
+    }
 }
 
 struct AdvancedStrategySettingsSnapshot: Decodable, Equatable {
@@ -571,9 +618,9 @@ struct BasicExitSettingsUpdatePayload: Encodable {
 
 struct BasicRiskSettingsUpdatePayload: Encodable {
     let maxLossLimitPct: Double?
-    let positionSizingMode: String?
-    let positionSizeValue: Double?
-    let dailyTradeLimit: Int?
+    let positionSizePct: Double?
+    let dailyTradeLimitEnabled: Bool?
+    let dailyTradeLimitCount: Int?
     let maxConcurrentPositions: Int?
 }
 
