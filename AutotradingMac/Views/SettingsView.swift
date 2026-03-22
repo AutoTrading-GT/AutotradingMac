@@ -177,7 +177,7 @@ struct SettingsView: View {
             settingsRow(
                 icon: "shield",
                 title: "리스크 한도",
-                value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)), 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct)), 일일 거래 \(draft.basic.risk.dailyTradeLimitEnabled ? \"최대 \\(draft.basic.risk.dailyTradeLimitCount)회\" : \"무제한\")"
+                value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)), 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct)), 일일 거래 \(draft.basic.risk.dailyTradeLimitEnabled ? "최대 \(draft.basic.risk.dailyTradeLimitCount)회" : "무제한")"
             )
             settingsRow(
                 icon: "clock.badge.exclamationmark",
