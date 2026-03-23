@@ -191,20 +191,24 @@ enum AppConnectionStatusResolver {
         in details: [String?],
         where predicate: (String) -> Bool
     ) -> String? {
-        details.compactMap { detail in
+        for detail in details {
             guard let trimmed = detail?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-                return nil
+                continue
             }
-            return predicate(trimmed) ? trimmed : nil
-        }.first
+            if predicate(trimmed) {
+                return trimmed
+            }
+        }
+        return nil
     }
 
     private static func firstNonEmpty(_ values: String?...) -> String? {
-        values.compactMap { value in
+        for value in values {
             guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-                return nil
+                continue
             }
             return trimmed
-        }.first
+        }
+        return nil
     }
 }
