@@ -17,6 +17,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var appSettingsSavingKeys: Set<String> = []
     @Published private(set) var appSettingsErrorMessage: String?
     @Published private(set) var notificationPermissionStatus: AppNotificationAuthorizationStatus = .unknown
+    @Published private(set) var apiConnectionPanelStatus: AppSettingsStatusMessage?
     @Published private(set) var notificationPanelStatus: AppSettingsStatusMessage?
     @Published private(set) var dataManagementPanelStatus: AppSettingsStatusMessage?
     @Published private(set) var strategySettings: StrategySettingsSnapshot?
@@ -46,6 +47,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var isLoadingSnapshot = false
     @Published private(set) var snapshotLoaded = false
     @Published private(set) var connectionState: WebSocketConnectionState = .disconnected
+    @Published private(set) var backendBaseURLDraft = AppConfig.backendBaseURLInputString
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var lastStrategySettingsErrorMessage: String?
@@ -80,6 +82,7 @@ final class MonitoringStore: ObservableObject {
     private let scannerMaxLimit = 30
     private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained"]
     private let strategySelectionModes = ["turnover", "surge"]
+    private var apiConnectionStatusClearTask: Task<Void, Never>?
     private var notificationStatusClearTask: Task<Void, Never>?
     private var dataManagementStatusClearTask: Task<Void, Never>?
     private var appSettingsRefreshTask: Task<Void, Never>?
@@ -104,6 +107,7 @@ final class MonitoringStore: ObservableObject {
         self.apiClient = apiClient
         self.webSocketClient = webSocketClient
         self.localNotificationService = localNotificationService
+        self.backendBaseURLDraft = AppConfig.backendBaseURLInputString
         bindWebSocketCallbacks()
     }
 
@@ -124,6 +128,8 @@ final class MonitoringStore: ObservableObject {
         snapshotRetryTask = nil
         chartFetchDebounceTask?.cancel()
         chartFetchDebounceTask = nil
+        apiConnectionStatusClearTask?.cancel()
+        apiConnectionStatusClearTask = nil
         notificationStatusClearTask?.cancel()
         notificationStatusClearTask = nil
         dataManagementStatusClearTask?.cancel()
@@ -191,6 +197,56 @@ final class MonitoringStore: ObservableObject {
     func reconnectWebSocket() {
         webSocketClient.disconnect()
         webSocketClient.connect()
+    }
+
+    func updateBackendBaseURLDraft(_ value: String) {
+        backendBaseURLDraft = value
+    }
+
+    func applyBackendBaseURLDraft() async {
+        apiConnectionPanelStatus = .saving("서버 주소를 적용하는 중...")
+
+        do {
+            _ = try AppConfig.updateBackendBaseURL(backendBaseURLDraft)
+            backendBaseURLDraft = AppConfig.backendBaseURLInputString
+            resetSnapshotStateForServerSwitch()
+            if AppConfig.isBackendConfigured {
+                apiConnectionPanelStatus = .success("서버 주소를 변경했습니다. 연결을 다시 확인하는 중입니다.")
+            } else {
+                apiConnectionPanelStatus = .success("저장된 서버 주소를 지웠습니다. 기본 주소가 있으면 그 값을 사용합니다.")
+            }
+            scheduleStatusMessageClear(for: .apiConnection)
+
+            if started {
+                await reloadSnapshot()
+                await reloadAppSettings()
+                webSocketClient.disconnect()
+                webSocketClient.connect()
+                scheduleSnapshotRetryIfNeeded()
+            }
+        } catch {
+            apiConnectionPanelStatus = .error(error.localizedDescription)
+        }
+    }
+
+    var connectionStatusSummary: AppConnectionStatusSnapshot {
+        AppConnectionStatusResolver.resolve(
+            isBackendConfigured: AppConfig.isBackendConfigured,
+            snapshotLoaded: snapshotLoaded,
+            isLoadingSnapshot: isLoadingSnapshot,
+            connectionState: connectionState,
+            runtime: runtime,
+            lastErrorMessage: lastErrorMessage
+        )
+    }
+
+    var resolvedBackendBaseURLText: String {
+        let value = AppConfig.backendBaseURLInputString
+        return value.isEmpty ? "미설정" : value
+    }
+
+    var resolvedWebSocketURLText: String {
+        AppConfig.webSocketURLDisplayString
     }
 
     func reloadStrategySettings() async {
@@ -1012,6 +1068,12 @@ final class MonitoringStore: ObservableObject {
 
     private func scheduleStatusMessageClear(for section: AppSettingsPanelSection) {
         switch section {
+        case .apiConnection:
+            apiConnectionStatusClearTask?.cancel()
+            apiConnectionStatusClearTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                self?.apiConnectionPanelStatus = nil
+            }
         case .notifications:
             notificationStatusClearTask?.cancel()
             notificationStatusClearTask = Task { @MainActor [weak self] in
@@ -1034,6 +1096,46 @@ final class MonitoringStore: ObservableObject {
             guard let self else { return }
             await self.reloadAppSettings()
         }
+    }
+
+    private func resetSnapshotStateForServerSwitch() {
+        runtime = nil
+        appSettings = nil
+        appSettingsDefaults = nil
+        appSettingsUpdatedAt = nil
+        strategySettings = nil
+        strategyDefaults = nil
+        strategyDraft = nil
+        strategyApplyStatus = nil
+        strategyUpdatedAt = nil
+        strategyDirty = false
+        strategyValidationMessages = []
+        marketTopRanks = []
+        recentSignals = []
+        recentRiskDecisions = []
+        recentOrders = []
+        recentFills = []
+        currentPositions = []
+        recentClosedPositions = []
+        pnlSummary = PnLSummarySnapshot(
+            openPositions: 0,
+            unrealizedPnlTotal: nil,
+            realizedPnlRecentTotal: nil,
+            recentClosedCount: 0
+        )
+        latestTicks = [:]
+        scannerRankRowsByMode = [:]
+        scannerLoadedLimitByMode = [:]
+        scannerHasMoreByMode = [:]
+        chartSeriesCache = [:]
+        chartLoadingKeys = []
+        chartErrorMessages = [:]
+        selectedScannerCode = nil
+        snapshotLoaded = false
+        isLoadingSnapshot = false
+        lastUpdatedAt = nil
+        lastErrorMessage = nil
+        connectionState = .disconnected
     }
 
     private func appSettingsErrorText(prefix: String, error: Error) -> String {
@@ -1570,6 +1672,12 @@ final class MonitoringStore: ObservableObject {
         case "connection.ack":
             _ = decodePayload(ConnectionAckPayload.self, from: event.data)
             connectionState = .connected
+            lastErrorMessage = nil
+            if snapshotLoaded == false {
+                Task { [weak self] in
+                    await self?.reloadSnapshot()
+                }
+            }
         case "worker.status":
             if let payload = decodePayload(WorkerStatusPayload.self, from: event.data) {
                 applyWorkerStatus(payload: payload)
@@ -2423,6 +2531,7 @@ struct AppSettingsStatusMessage: Equatable {
 }
 
 enum AppSettingsPanelSection {
+    case apiConnection
     case notifications
     case dataManagement
 }

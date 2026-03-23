@@ -41,45 +41,45 @@ enum MonitoringAPIError: LocalizedError {
 
 final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     private let session: URLSession
-    private let snapshotURL: URL
-    private let runtimeURL: URL
-    private let strategySettingsURL: URL
-    private let appSettingsURL: URL
-    private let engineStartURL: URL
-    private let enginePauseURL: URL
-    private let engineEmergencyStopURL: URL
-    private let engineClearEmergencyStopURL: URL
-    private let engineOrderModeURL: URL
-    private let engineAccountModeURL: URL
+    private let snapshotURLProvider: () -> URL
+    private let runtimeURLProvider: () -> URL
+    private let strategySettingsURLProvider: () -> URL
+    private let appSettingsURLProvider: () -> URL
+    private let engineStartURLProvider: () -> URL
+    private let enginePauseURLProvider: () -> URL
+    private let engineEmergencyStopURLProvider: () -> URL
+    private let engineClearEmergencyStopURLProvider: () -> URL
+    private let engineOrderModeURLProvider: () -> URL
+    private let engineAccountModeURLProvider: () -> URL
 
     init(
         session: URLSession = .shared,
-        snapshotURL: URL = AppConfig.snapshotURL,
-        runtimeURL: URL = AppConfig.runtimeURL,
-        strategySettingsURL: URL = AppConfig.strategySettingsURL,
-        appSettingsURL: URL = AppConfig.appSettingsURL,
-        engineStartURL: URL = AppConfig.engineStartURL,
-        enginePauseURL: URL = AppConfig.enginePauseURL,
-        engineEmergencyStopURL: URL = AppConfig.engineEmergencyStopURL,
-        engineClearEmergencyStopURL: URL = AppConfig.engineClearEmergencyStopURL,
-        engineOrderModeURL: URL = AppConfig.engineOrderModeURL,
-        engineAccountModeURL: URL = AppConfig.engineAccountModeURL
+        snapshotURL: URL? = nil,
+        runtimeURL: URL? = nil,
+        strategySettingsURL: URL? = nil,
+        appSettingsURL: URL? = nil,
+        engineStartURL: URL? = nil,
+        enginePauseURL: URL? = nil,
+        engineEmergencyStopURL: URL? = nil,
+        engineClearEmergencyStopURL: URL? = nil,
+        engineOrderModeURL: URL? = nil,
+        engineAccountModeURL: URL? = nil
     ) {
         self.session = session
-        self.snapshotURL = snapshotURL
-        self.runtimeURL = runtimeURL
-        self.strategySettingsURL = strategySettingsURL
-        self.appSettingsURL = appSettingsURL
-        self.engineStartURL = engineStartURL
-        self.enginePauseURL = enginePauseURL
-        self.engineEmergencyStopURL = engineEmergencyStopURL
-        self.engineClearEmergencyStopURL = engineClearEmergencyStopURL
-        self.engineOrderModeURL = engineOrderModeURL
-        self.engineAccountModeURL = engineAccountModeURL
+        self.snapshotURLProvider = { snapshotURL ?? AppConfig.snapshotURL }
+        self.runtimeURLProvider = { runtimeURL ?? AppConfig.runtimeURL }
+        self.strategySettingsURLProvider = { strategySettingsURL ?? AppConfig.strategySettingsURL }
+        self.appSettingsURLProvider = { appSettingsURL ?? AppConfig.appSettingsURL }
+        self.engineStartURLProvider = { engineStartURL ?? AppConfig.engineStartURL }
+        self.enginePauseURLProvider = { enginePauseURL ?? AppConfig.enginePauseURL }
+        self.engineEmergencyStopURLProvider = { engineEmergencyStopURL ?? AppConfig.engineEmergencyStopURL }
+        self.engineClearEmergencyStopURLProvider = { engineClearEmergencyStopURL ?? AppConfig.engineClearEmergencyStopURL }
+        self.engineOrderModeURLProvider = { engineOrderModeURL ?? AppConfig.engineOrderModeURL }
+        self.engineAccountModeURLProvider = { engineAccountModeURL ?? AppConfig.engineAccountModeURL }
     }
 
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
-        var request = URLRequest(url: snapshotURL)
+        var request = URLRequest(url: snapshotURLProvider())
         request.httpMethod = "GET"
         request.timeoutInterval = 10
         logRequest(request, context: "snapshot")
@@ -105,7 +105,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func fetchRuntime() async throws -> RuntimeStatusSnapshot {
-        var request = URLRequest(url: runtimeURL)
+        var request = URLRequest(url: runtimeURLProvider())
         request.httpMethod = "GET"
         request.timeoutInterval = 10
         logRequest(request, context: "runtime")
@@ -132,7 +132,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func fetchStrategySettings() async throws -> StrategySettingsResponseEnvelope {
-        var request = URLRequest(url: strategySettingsURL)
+        var request = URLRequest(url: strategySettingsURLProvider())
         request.httpMethod = "GET"
         request.timeoutInterval = 10
         logRequest(request, context: "strategy-settings")
@@ -158,7 +158,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func updateStrategySettings(_ payload: StrategySettingsUpdatePayload) async throws -> StrategySettingsResponseEnvelope {
-        var request = URLRequest(url: strategySettingsURL)
+        var request = URLRequest(url: strategySettingsURLProvider())
         request.httpMethod = "PATCH"
         request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -186,7 +186,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func fetchAppSettings() async throws -> AppSettingsResponseEnvelope {
-        var request = URLRequest(url: appSettingsURL)
+        var request = URLRequest(url: appSettingsURLProvider())
         request.httpMethod = "GET"
         request.timeoutInterval = 10
         logRequest(request, context: "app-settings")
@@ -212,7 +212,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func updateAppSettings(_ payload: AppSettingsUpdatePayload) async throws -> AppSettingsUpdateResponseEnvelope {
-        var request = URLRequest(url: appSettingsURL)
+        var request = URLRequest(url: appSettingsURLProvider())
         request.httpMethod = "PATCH"
         request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -296,24 +296,24 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func startEngine() async throws -> EngineControlCommandResponse {
-        try await sendEngineCommand(to: engineStartURL)
+        try await sendEngineCommand(to: engineStartURLProvider())
     }
 
     func pauseEngine() async throws -> EngineControlCommandResponse {
-        try await sendEngineCommand(to: enginePauseURL)
+        try await sendEngineCommand(to: enginePauseURLProvider())
     }
 
     func emergencyStopEngine() async throws -> EngineControlCommandResponse {
-        try await sendEngineCommand(to: engineEmergencyStopURL)
+        try await sendEngineCommand(to: engineEmergencyStopURLProvider())
     }
 
     func clearEmergencyStop() async throws -> EngineControlCommandResponse {
-        try await sendEngineCommand(to: engineClearEmergencyStopURL)
+        try await sendEngineCommand(to: engineClearEmergencyStopURLProvider())
     }
 
     func setOrderMode(_ mode: String, confirmLive: Bool) async throws -> EngineModeCommandResponse {
         try await sendModeCommand(
-            to: engineOrderModeURL,
+            to: engineOrderModeURLProvider(),
             mode: mode,
             confirmLive: confirmLive
         )
@@ -321,7 +321,7 @@ final class MonitoringAPIClient: MonitoringAPIClientProtocol {
 
     func setAccountMode(_ mode: String) async throws -> EngineModeCommandResponse {
         try await sendModeCommand(
-            to: engineAccountModeURL,
+            to: engineAccountModeURLProvider(),
             mode: mode,
             confirmLive: false
         )

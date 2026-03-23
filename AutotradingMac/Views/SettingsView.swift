@@ -2316,11 +2316,23 @@ struct SettingsView: View {
     private var apiConnectionPanel: some View {
         settingsPanel(
             title: "API 연결",
-            trailing: { StatusBadge(text: connectionStatusText, tone: connectionStatusTone) }
+            trailing: { StatusBadge(text: store.connectionStatusSummary.compactText, tone: store.connectionStatusSummary.tone) }
         ) {
             settingsRow(icon: "key.horizontal", title: "App Key", value: "••••••••••••")
             settingsRow(icon: "lock.shield", title: "App Secret", value: "••••••••••••")
-            settingsRow(icon: "wifi", title: "연결 상태", value: connectionHealthText, tone: connectionStatusTone)
+            settingsRow(
+                icon: store.connectionStatusSummary.iconName,
+                title: "연결 상태",
+                value: store.connectionStatusSummary.message,
+                tone: store.connectionStatusSummary.tone,
+                multiline: true
+            )
+            settingsRow(
+                icon: "bolt.horizontal.circle",
+                title: "실시간 연결",
+                value: webSocketConnectionText,
+                tone: webSocketConnectionTone
+            )
             settingsRow(
                 icon: "person.text.rectangle",
                 title: "계좌번호(마스킹)",
@@ -2329,8 +2341,20 @@ struct SettingsView: View {
                 mono: true
             )
             Divider().opacity(0.25)
-            settingsRow(title: "Backend Base URL", value: AppConfig.backendBaseURL.absoluteString, mono: true)
-            settingsRow(title: "WebSocket URL", value: AppConfig.webSocketURL.absoluteString, mono: true)
+            settingsRow(title: "현재 연결 서버", value: store.resolvedBackendBaseURLText, mono: true, multiline: true)
+            settingsRow(title: "WebSocket URL", value: store.resolvedWebSocketURLText, mono: true, multiline: true)
+            serverAddressEditorRow
+            Divider().opacity(0.25)
+            settingsRow(title: "앱 상태", value: store.runtime?.appStatus ?? "-")
+            settingsRow(title: "Readiness", value: store.runtime?.readinessStatus ?? "-", tone: readinessTone)
+            settingsRow(title: "Startup 상태", value: startupStatusText, tone: startupStatusTone, multiline: true)
+            settingsRow(title: "주문/계좌 모드", value: modeContextText)
+            settingsRow(title: "실행 모드", value: store.runtime?.executionMode ?? store.runtime?.orderMode ?? "-")
+            if let status = store.apiConnectionPanelStatus {
+                settingsStatusCaption(status)
+            } else if let detail = store.connectionStatusSummary.detail {
+                settingsInfoCaption(detail, tone: store.connectionStatusSummary.tone)
+            }
         }
     }
 
@@ -2574,6 +2598,16 @@ struct SettingsView: View {
             .padding(.bottom, 8)
     }
 
+    private func settingsInfoCaption(_ text: String, tone: StatusTone = .neutral) -> some View {
+        Text(text)
+            .font(.caption2)
+            .foregroundStyle(settingsValueColor(for: tone))
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+            .textSelection(.enabled)
+    }
+
     private var readOnlyCaption: some View {
         Text("읽기 전용 표시입니다. 설정 저장/제어는 아직 연결되지 않았습니다.")
             .font(.caption2)
@@ -2583,50 +2617,50 @@ struct SettingsView: View {
             .padding(.bottom, 8)
     }
 
-    private var connectionStatusTone: StatusTone {
-        if store.runtime?.startupError?.isEmpty == false {
-            return .danger
-        }
+    private var webSocketConnectionTone: StatusTone {
         switch store.connectionState {
         case .connected:
-            return store.runtime?.readinessStatus == "ready" ? .success : .warning
-        case .connecting:
+            return .success
+        case .connecting, .reconnecting:
             return .warning
-        case .error:
+        case .failed:
             return .danger
         case .disconnected:
             return .neutral
         }
     }
 
-    private var connectionStatusText: String {
+    private var webSocketConnectionText: String {
         switch store.connectionState {
         case .connected:
             return "연결됨"
         case .connecting:
-            return "연결중"
-        case .error:
-            return "오류"
+            return "초기 연결 중"
+        case .reconnecting:
+            return "재연결 시도 중"
+        case .failed:
+            return "연결 실패"
         case .disconnected:
             return "미연결"
         }
     }
 
-    private var connectionHealthText: String {
+    private var readinessTone: StatusTone {
+        .fromStatus(store.runtime?.readinessStatus)
+    }
+
+    private var startupStatusText: String {
         if let startupError = store.runtime?.startupError, !startupError.isEmpty {
-            if startupError.lowercased().contains("auth") {
-                return "인증 확인 필요"
-            }
-            return "초기화 확인 필요"
+            return startupError
         }
-        switch store.connectionState {
-        case .connected:
-            return store.runtime?.readinessStatus == "ready" ? "정상" : "주의 필요"
-        case .connecting:
-            return "확인 중"
-        case .error, .disconnected:
-            return "주의 필요"
+        return store.runtime?.startupStatus ?? "-"
+    }
+
+    private var startupStatusTone: StatusTone {
+        if store.runtime?.startupError?.isEmpty == false {
+            return .danger
         }
+        return .fromStatus(store.runtime?.startupStatus)
     }
 
     private var accountStatusTone: StatusTone {
@@ -2663,6 +2697,62 @@ struct SettingsView: View {
     private var backupRetentionCountText: String {
         guard let count = store.appSettings?.dataManagement.backupRetentionCount else { return "-" }
         return "최신 \(count)개 유지"
+    }
+
+    private var modeContextText: String {
+        let orderMode = (store.runtime?.orderMode ?? "-").uppercased()
+        let accountMode = (store.runtime?.accountMode ?? "-").uppercased()
+        return "\(orderMode) / \(accountMode)"
+    }
+
+    private var backendBaseURLBinding: Binding<String> {
+        Binding(
+            get: { store.backendBaseURLDraft },
+            set: { store.updateBackendBaseURLDraft($0) }
+        )
+    }
+
+    private var backendBaseURLChanged: Bool {
+        store.backendBaseURLDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            != AppConfig.backendBaseURLInputString.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var serverAddressEditorRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "server.rack")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(width: 14)
+                Text("서버 주소")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Spacer(minLength: 8)
+                Button("기본값 복원") {
+                    store.updateBackendBaseURLDraft("")
+                    Task { await store.applyBackendBaseURLDraft() }
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                Button("적용") {
+                    Task { await store.applyBackendBaseURLDraft() }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(!backendBaseURLChanged)
+            }
+
+            TextField("https://server.example:8008", text: backendBaseURLBinding)
+                .textFieldStyle(.roundedBorder)
+                .font(.caption.monospaced())
+
+            Text("REST와 WebSocket은 이 주소를 기준으로 계산됩니다. 값을 비우면 기본 환경값을 사용합니다.")
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
     }
 
     private var cleanupStatusText: String {

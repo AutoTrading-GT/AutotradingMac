@@ -47,10 +47,10 @@ enum StatusTone {
         if ["ready", "running", "connected", "up", "filled", "approved", "healthy"].contains(value) {
             return .success
         }
-        if ["starting", "stopping", "submitted", "partially_filled", "degraded", "paused"].contains(value) {
+        if ["starting", "stopping", "submitted", "partially_filled", "degraded", "paused", "connecting", "reconnecting"].contains(value) {
             return .warning
         }
-        if ["error", "down", "rejected", "blocked", "not_ready", "disconnected"].contains(value) {
+        if ["error", "failed", "down", "rejected", "blocked", "not_ready", "disconnected"].contains(value) {
             return .danger
         }
         return .neutral

@@ -26,6 +26,9 @@ struct AppShellView: View {
         } detail: {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.x3) {
                 GlobalTopBarView()
+                if !store.connectionStatusSummary.isHealthy {
+                    connectionStatusBanner(store.connectionStatusSummary)
+                }
 
                 Group {
                     switch currentSection {
@@ -64,6 +67,43 @@ struct AppShellView: View {
 
     private var currentSection: ConsoleSection {
         selectedSection ?? .dashboard
+    }
+
+    private func connectionStatusBanner(_ status: AppConnectionStatusSnapshot) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: status.iconName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(status.tone.foreground)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(status.title)
+                    .font(DesignTokens.Typography.bodyStrong)
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                Text(status.message)
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let detail = status.detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(DesignTokens.Typography.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                        .lineLimit(2)
+                        .textSelection(.enabled)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(status.tone.background.opacity(0.78))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(status.tone.foreground.opacity(0.22), lineWidth: 0.9)
+        )
     }
 }
 

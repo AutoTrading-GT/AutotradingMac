@@ -26,6 +26,8 @@
 - snapshot/runtime 디코딩은 서버 계약(`order_mode/account_mode`, `engine_*`, `account_summary`)을 기준으로 nullable 필드를 optional 처리
 - snapshot 최초 로드 실패 시 5초 주기로 자동 재시도하며, WS 연결 직후에도 snapshot 미로드 상태면 즉시 재시도
 - 백엔드 base URL은 `http://host:port`와 `http://host:port/api`를 모두 허용하며 API 경로를 자동 정규화
+  - 주소 저장 우선순위는 `AppConfig` 기준 `앱에 저장된 마지막 주소(UserDefaults) -> AUTOTRADING_BACKEND_BASE_URL` 이다.
+  - `AUTOTRADING_BACKEND_WS_URL`가 없으면 WebSocket URL은 Base URL에서 `/ws/events`로 자동 계산한다.
 - 임시 진단 로그(2026-03-20):
   - 앱 시작/REST 요청/WS 연결 단계별 URL·status·응답 body prefix 로그를 콘솔에 출력
 - 코드 연결 맵 문서: `CODE_CONNECT_MAP.md`
@@ -83,6 +85,17 @@
 - Settings 페이지(운영형 2x2 패널)
   - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
   - `API 연결` 패널에 마스킹 계좌 식별자 표시(`runtime.account_summary.masked_account` 우선)
+  - `API 연결` 패널에서 현재 Backend Base URL을 편집/적용할 수 있다.
+  - `WebSocket URL`은 현재 Base URL 기준의 실제 접속값을 표시한다.
+  - 연결 상태는 공통 모델로 해석한다.
+    - `정상 연결`
+    - `서버 연결 확인 중`
+    - `서버 연결 실패`
+    - `실시간 연결 끊김`
+    - `재연결 중`
+    - `인증 확인 필요`
+    - `서버 초기화 확인 필요`
+  - 비정상 상태는 전역 top bar pill + 상단 inline banner + `API 연결` 패널 상세 문구로 노출한다.
   - `design_ref/figma_web_export/src/app/pages/SettingsPage.tsx` 정보구조를 SwiftUI로 반영
   - 데이터 소스:
     - `GET /api/monitoring/runtime`: 연결/계좌/모드/환경 상태
@@ -104,7 +117,7 @@
     - `자동 백업`은 SQLite 파일 복사 또는 PostgreSQL `pg_dump` 실행 on/off에 직접 연결된다.
     - backup rotation은 새 backup 생성 후 최신 N개만 유지하는 방식으로 동작한다(기본 7개).
     - rotation 실패 시 최신 backup은 유지되고 상태는 warning 성격으로 표시된다.
-  - WebSocket 끊김 시 앱이 자동 재연결을 시도한다.
+  - WebSocket 끊김 시 앱이 자동 재연결을 시도하고, 반복 실패 시 `재연결 중`/`실시간 연결 끊김` 상태를 유지해 사용자가 인지할 수 있게 한다.
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`
   - Strategy 3단계는 `Basic Strategy + Advanced Settings` 2계층 편집 화면

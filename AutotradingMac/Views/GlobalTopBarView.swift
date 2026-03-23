@@ -37,6 +37,15 @@ struct GlobalTopBarView: View {
         TimelineView(.periodic(from: Date(), by: 30)) { _ in
             HStack(alignment: .center, spacing: 7) {
                 toolbarInfoPill(
+                    icon: store.connectionStatusSummary.iconName,
+                    title: "연결",
+                    value: store.connectionStatusSummary.compactText,
+                    tone: store.connectionStatusSummary.tone
+                )
+
+                separatorPill
+
+                toolbarInfoPill(
                     icon: "bolt.horizontal.circle.fill",
                     title: "자동매매",
                     value: automationStatusText,

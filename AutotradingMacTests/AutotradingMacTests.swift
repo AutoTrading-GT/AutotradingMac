@@ -313,4 +313,150 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(rows.first?.status, .executed)
         XCTAssertEqual(rows.first?.summary, "매수 주문 체결 완료")
     }
+
+    func test_connectionStatusResolver_reportsConnectedWhenRuntimeAndWebSocketAreHealthy() {
+        let status = AppConnectionStatusResolver.resolve(
+            isBackendConfigured: true,
+            snapshotLoaded: true,
+            isLoadingSnapshot: false,
+            connectionState: .connected,
+            runtime: RuntimeStatusSnapshot(
+                timestamp: Date(),
+                appName: "autotrading-core",
+                appVersion: "1.0",
+                env: "dev",
+                appStatus: "ready",
+                orderMode: "paper",
+                accountMode: "paper",
+                marketTradingActive: true,
+                marketClosedIdle: false,
+                strategyRunState: "running",
+                riskRunState: "running",
+                executionMode: "paper",
+                engineState: "running",
+                engineAvailableActions: [],
+                engineTransitioningAction: nil,
+                engineLastAction: nil,
+                engineLastError: nil,
+                engineMessage: nil,
+                engineEmergencyLatched: false,
+                engineUpdatedAt: nil,
+                databaseStatus: "up",
+                databaseConnected: true,
+                readinessStatus: "ready",
+                startupOk: true,
+                startupStatus: "ready",
+                startupError: nil,
+                activeWsClients: 1,
+                accountSummary: nil,
+                workers: .fallback
+            ),
+            lastErrorMessage: nil
+        )
+
+        XCTAssertEqual(status.kind, .connected)
+        XCTAssertEqual(status.compactText, "정상 연결")
+    }
+
+    func test_connectionStatusResolver_reportsServerUnavailableForBadBaseURL() {
+        let status = AppConnectionStatusResolver.resolve(
+            isBackendConfigured: true,
+            snapshotLoaded: false,
+            isLoadingSnapshot: false,
+            connectionState: .disconnected,
+            runtime: nil,
+            lastErrorMessage: "Snapshot load failed: Could not connect to the server."
+        )
+
+        XCTAssertEqual(status.kind, .serverUnavailable)
+        XCTAssertEqual(status.title, "서버 연결 실패")
+    }
+
+    func test_connectionStatusResolver_reportsReconnectingWhenSnapshotExistsButWSIsRetrying() {
+        let status = AppConnectionStatusResolver.resolve(
+            isBackendConfigured: true,
+            snapshotLoaded: true,
+            isLoadingSnapshot: false,
+            connectionState: .reconnecting,
+            runtime: RuntimeStatusSnapshot(
+                timestamp: Date(),
+                appName: "autotrading-core",
+                appVersion: "1.0",
+                env: "dev",
+                appStatus: "ready",
+                orderMode: "paper",
+                accountMode: "paper",
+                marketTradingActive: true,
+                marketClosedIdle: false,
+                strategyRunState: "running",
+                riskRunState: "running",
+                executionMode: "paper",
+                engineState: "running",
+                engineAvailableActions: [],
+                engineTransitioningAction: nil,
+                engineLastAction: nil,
+                engineLastError: nil,
+                engineMessage: nil,
+                engineEmergencyLatched: false,
+                engineUpdatedAt: nil,
+                databaseStatus: "up",
+                databaseConnected: true,
+                readinessStatus: "ready",
+                startupOk: true,
+                startupStatus: "ready",
+                startupError: nil,
+                activeWsClients: 1,
+                accountSummary: nil,
+                workers: .fallback
+            ),
+            lastErrorMessage: "WebSocket receive failed: network connection lost"
+        )
+
+        XCTAssertEqual(status.kind, .reconnecting)
+        XCTAssertEqual(status.compactText, "재연결 중")
+    }
+
+    func test_connectionStatusResolver_reportsAuthenticationFailure() {
+        let status = AppConnectionStatusResolver.resolve(
+            isBackendConfigured: true,
+            snapshotLoaded: true,
+            isLoadingSnapshot: false,
+            connectionState: .connected,
+            runtime: RuntimeStatusSnapshot(
+                timestamp: Date(),
+                appName: "autotrading-core",
+                appVersion: "1.0",
+                env: "prod",
+                appStatus: "degraded",
+                orderMode: "paper",
+                accountMode: "paper",
+                marketTradingActive: nil,
+                marketClosedIdle: nil,
+                strategyRunState: nil,
+                riskRunState: nil,
+                executionMode: "paper",
+                engineState: "running",
+                engineAvailableActions: [],
+                engineTransitioningAction: nil,
+                engineLastAction: nil,
+                engineLastError: nil,
+                engineMessage: nil,
+                engineEmergencyLatched: false,
+                engineUpdatedAt: nil,
+                databaseStatus: "up",
+                databaseConnected: true,
+                readinessStatus: "not_ready",
+                startupOk: false,
+                startupStatus: "error",
+                startupError: "KIS auth failed: unauthorized",
+                activeWsClients: 0,
+                accountSummary: nil,
+                workers: .fallback
+            ),
+            lastErrorMessage: nil
+        )
+
+        XCTAssertEqual(status.kind, .authenticationFailure)
+        XCTAssertEqual(status.compactText, "인증 확인 필요")
+    }
 }

@@ -9,12 +9,13 @@ enum WebSocketConnectionState: String {
     case disconnected
     case connecting
     case connected
-    case error
+    case reconnecting
+    case failed
 }
 
 final class MonitoringWebSocketClient {
     private let session: URLSession
-    private let url: URL
+    private let urlProvider: () -> URL
     private var task: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
@@ -27,10 +28,10 @@ final class MonitoringWebSocketClient {
 
     init(
         session: URLSession = .shared,
-        url: URL = AppConfig.webSocketURL
+        url: URL? = nil
     ) {
         self.session = session
-        self.url = url
+        self.urlProvider = { url ?? AppConfig.webSocketURL }
     }
 
     func connect() {
@@ -38,6 +39,7 @@ final class MonitoringWebSocketClient {
         shouldReconnect = true
         reconnectTask?.cancel()
         reconnectTask = nil
+        let url = urlProvider()
         print("[MonitoringWebSocketClient] connect attempt url=\(url.absoluteString)")
         onStateChange?(.connecting)
 
@@ -46,7 +48,6 @@ final class MonitoringWebSocketClient {
         task.resume()
         reconnectAttempt = 0
         print("[MonitoringWebSocketClient] open url=\(url.absoluteString)")
-        onStateChange?(.connected)
         receiveTask = Task { [weak self] in
             await self?.receiveLoop()
         }
@@ -93,7 +94,7 @@ final class MonitoringWebSocketClient {
                 let closeReason = closeReasonText(task.closeReason)
                 print("[MonitoringWebSocketClient] error=\(error.localizedDescription) closeCode=\(closeCode) closeReason=\(closeReason)")
                 onError?("WebSocket receive failed: \(error.localizedDescription)")
-                onStateChange?(.error)
+                onStateChange?(.failed)
                 cleanupConnection(emitStateChange: false)
                 scheduleReconnect()
                 break
@@ -118,6 +119,7 @@ final class MonitoringWebSocketClient {
         guard reconnectTask == nil else { return }
         reconnectAttempt += 1
         let delayNanoseconds = min(UInt64(reconnectAttempt), 5) * 1_000_000_000
+        onStateChange?(.reconnecting)
         reconnectTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: delayNanoseconds)
             guard let self, !Task.isCancelled else { return }
