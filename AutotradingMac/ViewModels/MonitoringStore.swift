@@ -2381,6 +2381,9 @@ enum NotificationToggleKey: String {
 }
 
 enum AppSettingsSaveKey: String {
+    case tradeFillNotificationsEnabled = "notifications.trade_fill_notifications_enabled"
+    case tradeSignalNotificationsEnabled = "notifications.trade_signal_notifications_enabled"
+    case systemErrorNotificationsEnabled = "notifications.system_error_notifications_enabled"
     case autoBackupEnabled = "data_management.auto_backup_enabled"
     case logRetentionDays = "data_management.log_retention_days"
 }
