@@ -12,7 +12,7 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
+            VStack(alignment: .leading, spacing: mode == .stategy ? strategySectionSpacing : DesignTokens.Layout.sectionGap) {
                 pageHeader
                 switch mode {
                 case .settings:
@@ -26,14 +26,16 @@ struct SettingsView: View {
         .safeAreaInset(edge: .bottom) {
             if mode == .stategy {
                 strategyActionBar
+                    .frame(maxWidth: strategyContentMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.horizontal, DesignTokens.Layout.pagePadding)
-                    .padding(.top, 8)
-                    .padding(.bottom, 10)
+                    .padding(.top, 14)
+                    .padding(.bottom, 14)
                     .background(
                         LinearGradient(
                             colors: [
                                 DesignTokens.Colors.bgBase.opacity(0),
-                                DesignTokens.Colors.bgBase.opacity(0.88),
+                                DesignTokens.Colors.bgBase.opacity(0.84),
                                 DesignTokens.Colors.bgBase,
                             ],
                             startPoint: .top,
@@ -45,11 +47,11 @@ struct SettingsView: View {
     }
 
     private var pageHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(pageTitle)
-                    .font(.system(size: 22, weight: .semibold))
-                    .tracking(-0.2)
+                    .font(.system(size: mode == .stategy ? 24 : 22, weight: .semibold))
+                    .tracking(-0.3)
                 if mode == .stategy {
                     strategyBadge(
                         text: store.strategyDirty ? "편집 중" : "저장값 기준",
@@ -59,10 +61,10 @@ struct SettingsView: View {
                 }
             }
             Text(pageSubtitle)
-                .font(.caption)
+                .font(.system(size: mode == .stategy ? 13.5 : 12, weight: .regular))
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .lineLimit(2)
-                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: mode == .stategy ? 820 : 720, alignment: .leading)
         }
     }
 
@@ -98,11 +100,12 @@ struct SettingsView: View {
     }
 
     private var strategyContent: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
+        VStack(alignment: .leading, spacing: strategySectionSpacing) {
             Text("먼저 Basic Strategy에서 진입/청산/리스크 핵심을 설정하고, 상세 튜닝은 Advanced Settings에서 조정하세요.")
-                .font(.caption)
+                .font(.system(size: 13.5, weight: .regular))
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, 2)
+                .padding(.bottom, 2)
 
             if let draft = store.strategyDraft {
                 strategyOverviewPanel(draft)
@@ -169,7 +172,7 @@ struct SettingsView: View {
             title: "현재 전략 요약",
             subtitle: "핵심 운용 기준과 실제 적용 상태를 묶어서 확인합니다."
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 336), alignment: .leading, spacing: 14) {
                 strategySummaryBlock(
                     title: "전략 핵심 요약",
                     subtitle: "후보 선정, 청산 기준, 리스크 한도를 빠르게 확인합니다."
@@ -230,8 +233,8 @@ struct SettingsView: View {
                     )
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
         }
     }
 
@@ -240,12 +243,12 @@ struct SettingsView: View {
             title: "Basic Strategy",
             subtitle: "실제 엔진에 직접 연결되는 핵심 운용 기준입니다."
         ) {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 22) {
                 strategyCategoryBlock(
                     title: "진입 전략",
                     summary: "무엇을 우선 감시하고 어떤 신호로 진입할지 정합니다."
                 ) {
-                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 336), alignment: .leading, spacing: 14) {
                         strategyGroup(
                             title: "후보 선정",
                             subtitle: "후보 모집단과 감시 범위를 정합니다."
@@ -294,7 +297,7 @@ struct SettingsView: View {
                     title: "청산 전략",
                     summary: "손익 기준과 시간 기준을 분리해 읽기 쉽게 정리합니다."
                 ) {
-                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 336), alignment: .leading, spacing: 14) {
                         strategyGroup(
                             title: "손익 기준",
                             subtitle: "수익 실현과 손절 기준입니다."
@@ -341,7 +344,7 @@ struct SettingsView: View {
                     title: "리스크 관리",
                     summary: "손실 한도와 거래 제한을 묶어서 관리합니다."
                 ) {
-                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 336), alignment: .leading, spacing: 14) {
                         strategyGroup(
                             title: "손실/비중",
                             subtitle: "계좌 손실 허용치와 1회 진입 비중입니다."
@@ -396,8 +399,8 @@ struct SettingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
         }
     }
 
@@ -414,9 +417,9 @@ struct SettingsView: View {
                     riskSettingsPanel(draft.advanced.risk)
                     strategyHelpPanel
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 18)
             } label: {
                 HStack(spacing: 10) {
                     strategyBadge(text: "선택 사항", tone: .neutral, size: .compact)
@@ -445,7 +448,7 @@ struct SettingsView: View {
             title: "Scanner",
             summary: "후보 우선순위와 필터 기준을 조정합니다."
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 260), alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 320), alignment: .leading, spacing: 14) {
                 strategyGroup(title: "기본 기준", subtitle: "스캔 기준과 평가 범위") {
                     strategySegmentControlRow(
                         title: "기본 스캔 기준",
@@ -506,7 +509,7 @@ struct SettingsView: View {
             title: "Signal",
             summary: "후보 중 실제 신호로 인정할 범위와 임계값입니다."
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 260), alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 320), alignment: .leading, spacing: 14) {
                 strategyGroup(title: "신호 판단 범위", subtitle: "신호 평가 대상 범위") {
                     compactNumberControl(
                         title: "신호 판단 범위",
@@ -558,7 +561,7 @@ struct SettingsView: View {
             title: "Risk",
             summary: "고급 리스크 게이트와 시간 제한을 조정합니다."
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 260), alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 320), alignment: .leading, spacing: 14) {
                 strategyGroup(title: "허용 신호", subtitle: "리스크 게이트가 통과시킬 신호") {
                     strategySignalToggleGrid(
                         selected: risk.allowedSignalTypes,
@@ -636,7 +639,7 @@ struct SettingsView: View {
     }
 
     private var strategyActionBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     strategyBadge(
@@ -644,17 +647,17 @@ struct SettingsView: View {
                         tone: store.strategyDirty ? .warning : .success
                     )
                     Text(store.strategyApplyPolicy ?? "저장된 값은 다음 평가 사이클부터 반영됩니다.")
-                        .font(.caption2)
+                        .font(.system(size: 12.5, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                         .lineLimit(1)
                 }
                 Text(
                     "저장: \(store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-")  |  적용: \(store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "-")"
                 )
-                    .font(.caption2)
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: 18)
             Button("취소") {
                 store.cancelStrategyDraftChanges()
             }
@@ -683,15 +686,15 @@ struct SettingsView: View {
             .buttonStyle(AppToolButtonStyle())
             .disabled(!store.strategyDirty || store.strategySaveInFlight)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
-                            DesignTokens.Colors.surface2.opacity(0.95),
-                            DesignTokens.Colors.surface1.opacity(0.92),
+                            DesignTokens.Colors.surface2.opacity(0.9),
+                            DesignTokens.Colors.surface1.opacity(0.86),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -704,17 +707,19 @@ struct SettingsView: View {
         )
         .overlay(alignment: .top) {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
-                .fill(Color.white.opacity(0.035))
+                .fill(Color.white.opacity(0.028))
                 .frame(height: 1)
                 .padding(.horizontal, 1)
         }
-        .shadow(color: Color.black.opacity(0.26), radius: 10, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 3)
     }
 
-    private var strategyContentMaxWidth: CGFloat { 980 }
+    private var strategyContentMaxWidth: CGFloat { 1120 }
+
+    private var strategySectionSpacing: CGFloat { 22 }
 
     private func strategyAdaptiveColumns(minimum: CGFloat) -> [GridItem] {
-        [GridItem(.adaptive(minimum: minimum, maximum: 420), spacing: 12, alignment: .top)]
+        [GridItem(.adaptive(minimum: minimum, maximum: 520), spacing: 14, alignment: .top)]
     }
 
     private func strategyPanel<Content: View>(
@@ -726,19 +731,19 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
                 Text(title)
-                    .font(.system(size: prominence == .primary ? 16 : 15, weight: .semibold))
+                    .font(.system(size: prominence == .primary ? 17 : 16, weight: .semibold))
                     .tracking(-0.1)
                     .foregroundStyle(prominence == .primary ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.system(size: 13, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                         .lineLimit(2)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 18)
+            .padding(.top, 16)
+            .padding(.bottom, 14)
 
             Divider().opacity(prominence == .primary ? 0.3 : 0.18)
 
@@ -820,15 +825,15 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 Text(summary)
-                    .font(.caption2)
+                    .font(.system(size: 12.5, weight: .regular))
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             content()
         }
-        .padding(14)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
                 .fill(
@@ -863,10 +868,10 @@ struct SettingsView: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: 13.5, weight: .semibold))
                         .foregroundStyle(DesignTokens.Colors.textSecondary)
                     Text(subtitle)
-                        .font(.caption2)
+                        .font(.system(size: 12.5, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -878,7 +883,7 @@ struct SettingsView: View {
                 content()
             }
         }
-        .padding(14)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
                 .fill(
@@ -920,13 +925,13 @@ struct SettingsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(DesignTokens.Colors.textQuaternary)
             Text(value)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(settingsValueColor(for: tone))
             Text(detail)
-                .font(.caption2)
+                .font(.system(size: 12.5, weight: .regular))
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -941,7 +946,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 Text(title)
-                    .font(.caption2.weight(.semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
                 if let badge {
                     strategyBadge(text: badge, tone: tone, size: .compact)
@@ -949,7 +954,7 @@ struct SettingsView: View {
                 Spacer(minLength: 0)
             }
             Text(detail)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(settingsValueColor(for: tone))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1040,11 +1045,11 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .tracking(-0.1)
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
                 Text(summary)
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
             }
             content()
@@ -1059,18 +1064,18 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption2)
+                        .font(.system(size: 12.5, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
             content()
         }
         .background(
@@ -1106,11 +1111,11 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 2) {
                 Text(title)
-                    .font(.caption)
+                    .font(.system(size: 13.5, weight: .medium))
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption2)
+                        .font(.system(size: 12.5, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textQuaternary)
                 }
             }
@@ -1125,8 +1130,8 @@ struct SettingsView: View {
                         .stroke(DesignTokens.Colors.borderSubtle.opacity(0.62), lineWidth: 0.9)
                 )
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
     }
 
     private func strategySegmentedControl(
@@ -1142,7 +1147,7 @@ struct SettingsView: View {
                     selection.wrappedValue = option.value
                 } label: {
                     Text(option.title)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(isSelected ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
                         .frame(maxWidth: .infinity)
                         .frame(minWidth: minSegmentWidth)
@@ -1221,11 +1226,11 @@ struct SettingsView: View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13.5, weight: .medium))
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.caption2)
+                        .font(.system(size: 12.5, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textQuaternary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1233,10 +1238,10 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             control()
-                .frame(minWidth: 128, alignment: .trailing)
+                .frame(minWidth: 144, alignment: .trailing)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     private func compactNumberControl(
@@ -1256,16 +1261,16 @@ struct SettingsView: View {
                 } label: {
                     Image(systemName: "minus")
                         .font(.caption.weight(.bold))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 26, height: 26)
                 }
                 .buttonStyle(.plain)
                 .background(strategyMiniButtonBackground(isPressed: false))
                 .disabled(value <= range.lowerBound)
 
                 Text("\(value)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .frame(width: 44, height: 24)
+                    .frame(width: 50, height: 26)
                     .background(
                         RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
                             .fill(DesignTokens.Colors.surface3.opacity(0.62))
@@ -1282,7 +1287,7 @@ struct SettingsView: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.caption.weight(.bold))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 26, height: 26)
                 }
                 .buttonStyle(.plain)
                 .background(strategyMiniButtonBackground(isPressed: false))
@@ -1561,17 +1566,17 @@ struct SettingsView: View {
                     )
                 )
                 .textFieldStyle(.plain)
-                .font(.caption.monospacedDigit())
-                .frame(width: 88)
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .frame(width: 96)
 
                 if let unit {
                     Text(unit)
-                        .font(.caption2)
+                        .font(.system(size: 12.5, weight: .regular))
                         .foregroundStyle(DesignTokens.Colors.textQuaternary)
                 }
             }
             .padding(.horizontal, 10)
-            .frame(height: 36)
+            .frame(height: 38)
             .background(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
                     .fill(
@@ -2083,9 +2088,9 @@ private enum StrategyBadgeSize {
     var font: Font {
         switch self {
         case .regular:
-            return .system(size: 11, weight: .semibold)
+            return .system(size: 12, weight: .semibold)
         case .compact:
-            return .system(size: 10, weight: .semibold)
+            return .system(size: 11, weight: .semibold)
         }
     }
 

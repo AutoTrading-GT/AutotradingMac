@@ -111,6 +111,11 @@
     - surface layering은 opacity 차이, 얇은 inner border, soft shadow, radius hierarchy로 만든다
     - spacing은 크게 비우기보다 계산된 리듬을 유지해 desktop utility/settings panel 느낌을 만든다
     - 입력 요소와 상태 요소는 서로 다른 재질감으로 구분한다
+  - 폭/가독성 보정 원칙:
+    - Strategy 페이지는 데스크톱 창 안에서 메인 패널이 작게 떠 보이지 않도록 일반 화면보다 더 넓은 읽기 폭을 사용한다
+    - 상위 패널과 내부 카드의 비율을 키워 “모바일 카드가 가운데 모인 느낌”을 줄인다
+    - 라벨/보조 설명/숫자/요약 값은 Dashboard/Logs보다 한 단계 큰 타입 스케일로 조정해 읽기 피로를 낮춘다
+    - 하단 action bar는 본문과 같은 중심축에 정렬하되, visual weight는 더 낮게 유지한다
   - Basic 편집 항목:
     - 진입: 후보 선정 방식, 관찰 Top-N, 주요 진입 신호 유형
     - 청산: 목표 수익률, 손절 기준, 최대 보유시간, 장 마감 5분 전 전체 청산
