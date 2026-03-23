@@ -106,6 +106,11 @@
       - 청산: `손익 기준`, `시간 기준`
       - 리스크: `손실/비중`, `거래 제한`
     - `Advanced Settings`는 disclosure + 저대비 컨테이너로 Basic보다 한 단계 가볍게 표시
+  - visual polish 원칙:
+    - panel hierarchy를 분명히 해 상위 패널 / 하위 그룹 / 입력 표면 / 상태 badge가 같은 카드처럼 보이지 않게 한다
+    - surface layering은 opacity 차이, 얇은 inner border, soft shadow, radius hierarchy로 만든다
+    - spacing은 크게 비우기보다 계산된 리듬을 유지해 desktop utility/settings panel 느낌을 만든다
+    - 입력 요소와 상태 요소는 서로 다른 재질감으로 구분한다
   - Basic 편집 항목:
     - 진입: 후보 선정 방식, 관찰 Top-N, 주요 진입 신호 유형
     - 청산: 목표 수익률, 손절 기준, 최대 보유시간, 장 마감 5분 전 전체 청산

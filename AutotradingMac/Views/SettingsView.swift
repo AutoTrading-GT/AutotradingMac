@@ -48,11 +48,13 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(pageTitle)
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 22, weight: .semibold))
+                    .tracking(-0.2)
                 if mode == .stategy {
-                    StatusBadge(
+                    strategyBadge(
                         text: store.strategyDirty ? "편집 중" : "저장값 기준",
-                        tone: store.strategyDirty ? .warning : .neutral
+                        tone: store.strategyDirty ? .warning : .neutral,
+                        size: .compact
                     )
                 }
             }
@@ -60,6 +62,7 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
                 .lineLimit(2)
+                .frame(maxWidth: 720, alignment: .leading)
         }
     }
 
@@ -197,7 +200,7 @@ struct SettingsView: View {
                     title: "적용 상태",
                     subtitle: "저장/반영 흐름과 오늘 기준 리스크 상태를 봅니다.",
                     trailing: {
-                        StatusBadge(
+                        strategyBadge(
                             text: strategyOverallApplyStatusText,
                             tone: strategyOverallApplyStatusTone
                         )
@@ -251,7 +254,7 @@ struct SettingsView: View {
                                 title: "후보 선정 방식",
                                 subtitle: "기본 정렬 기준",
                                 control: AnyView(
-                                    AppSegmentedControl(
+                                    strategySegmentedControl(
                                         options: [
                                             AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
                                             AppSegmentedOption(value: "surge", title: "급등률 중심"),
@@ -260,8 +263,8 @@ struct SettingsView: View {
                                             get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
                                             set: { store.updateStrategyBasicSelectionMode($0) }
                                         ),
-                                        minSegmentWidth: 132,
-                                        height: 34
+                                        minSegmentWidth: 138,
+                                        height: 36
                                     )
                                 )
                             )
@@ -416,7 +419,7 @@ struct SettingsView: View {
                 .padding(.bottom, 16)
             } label: {
                 HStack(spacing: 10) {
-                    StatusBadge(text: "선택 사항", tone: .neutral)
+                    strategyBadge(text: "선택 사항", tone: .neutral, size: .compact)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("상세 튜닝 펼치기")
                             .font(.caption.weight(.semibold))
@@ -448,14 +451,14 @@ struct SettingsView: View {
                         title: "기본 스캔 기준",
                         subtitle: "기본 랭킹 모드",
                         control: AnyView(
-                            AppSegmentedControl(
+                            strategySegmentedControl(
                                 options: [
                                     AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
                                     AppSegmentedOption(value: "surge", title: "급등률 순위"),
                                 ],
                                 selection: scannerDefaultModeBinding(),
-                                minSegmentWidth: 120,
-                                height: 34
+                                minSegmentWidth: 126,
+                                height: 36
                             )
                         )
                     )
@@ -636,7 +639,7 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    StatusBadge(
+                    strategyBadge(
                         text: store.strategyDirty ? "변경 사항 있음" : "변경 없음",
                         tone: store.strategyDirty ? .warning : .success
                     )
@@ -681,8 +684,31 @@ struct SettingsView: View {
             .disabled(!store.strategyDirty || store.strategySaveInFlight)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .appToolbarChrome(cornerRadius: DesignTokens.Radius.xl)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.95),
+                            DesignTokens.Colors.surface1.opacity(0.92),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.92), lineWidth: 1)
+        )
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
+                .fill(Color.white.opacity(0.035))
+                .frame(height: 1)
+                .padding(.horizontal, 1)
+        }
+        .shadow(color: Color.black.opacity(0.26), radius: 10, x: 0, y: 4)
     }
 
     private var strategyContentMaxWidth: CGFloat { 980 }
@@ -700,7 +726,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
                 Text(title)
-                    .font(DesignTokens.Typography.sectionTitle)
+                    .font(.system(size: prominence == .primary ? 16 : 15, weight: .semibold))
+                    .tracking(-0.1)
                     .foregroundStyle(prominence == .primary ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
                 if let subtitle {
                     Text(subtitle)
@@ -726,6 +753,11 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
                 .stroke(strategyPanelBorder(prominence: prominence), lineWidth: 1)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl - 1, style: .continuous)
+                .stroke(Color.white.opacity(prominence == .primary ? 0.035 : 0.02), lineWidth: 0.8)
+                .padding(1)
+        )
         .overlay(alignment: .top) {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
                 .fill(
@@ -738,6 +770,12 @@ struct SettingsView: View {
                 .frame(height: prominence == .primary ? 30 : 22)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous))
         }
+        .shadow(
+            color: Color.black.opacity(prominence == .primary ? 0.24 : 0.12),
+            radius: prominence == .primary ? 12 : 6,
+            x: 0,
+            y: prominence == .primary ? 5 : 2
+        )
     }
 
     private func strategyPanelBackground(prominence: StrategyPanelProminence) -> LinearGradient {
@@ -745,8 +783,9 @@ struct SettingsView: View {
         case .primary:
             return LinearGradient(
                 colors: [
-                    AppTheme.panelBackground.opacity(0.98),
-                    DesignTokens.Colors.bgElevated.opacity(0.88),
+                    DesignTokens.Colors.bgPanel.opacity(0.98),
+                    DesignTokens.Colors.bgElevated.opacity(0.94),
+                    DesignTokens.Colors.bgBase.opacity(0.9),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -754,8 +793,9 @@ struct SettingsView: View {
         case .secondary:
             return LinearGradient(
                 colors: [
-                    DesignTokens.Colors.surface1.opacity(0.74),
-                    DesignTokens.Colors.bgElevated.opacity(0.5),
+                    DesignTokens.Colors.surface1.opacity(0.62),
+                    DesignTokens.Colors.bgElevated.opacity(0.58),
+                    DesignTokens.Colors.bgBase.opacity(0.46),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -791,11 +831,25 @@ struct SettingsView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
-                .fill(DesignTokens.Colors.surface1.opacity(0.38))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface1.opacity(0.52),
+                            DesignTokens.Colors.surface1.opacity(0.22),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
-                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.55), lineWidth: 0.9)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.58), lineWidth: 0.9)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.018), lineWidth: 0.7)
+                .padding(1)
         )
     }
 
@@ -827,12 +881,27 @@ struct SettingsView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
-                .fill(DesignTokens.Colors.surface1.opacity(0.52))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.92),
+                            DesignTokens.Colors.surface1.opacity(0.5),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
                 .stroke(DesignTokens.Colors.borderSubtle.opacity(0.82), lineWidth: 0.9)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.03), lineWidth: 0.7)
+                .padding(1)
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 2)
     }
 
     private func strategySummaryBlock<Content: View>(
@@ -875,14 +944,91 @@ struct SettingsView: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
                 if let badge {
-                    StatusBadge(text: badge, tone: tone)
+                    strategyBadge(text: badge, tone: tone, size: .compact)
                 }
                 Spacer(minLength: 0)
             }
             Text(detail)
-                .font(.caption)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(settingsValueColor(for: tone))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func strategyBadge(
+        text: String,
+        tone: StatusTone,
+        size: StrategyBadgeSize = .regular
+    ) -> some View {
+        Text(text)
+            .font(size.font)
+            .tracking(0.15)
+            .foregroundStyle(strategyBadgeForeground(tone))
+            .padding(.horizontal, size.horizontalPadding)
+            .padding(.vertical, size.verticalPadding)
+            .background(
+                RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                strategyBadgeFill(tone).opacity(0.88),
+                                strategyBadgeFill(tone).opacity(0.62),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)
+                    .stroke(strategyBadgeBorder(tone), lineWidth: 0.9)
+            )
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(height: 1)
+                    .padding(.horizontal, 1)
+            }
+            .shadow(color: Color.black.opacity(0.14), radius: 2, x: 0, y: 1)
+            .lineLimit(1)
+    }
+
+    private func strategyBadgeFill(_ tone: StatusTone) -> Color {
+        switch tone {
+        case .success:
+            return DesignTokens.Colors.successBackground
+        case .warning:
+            return DesignTokens.Colors.warningBackground
+        case .danger:
+            return DesignTokens.Colors.dangerBackground
+        case .info:
+            return DesignTokens.Colors.infoBackground
+        case .neutral:
+            return DesignTokens.Colors.surface2.opacity(0.92)
+        }
+    }
+
+    private func strategyBadgeBorder(_ tone: StatusTone) -> Color {
+        switch tone {
+        case .success:
+            return DesignTokens.Colors.success.opacity(0.26)
+        case .warning:
+            return DesignTokens.Colors.warning.opacity(0.28)
+        case .danger:
+            return DesignTokens.Colors.danger.opacity(0.3)
+        case .info:
+            return DesignTokens.Colors.info.opacity(0.3)
+        case .neutral:
+            return DesignTokens.Colors.borderMedium.opacity(0.75)
+        }
+    }
+
+    private func strategyBadgeForeground(_ tone: StatusTone) -> Color {
+        switch tone {
+        case .neutral:
+            return DesignTokens.Colors.textSecondary
+        default:
+            return tone.foreground
         }
     }
 
@@ -894,7 +1040,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.headline.weight(.semibold))
+                    .font(.system(size: 15, weight: .semibold))
+                    .tracking(-0.1)
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
                 Text(summary)
                     .font(.caption)
@@ -928,12 +1075,27 @@ struct SettingsView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
-                .fill(DesignTokens.Colors.surface1.opacity(0.55))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.68),
+                            DesignTokens.Colors.surface1.opacity(0.48),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
                 .stroke(DesignTokens.Colors.borderSubtle.opacity(0.9), lineWidth: 0.9)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.028), lineWidth: 0.7)
+                .padding(1)
+        )
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 
     private func strategySegmentControlRow(
@@ -953,9 +1115,102 @@ struct SettingsView: View {
                 }
             }
             control
+                .padding(5)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                        .fill(DesignTokens.Colors.surface1.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                        .stroke(DesignTokens.Colors.borderSubtle.opacity(0.62), lineWidth: 0.9)
+                )
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    private func strategySegmentedControl(
+        options: [AppSegmentedOption<String>],
+        selection: Binding<String>,
+        minSegmentWidth: CGFloat,
+        height: CGFloat
+    ) -> some View {
+        HStack(spacing: 4) {
+            ForEach(options) { option in
+                let isSelected = option.value == selection.wrappedValue
+                Button {
+                    selection.wrappedValue = option.value
+                } label: {
+                    Text(option.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(isSelected ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(minWidth: minSegmentWidth)
+                        .frame(height: height - 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                                .fill(
+                                    isSelected
+                                        ? LinearGradient(
+                                            colors: [
+                                                DesignTokens.Colors.surface3.opacity(0.92),
+                                                DesignTokens.Colors.accentMuted.opacity(0.52),
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                        : LinearGradient(
+                                            colors: [
+                                                Color.clear,
+                                                Color.clear,
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                                .stroke(
+                                    isSelected ? DesignTokens.Colors.borderMedium.opacity(0.95) : Color.clear,
+                                    lineWidth: 0.9
+                                )
+                        )
+                        .overlay(alignment: .top) {
+                            RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                                .fill(Color.white.opacity(isSelected ? 0.045 : 0.0))
+                                .frame(height: 1)
+                                .padding(.horizontal, 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .shadow(color: Color.black.opacity(isSelected ? 0.18 : 0), radius: 3, x: 0, y: 1)
+            }
+        }
+        .padding(4)
+        .frame(height: height)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface1.opacity(0.96),
+                            DesignTokens.Colors.surface1.opacity(0.72),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.92), lineWidth: 0.9)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.03), lineWidth: 0.7)
+                .padding(1)
+        )
     }
 
     private func strategyFormRow<Control: View>(
@@ -966,7 +1221,7 @@ struct SettingsView: View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
                 Text(title)
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
                 if let subtitle {
                     Text(subtitle)
@@ -978,10 +1233,10 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             control()
-                .frame(minWidth: 124, alignment: .trailing)
+                .frame(minWidth: 128, alignment: .trailing)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 9)
     }
 
     private func compactNumberControl(
@@ -1003,13 +1258,22 @@ struct SettingsView: View {
                         .font(.caption.weight(.bold))
                         .frame(width: 24, height: 24)
                 }
-                .buttonStyle(AppToolButtonStyle())
+                .buttonStyle(.plain)
+                .background(strategyMiniButtonBackground(isPressed: false))
                 .disabled(value <= range.lowerBound)
 
                 Text("\(value)")
-                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .frame(width: 44)
+                    .frame(width: 44, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
+                            .fill(DesignTokens.Colors.surface3.opacity(0.62))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
+                            .stroke(Color.white.opacity(0.05), lineWidth: 0.8)
+                    )
 
                 Button {
                     let next = min(range.upperBound, value + step)
@@ -1020,13 +1284,48 @@ struct SettingsView: View {
                         .font(.caption.weight(.bold))
                         .frame(width: 24, height: 24)
                 }
-                .buttonStyle(AppToolButtonStyle())
+                .buttonStyle(.plain)
+                .background(strategyMiniButtonBackground(isPressed: false))
                 .disabled(value >= range.upperBound)
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .appSurfaceStyle(cornerRadius: DesignTokens.Radius.md)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignTokens.Colors.surface1.opacity(0.92),
+                                DesignTokens.Colors.surface2.opacity(0.72),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.88), lineWidth: 0.9)
+            )
         }
+    }
+
+    private func strategyMiniButtonBackground(isPressed: Bool) -> some View {
+        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        DesignTokens.Colors.surface2.opacity(isPressed ? 0.9 : 0.72),
+                        DesignTokens.Colors.surface1.opacity(isPressed ? 0.82 : 0.62),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.9), lineWidth: 0.8)
+            )
     }
 
     private func strategyToggleRow(
@@ -1038,7 +1337,26 @@ struct SettingsView: View {
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
                 .labelsHidden()
-                .tint(DesignTokens.Colors.warning)
+                .tint(DesignTokens.Colors.warningMuted)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    DesignTokens.Colors.surface1.opacity(0.94),
+                                    DesignTokens.Colors.surface2.opacity(0.64),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                        .stroke(DesignTokens.Colors.borderSubtle.opacity(0.88), lineWidth: 0.9)
+                )
         }
     }
 
@@ -1166,7 +1484,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
             HStack(spacing: 6) {
                 Button {
                     value.wrappedValue = max(0, value.wrappedValue - 1)
@@ -1175,13 +1493,22 @@ struct SettingsView: View {
                         .font(.caption.weight(.bold))
                         .frame(width: 20, height: 20)
                 }
-                .buttonStyle(AppToolButtonStyle())
+                .buttonStyle(.plain)
+                .background(strategyMiniButtonBackground(isPressed: false))
                 .disabled(value.wrappedValue <= 0)
 
                 Text("\(Int(value.wrappedValue.rounded()))")
-                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .frame(minWidth: 30)
+                    .frame(minWidth: 32, minHeight: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
+                            .fill(DesignTokens.Colors.surface3.opacity(0.54))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
+                            .stroke(Color.white.opacity(0.04), lineWidth: 0.8)
+                    )
 
                 Button {
                     value.wrappedValue = min(100, value.wrappedValue + 1)
@@ -1190,12 +1517,29 @@ struct SettingsView: View {
                         .font(.caption.weight(.bold))
                         .frame(width: 20, height: 20)
                 }
-                .buttonStyle(AppToolButtonStyle())
+                .buttonStyle(.plain)
+                .background(strategyMiniButtonBackground(isPressed: false))
                 .disabled(value.wrappedValue >= 100)
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 4)
-            .appSurfaceStyle(cornerRadius: DesignTokens.Radius.md)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignTokens.Colors.surface1.opacity(0.9),
+                                DesignTokens.Colors.surface2.opacity(0.66),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.88), lineWidth: 0.9)
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1227,15 +1571,30 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 10)
-            .frame(height: 34)
+            .frame(height: 36)
             .background(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
-                    .fill(DesignTokens.Colors.surface1.opacity(0.85))
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignTokens.Colors.surface1.opacity(0.95),
+                                DesignTokens.Colors.surface2.opacity(0.62),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
                     .stroke(DesignTokens.Colors.borderSubtle.opacity(0.95), lineWidth: 0.9)
             )
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+                    .frame(height: 1)
+                    .padding(.horizontal, 1)
+            }
         }
     }
 
@@ -1715,6 +2074,41 @@ struct SettingsView: View {
 private enum StrategyPanelProminence {
     case primary
     case secondary
+}
+
+private enum StrategyBadgeSize {
+    case regular
+    case compact
+
+    var font: Font {
+        switch self {
+        case .regular:
+            return .system(size: 11, weight: .semibold)
+        case .compact:
+            return .system(size: 10, weight: .semibold)
+        }
+    }
+
+    var horizontalPadding: CGFloat {
+        switch self {
+        case .regular: return 10
+        case .compact: return 8
+        }
+    }
+
+    var verticalPadding: CGFloat {
+        switch self {
+        case .regular: return 4.5
+        case .compact: return 3.5
+        }
+    }
+
+    var cornerRadius: CGFloat {
+        switch self {
+        case .regular: return 7
+        case .compact: return 6
+        }
+    }
 }
 
 enum SettingsPageMode {
