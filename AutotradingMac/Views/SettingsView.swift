@@ -412,10 +412,9 @@ struct SettingsView: View {
         ) {
             DisclosureGroup(isExpanded: $showAdvancedSettings) {
                 VStack(alignment: .leading, spacing: 14) {
-                    scannerSettingsPanel(draft.advanced.scanner)
+                    scannerSettingsPanel(draft.advanced.scanner, basicEntry: draft.basic.entry)
                     signalSettingsPanel(draft.advanced.signal)
                     riskSettingsPanel(draft.advanced.risk)
-                    strategyHelpPanel
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -443,59 +442,59 @@ struct SettingsView: View {
         }
     }
 
-    private func scannerSettingsPanel(_ scanner: ScannerSettingsSnapshot) -> some View {
+    private func scannerSettingsPanel(
+        _ scanner: ScannerSettingsSnapshot,
+        basicEntry: BasicEntrySettingsSnapshot
+    ) -> some View {
         advancedSectionCard(
             title: "Scanner",
-            summary: "후보 우선순위와 필터 기준을 조정합니다."
+            summary: "Basic Strategy의 방향 위에 세부 필터와 가중치만 더합니다.",
+            trailing: {
+                advancedSectionMeta(
+                    title: "Basic 기준",
+                    value: "\(localizedScannerMode(basicEntry.selectionMode)) · Top \(basicEntry.topN)"
+                )
+            }
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 320), alignment: .leading, spacing: 14) {
-                strategyGroup(title: "기본 기준", subtitle: "스캔 기준과 평가 범위") {
-                    strategySegmentControlRow(
-                        title: "기본 스캔 기준",
-                        subtitle: "기본 랭킹 모드",
-                        control: AnyView(
-                            strategySegmentedControl(
-                                options: [
-                                    AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
-                                    AppSegmentedOption(value: "surge", title: "급등률 순위"),
-                                ],
-                                selection: scannerDefaultModeBinding(),
-                                minSegmentWidth: 126,
-                                height: 36
-                            )
+            advancedCardRow(minHeight: 232) {
+                advancedTuningCard(
+                    title: "최소 거래 필터",
+                    tooltip: "Basic Strategy의 스캔 방향과 별개로, 스캐너 후보군을 더 보수적으로 좁히는 조건입니다.",
+                    minHeight: 232
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최소 거래대금",
+                            unit: "원",
+                            text: scannerMinTurnoverText,
+                            onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
                         )
-                    )
-                    compactNumberControl(
-                        title: "상위 후보 평가 범위",
-                        subtitle: "Top-N",
-                        value: scanner.topN,
-                        range: 1...30,
-                        step: 1,
-                        onChange: { store.updateStrategyScannerTopN($0) }
-                    )
+                        strategyBandNumericField(
+                            label: "최소 등락률",
+                            unit: "%",
+                            text: scannerMinChangePctText,
+                            onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
+                        )
+                    }
                 }
-                strategyGroup(title: "필터", subtitle: "최소 거래 조건") {
-                    editableDoubleTextRow(
-                        title: "최소 거래대금",
-                        unit: "원",
-                        text: scannerMinTurnoverText,
-                        onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
-                    )
-                    editableDoubleTextRow(
-                        title: "최소 등락률",
-                        unit: "%",
-                        text: scannerMinChangePctText,
-                        onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
-                    )
-                }
-                strategyGroup(title: "가중치", subtitle: "후보 점수 구성 비율") {
-                    scannerWeightEditor(
-                        title: "거래대금 순위 기준",
+            } second: {
+                advancedTuningCard(
+                    title: "거래대금 순위 가중치",
+                    tooltip: "순위, 거래대금, 등락률이 후보 점수에 반영되는 비율을 100% 안에서 조정합니다.",
+                    minHeight: 232
+                ) {
+                    advancedWeightEditor(
                         mode: "turnover",
                         weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
                     )
-                    scannerWeightEditor(
-                        title: "급등률 순위 기준",
+                }
+            } third: {
+                advancedTuningCard(
+                    title: "급등률 순위 가중치",
+                    tooltip: "급등률 모드에서 순위, 거래대금, 등락률 비중을 따로 조정합니다.",
+                    minHeight: 232
+                ) {
+                    advancedWeightEditor(
                         mode: "surge",
                         weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
                     )
@@ -507,47 +506,63 @@ struct SettingsView: View {
     private func signalSettingsPanel(_ signal: SignalSettingsSnapshot) -> some View {
         advancedSectionCard(
             title: "Signal",
-            summary: "후보 중 실제 신호로 인정할 범위와 임계값입니다."
+            summary: "Basic 신호를 보완하는 세부 판단 임계값만 조정합니다."
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 320), alignment: .leading, spacing: 14) {
-                strategyGroup(title: "신호 판단 범위", subtitle: "신호 평가 대상 범위") {
-                    compactNumberControl(
-                        title: "신호 판단 범위",
-                        subtitle: "Top-N",
+            advancedCardRow(minHeight: 246) {
+                advancedTuningCard(
+                    title: "신호 평가 범위",
+                    tooltip: "Basic Strategy의 관찰 후보 안에서 실제 신호로 평가할 범위를 더 좁히거나 넓힙니다.",
+                    minHeight: 246
+                ) {
+                    strategyBandStepperTile(
+                        label: "평가 대상 범위",
                         value: signal.topN,
                         range: 1...30,
                         step: 1,
+                        unit: "Top-N",
                         onChange: { store.updateStrategySignalTopN($0) }
                     )
                 }
-                strategyGroup(title: "급상승/유지 조건", subtitle: "순위 변화 판단 기준") {
-                    compactNumberControl(
-                        title: "급상승 임계값",
-                        subtitle: "순위 단계",
-                        value: signal.rankJumpThreshold,
-                        range: 1...50,
-                        step: 1,
-                        onChange: { store.updateStrategyRankJumpThreshold($0) }
-                    )
-                    compactNumberControl(
-                        title: "급상승 윈도우",
-                        subtitle: "초",
-                        value: signal.rankJumpWindowSeconds,
-                        range: 10...86_400,
-                        step: 10,
-                        onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
-                    )
-                    compactNumberControl(
-                        title: "상위권 유지 편차",
-                        subtitle: "순위 단계",
-                        value: signal.rankHoldTolerance,
-                        range: 0...20,
-                        step: 1,
-                        onChange: { store.updateStrategyRankHoldTolerance($0) }
-                    )
+            } second: {
+                advancedTuningCard(
+                    title: "급상승 / 유지 조건",
+                    tooltip: "순위가 얼마나 빠르게 변해야 급상승으로 볼지, 상위권 유지 허용 편차를 어디까지 둘지 정합니다.",
+                    minHeight: 246
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        strategyBandStepperTile(
+                            label: "급상승 임계값",
+                            value: signal.rankJumpThreshold,
+                            range: 1...50,
+                            step: 1,
+                            unit: "단계",
+                            onChange: { store.updateStrategyRankJumpThreshold($0) }
+                        )
+                        strategyBandStepperTile(
+                            label: "급상승 윈도우",
+                            value: signal.rankJumpWindowSeconds,
+                            range: 10...86_400,
+                            step: 10,
+                            unit: "초",
+                            onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
+                        )
+                        strategyBandStepperTile(
+                            label: "상위권 유지 편차",
+                            value: signal.rankHoldTolerance,
+                            range: 0...20,
+                            step: 1,
+                            unit: "단계",
+                            onChange: { store.updateStrategyRankHoldTolerance($0) }
+                        )
+                    }
                 }
-                strategyGroup(title: "활성 신호 유형", subtitle: "추가 감시할 신호 선택") {
-                    strategySignalToggleGrid(
+            } third: {
+                advancedTuningCard(
+                    title: "활성 신호 유형",
+                    tooltip: "Basic에서 선택한 진입 신호 중 세부 평가에 계속 반영할 유형만 남깁니다.",
+                    minHeight: 246
+                ) {
+                    strategySignalToggleList(
                         selected: signal.enabledSignalTypes,
                         binding: signalEnabledBinding
                     )
@@ -559,81 +574,76 @@ struct SettingsView: View {
     private func riskSettingsPanel(_ risk: RiskSettingsSnapshot) -> some View {
         advancedSectionCard(
             title: "Risk",
-            summary: "고급 리스크 게이트와 시간 제한을 조정합니다."
+            summary: "Basic 리스크 기준 위에 고급 게이트와 시간창만 더합니다."
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 320), alignment: .leading, spacing: 14) {
-                strategyGroup(title: "허용 신호", subtitle: "리스크 게이트가 통과시킬 신호") {
-                    strategySignalToggleGrid(
+            advancedCardRow(minHeight: 258) {
+                advancedTuningCard(
+                    title: "허용 신호",
+                    tooltip: "리스크 게이트를 통과시킬 신호 유형만 남깁니다.",
+                    minHeight: 258
+                ) {
+                    strategySignalToggleList(
                         selected: risk.allowedSignalTypes,
                         binding: riskAllowedBinding
                     )
                 }
-                strategyGroup(title: "동시 후보 제한", subtitle: "과도한 동시 진입 방지") {
-                    compactNumberControl(
-                        title: "최대 동시 후보 수",
-                        subtitle: "개",
-                        value: risk.maxConcurrentCandidates,
-                        range: 1...50,
-                        step: 1,
-                        onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
-                    )
-                    strategyToggleRow(
-                        title: "보유 시 신규 진입 차단",
-                        subtitle: "기존 포지션이 있으면 추가 진입을 막습니다.",
-                        isOn: Binding(
-                            get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
-                            set: { store.updateStrategyBlockWhenPositionExists($0) }
+            } second: {
+                advancedTuningCard(
+                    title: "동시 후보 제한",
+                    tooltip: "한 번에 너무 많은 승인 후보가 열리는 상황을 막는 보수적 제한입니다.",
+                    minHeight: 258
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandStepperTile(
+                            label: "최대 동시 후보 수",
+                            value: risk.maxConcurrentCandidates,
+                            range: 1...50,
+                            step: 1,
+                            unit: "개",
+                            onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
                         )
-                    )
+                        strategyBandToggleControl(
+                            title: "보유 시 신규 진입 차단",
+                            isOn: Binding(
+                                get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
+                                set: { store.updateStrategyBlockWhenPositionExists($0) }
+                            )
+                        )
+                    }
                 }
-                strategyGroup(title: "재진입/시간 제한", subtitle: "보수적 재진입 판단") {
-                    compactNumberControl(
-                        title: "재진입 대기 시간",
-                        subtitle: "분",
-                        value: risk.cooldownMinutes,
-                        range: 1...1_440,
-                        step: 1,
-                        onChange: { store.updateStrategyCooldownMinutes($0) }
-                    )
-                    compactNumberControl(
-                        title: "신호 유효 시간",
-                        subtitle: "분",
-                        value: risk.signalWindowMinutes,
-                        range: 1...1_440,
-                        step: 1,
-                        onChange: { store.updateStrategySignalWindowMinutes($0) }
-                    )
-                    compactNumberControl(
-                        title: "동시성 계산 시간창",
-                        subtitle: "분",
-                        value: risk.concurrencyWindowMinutes,
-                        range: 1...1_440,
-                        step: 1,
-                        onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
-                    )
+            } third: {
+                advancedTuningCard(
+                    title: "재진입 / 시간 제한",
+                    tooltip: "같은 종목 재진입과 동시성 계산, 신호 유효 시간을 보수적으로 조정합니다.",
+                    minHeight: 258
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        strategyBandStepperTile(
+                            label: "재진입 대기 시간",
+                            value: risk.cooldownMinutes,
+                            range: 1...1_440,
+                            step: 1,
+                            unit: "분",
+                            onChange: { store.updateStrategyCooldownMinutes($0) }
+                        )
+                        strategyBandStepperTile(
+                            label: "신호 유효 시간",
+                            value: risk.signalWindowMinutes,
+                            range: 1...1_440,
+                            step: 1,
+                            unit: "분",
+                            onChange: { store.updateStrategySignalWindowMinutes($0) }
+                        )
+                        strategyBandStepperTile(
+                            label: "동시성 계산 시간창",
+                            value: risk.concurrencyWindowMinutes,
+                            range: 1...1_440,
+                            step: 1,
+                            unit: "분",
+                            onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
+                        )
+                    }
                 }
-            }
-        }
-    }
-
-    private var strategyHelpPanel: some View {
-        advancedSectionCard(
-            title: "도움말",
-            summary: "긴 설명 대신 필요한 운영 원칙만 남깁니다."
-        ) {
-            VStack(alignment: .leading, spacing: 8) {
-                strategyCompactNote(
-                    title: "스캔 점수",
-                    detail: "실전 승률이 아니라 후보 우선순위 점수입니다."
-                )
-                strategyCompactNote(
-                    title: "반영 시점",
-                    detail: "저장된 값은 다음 평가 사이클부터 적용됩니다."
-                )
-                strategyCompactNote(
-                    title: "안전 원칙",
-                    detail: "저장 전에는 서버 설정이 바뀌지 않습니다."
-                )
             }
         }
     }
@@ -835,19 +845,24 @@ struct SettingsView: View {
         }
     }
 
-    private func advancedSectionCard<Content: View>(
+    private func advancedSectionCard<Trailing: View, Content: View>(
         title: String,
         summary: String,
+        @ViewBuilder trailing: () -> Trailing,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                Text(summary)
-                    .font(.system(size: 12.5, weight: .regular))
-                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    Text(summary)
+                        .font(.system(size: 12.5, weight: .regular))
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                }
+                Spacer(minLength: 10)
+                trailing()
             }
             content()
         }
@@ -872,6 +887,95 @@ struct SettingsView: View {
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
                 .stroke(Color.white.opacity(0.018), lineWidth: 0.7)
+                .padding(1)
+        )
+    }
+
+    private func advancedSectionCard<Content: View>(
+        title: String,
+        summary: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        advancedSectionCard(title: title, summary: summary, trailing: { EmptyView() }, content: content)
+    }
+
+    private func advancedSectionMeta(title: String, value: String) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(DesignTokens.Colors.textQuaternary)
+            Text(value)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+        }
+    }
+
+    private func advancedCardRow<First: View, Second: View, Third: View>(
+        minHeight: CGFloat,
+        @ViewBuilder _ first: () -> First,
+        @ViewBuilder second: () -> Second,
+        @ViewBuilder third: () -> Third
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 14) {
+                first()
+                second()
+                third()
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                first()
+                second()
+                third()
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+    }
+
+    private func advancedTuningCard<Content: View>(
+        title: String,
+        tooltip: String? = nil,
+        minHeight: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 6) {
+                Text(title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let tooltip {
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                        .help(tooltip)
+                }
+            }
+            Spacer(minLength: 4)
+            content()
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface1.opacity(0.58),
+                            DesignTokens.Colors.surface1.opacity(0.28),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.62), lineWidth: 0.9)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.022), lineWidth: 0.7)
                 .padding(1)
         )
     }
@@ -1819,13 +1923,6 @@ struct SettingsView: View {
         return DisplayFormatters.number(value)
     }
 
-    private func scannerDefaultModeBinding() -> Binding<String> {
-        Binding(
-            get: { store.strategyDraft?.scanner.defaultMode ?? "turnover" },
-            set: { store.updateStrategyScannerDefaultMode($0) }
-        )
-    }
-
     private func signalEnabledBinding(type: String) -> Binding<Bool> {
         Binding(
             get: { store.strategyDraft?.signal.enabledSignalTypes.contains(type) ?? false },
@@ -1862,96 +1959,21 @@ struct SettingsView: View {
         )
     }
 
-    private func scannerWeightEditor(
-        title: String,
+    private func advancedWeightEditor(
         mode: String,
         weights: ScannerScoreWeightsSnapshot
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            HStack(spacing: 10) {
-                weightStepper(
-                    label: "순위",
-                    value: scannerWeightBinding(mode: mode, key: "rank", fallback: weights.rank)
-                )
-                weightStepper(
-                    label: "거래대금",
-                    value: scannerWeightBinding(mode: mode, key: "turnover", fallback: weights.turnover)
-                )
-                weightStepper(
-                    label: "등락률",
-                    value: scannerWeightBinding(mode: mode, key: "change_pct", fallback: weights.changePct)
-                )
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    private func weightStepper(label: String, value: Binding<Double>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.caption2)
+            Text("총합 100% 안에서 비율이 자동 유지됩니다.")
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
-            HStack(spacing: 6) {
-                Button {
-                    value.wrappedValue = max(0, value.wrappedValue - 1)
-                } label: {
-                    Image(systemName: "minus")
-                        .font(.caption.weight(.bold))
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .background(strategyMiniButtonBackground(isPressed: false))
-                .disabled(value.wrappedValue <= 0)
 
-                Text("\(Int(value.wrappedValue.rounded()))")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(DesignTokens.Colors.textPrimary)
-                    .frame(minWidth: 32, minHeight: 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
-                            .fill(DesignTokens.Colors.surface3.opacity(0.54))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.Radius.sm, style: .continuous)
-                            .stroke(Color.white.opacity(0.04), lineWidth: 0.8)
-                    )
-
-                Button {
-                    value.wrappedValue = min(100, value.wrappedValue + 1)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.caption.weight(.bold))
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .background(strategyMiniButtonBackground(isPressed: false))
-                .disabled(value.wrappedValue >= 100)
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                DesignTokens.Colors.surface1.opacity(0.9),
-                                DesignTokens.Colors.surface2.opacity(0.66),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
-                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.88), lineWidth: 0.9)
+            AdvancedWeightRangeControl(
+                rank: scannerWeightBinding(mode: mode, key: "rank", fallback: weights.rank),
+                turnover: scannerWeightBinding(mode: mode, key: "turnover", fallback: weights.turnover),
+                changePct: scannerWeightBinding(mode: mode, key: "change_pct", fallback: weights.changePct)
             )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func editableDoubleTextRow(
@@ -2572,6 +2594,148 @@ private enum StrategyBadgeSize {
 enum SettingsPageMode {
     case settings
     case stategy
+}
+
+private struct AdvancedWeightRangeControl: View {
+    @Binding var rank: Double
+    @Binding var turnover: Double
+    @Binding var changePct: Double
+
+    private let trackHeight: CGFloat = 14
+    private let knobSize: CGFloat = 16
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            GeometryReader { proxy in
+                let width = max(proxy.size.width - knobSize, 1)
+                let boundaries = normalizedBoundaries()
+                let firstX = knobSize / 2 + CGFloat(boundaries.first / 100) * width
+                let secondX = knobSize / 2 + CGFloat(boundaries.second / 100) * width
+                let leadingInset = knobSize / 2
+                let firstWidth = max(0, firstX - leadingInset)
+                let middleWidth = max(0, secondX - firstX)
+                let trailingWidth = max(0, proxy.size.width - leadingInset - secondX)
+
+                ZStack(alignment: .leading) {
+                    Capsule(style: .continuous)
+                        .fill(DesignTokens.Colors.surface1.opacity(0.76))
+                        .frame(height: trackHeight)
+
+                    HStack(spacing: 0) {
+                        Capsule(style: .continuous)
+                            .fill(DesignTokens.Colors.info.opacity(0.82))
+                            .frame(width: firstWidth, height: trackHeight)
+                        Rectangle()
+                            .fill(DesignTokens.Colors.warning.opacity(0.78))
+                            .frame(width: middleWidth, height: trackHeight)
+                        Capsule(style: .continuous)
+                            .fill(DesignTokens.Colors.success.opacity(0.74))
+                            .frame(width: trailingWidth, height: trackHeight)
+                    }
+                    .clipShape(Capsule(style: .continuous))
+
+                    handle
+                        .position(x: firstX, y: trackHeight / 2)
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    let local = boundaryValue(from: value.location.x, width: width)
+                                    update(firstBoundary: local, secondBoundary: boundaries.second)
+                                }
+                        )
+
+                    handle
+                        .position(x: secondX, y: trackHeight / 2)
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    let local = boundaryValue(from: value.location.x, width: width)
+                                    update(firstBoundary: boundaries.first, secondBoundary: local)
+                                }
+                        )
+                }
+                .frame(height: max(knobSize, trackHeight))
+            }
+            .frame(height: knobSize)
+
+            HStack(spacing: 8) {
+                legendChip(title: "순위", value: rank, color: DesignTokens.Colors.info.opacity(0.82))
+                legendChip(title: "거래대금", value: turnover, color: DesignTokens.Colors.warning.opacity(0.78))
+                legendChip(title: "등락률", value: changePct, color: DesignTokens.Colors.success.opacity(0.74))
+            }
+        }
+    }
+
+    private var handle: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        DesignTokens.Colors.surface3.opacity(0.96),
+                        DesignTokens.Colors.surface2.opacity(0.82),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: knobSize, height: knobSize)
+            .overlay(
+                Circle()
+                    .stroke(DesignTokens.Colors.borderMedium.opacity(0.95), lineWidth: 0.9)
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.white.opacity(0.06), lineWidth: 0.7)
+                    .padding(1)
+            )
+            .shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
+    }
+
+    private func legendChip(title: String, value: Double, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text("\(title) \(Int(value.rounded()))")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(DesignTokens.Colors.surface1.opacity(0.58))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.68), lineWidth: 0.8)
+        )
+    }
+
+    private func normalizedBoundaries() -> (first: Double, second: Double) {
+        let total = max(rank + turnover + changePct, 0.0001)
+        let normalizedRank = (rank / total) * 100
+        let normalizedTurnover = (turnover / total) * 100
+        let first = max(0, min(100, normalizedRank))
+        let second = max(first, min(100, normalizedRank + normalizedTurnover))
+        return (first, second)
+    }
+
+    private func boundaryValue(from x: CGFloat, width: CGFloat) -> Double {
+        let position = max(0, min(width, x - knobSize / 2))
+        return Double(position / width) * 100
+    }
+
+    private func update(firstBoundary: Double, secondBoundary: Double) {
+        let firstInt = Int(max(0, min(firstBoundary, secondBoundary)).rounded())
+        let secondInt = Int(max(Double(firstInt), min(secondBoundary, 100)).rounded())
+        let nextRank = Double(firstInt)
+        let nextTurnover = Double(max(0, secondInt - firstInt))
+        let nextChange = Double(max(0, 100 - secondInt))
+        rank = nextRank
+        turnover = nextTurnover
+        changePct = nextChange
+    }
 }
 
 #Preview("Settings") {

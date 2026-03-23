@@ -108,7 +108,11 @@
     - 구획 사이는 subtle divider로만 나누고, 각 구획 안은 `제목 -> 값/입력 -> 필요 시 보조 정보` 순서로 읽힌다
     - 긴 설명은 줄이고, 헷갈릴 수 있는 항목만 `?` tooltip으로 이동한다
     - 값 하나만 보는 항목은 한 줄, 여러 조건을 함께 보는 항목은 두 줄 중심으로 정리한다
-    - `Advanced Settings`는 disclosure + 저대비 컨테이너로 Basic보다 한 단계 가볍게 표시
+    - `Advanced Settings`는 disclosure + 저대비 컨테이너로 Basic보다 한 단계 가볍게 표시하되, 내부는 전문가용 튜닝 패널처럼 정리한다
+    - Advanced `Scanner/Signal/Risk` 카드는 같은 row에서 높이를 맞추고, 적은 내용의 카드는 spacer로 vertical rhythm을 보정한다
+    - Advanced Scanner는 Basic과 겹치는 `기본 스캔 기준`/`Top-N` 직접 편집을 제거하고 `최소 거래 필터 + mode별 가중치`만 남긴다
+    - scanner 가중치는 `2개 핸들 + 3개 구간` control로 조정하며, `순위 / 거래대금 / 등락률` 총합 100%를 자동 유지한다
+    - 하단 별도 도움말 카드는 제거하고, 필요한 설명만 각 카드 제목 옆 `?` tooltip으로 이동한다
   - visual polish 원칙:
     - panel hierarchy를 분명히 해 상위 패널 / 하위 그룹 / 입력 표면 / 상태 badge가 같은 카드처럼 보이지 않게 한다
     - surface layering은 opacity 차이, 얇은 inner border, soft shadow, radius hierarchy로 만든다
@@ -137,7 +141,10 @@
     - `마지막 적용`, `일일 거래 제한 상태`, `일일 손실 한도 상태`를 함께 표시
     - 저장 성공과 실제 엔진 반영 완료를 구분해 표시
     - 리스크 요약에 `일일 거래 제한 상태`(오늘 사용/남은 횟수)와 `일일 손실 한도 상태`(오늘 손익/손실률/한도 도달 여부)를 함께 표시
-  - Advanced 섹션: 기존 `Scanner Settings`, `Signal Settings`, `Risk Settings` 상세 튜닝
+  - Advanced 섹션:
+    - `Scanner`: 최소 거래 필터 + mode별 가중치
+    - `Signal`: 세부 신호 임계값 + 활성 유형
+    - `Risk`: 허용 신호 + 동시 후보 제한 + 재진입/시간창
   - 설명 문구 노출 정책:
     - 기본 화면은 한 줄 요약 중심
     - 장문 설명 대신 compact note를 유지
