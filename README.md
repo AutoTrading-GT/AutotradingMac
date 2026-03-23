@@ -92,6 +92,14 @@
     - 권한이 없으면 토글 ON 시 권한을 요청하고, 거부 상태면 저장을 롤백한다.
     - 체결/신호/시스템 오류 알림은 각 토글이 켜져 있을 때만 local notification을 보낸다.
   - 데이터 관리 패널은 `자동 백업`, `로그 보관 기간`, `실사용 저장공간`을 실제 서버 응답 기준으로 표시한다.
+  - Settings 진입 시 `app-settings`를 다시 조회해 저장공간/maintenance 상태를 갱신한다.
+  - 데이터 관리 패널은 아래 운영 메타를 함께 표시한다.
+    - `최근 로그 정리`
+    - `최근 자동 백업`
+  - 저장 직후에는 지연 재조회로 background maintenance 결과를 다시 반영한다.
+  - 서버 정책 의미:
+    - `로그 보관 기간`은 현재 `engine_events`, `risk_events`, `strategy_signals` cleanup에 적용된다.
+    - `자동 백업`은 SQLite 파일 복사 또는 PostgreSQL `pg_dump` 실행 on/off에 직접 연결된다.
   - WebSocket 끊김 시 앱이 자동 재연결을 시도한다.
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`

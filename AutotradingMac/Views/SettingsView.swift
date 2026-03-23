@@ -25,9 +25,7 @@ struct SettingsView: View {
         }
         .task {
             guard mode == .settings else { return }
-            if store.appSettings == nil {
-                await store.reloadAppSettings()
-            }
+            await store.reloadAppSettings()
             await store.refreshNotificationAuthorizationStatus()
         }
         .safeAreaInset(edge: .bottom) {
@@ -2393,6 +2391,20 @@ struct SettingsView: View {
                 disabled: store.appSettings == nil
             )
             settingsRow(icon: "internaldrive", title: "사용 중인 저장공간", value: storageUsageText)
+            settingsRow(
+                icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                title: "최근 로그 정리",
+                value: cleanupStatusText,
+                tone: cleanupStatusTone,
+                multiline: true
+            )
+            settingsRow(
+                icon: "archivebox",
+                title: "최근 자동 백업",
+                value: backupStatusText,
+                tone: backupStatusTone,
+                multiline: true
+            )
             if let status = store.dataManagementPanelStatus {
                 settingsStatusCaption(status)
             } else if let error = store.appSettingsErrorMessage, store.appSettings == nil {
@@ -2641,6 +2653,70 @@ struct SettingsView: View {
 
     private var storageUsageText: String {
         store.appSettings?.dataManagement.storageUsageLabel ?? "-"
+    }
+
+    private var cleanupStatusText: String {
+        guard let dataManagement = store.appSettings?.dataManagement else { return "-" }
+        let summary = dataManagement.lastCleanupSummary ?? "아직 실행 기록이 없습니다."
+        guard let lastRun = dataManagement.lastCleanupAt else { return summary }
+        return "\(summary) · \(DisplayFormatters.dateTime(lastRun))"
+    }
+
+    private var backupStatusText: String {
+        guard let dataManagement = store.appSettings?.dataManagement else { return "-" }
+        let summary = dataManagement.lastBackupSummary ?? "아직 실행 기록이 없습니다."
+        let mode = backupModeLabel(dataManagement.backupMode)
+        if let lastRun = dataManagement.lastBackupAt {
+            if mode.isEmpty {
+                return "\(summary) · \(DisplayFormatters.dateTime(lastRun))"
+            }
+            return "\(summary) · \(mode) · \(DisplayFormatters.dateTime(lastRun))"
+        }
+        if mode.isEmpty {
+            return summary
+        }
+        return "\(summary) · \(mode)"
+    }
+
+    private var cleanupStatusTone: StatusTone {
+        switch store.appSettings?.dataManagement.lastCleanupStatus?.lowercased() {
+        case "success":
+            return .success
+        case "failed":
+            return .warning
+        case "pending":
+            return .neutral
+        default:
+            return .neutral
+        }
+    }
+
+    private var backupStatusTone: StatusTone {
+        switch store.appSettings?.dataManagement.lastBackupStatus?.lowercased() {
+        case "success":
+            return .success
+        case "failed":
+            return .warning
+        case "pending":
+            return .neutral
+        case "disabled":
+            return .neutral
+        default:
+            return .neutral
+        }
+    }
+
+    private func backupModeLabel(_ raw: String?) -> String {
+        switch raw?.lowercased() {
+        case "sqlite_file_copy":
+            return "SQLite 파일 백업"
+        case "postgres_pg_dump":
+            return "PostgreSQL dump"
+        case .some(let value) where !value.isEmpty:
+            return value
+        default:
+            return ""
+        }
     }
 
     private var autoBackupBinding: Binding<Bool> {

@@ -416,6 +416,13 @@ struct DataManagementSettingsSnapshot: Decodable, Equatable {
     var logRetentionDays: Int
     var storageUsageBytes: Int?
     var storageUsageLabel: String?
+    var lastCleanupAt: Date?
+    var lastCleanupStatus: String?
+    var lastCleanupSummary: String?
+    var lastBackupAt: Date?
+    var lastBackupStatus: String?
+    var lastBackupSummary: String?
+    var backupMode: String?
 }
 
 struct StrategyApplyStatusSnapshot: Decodable {

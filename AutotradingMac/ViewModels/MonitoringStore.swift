@@ -82,6 +82,7 @@ final class MonitoringStore: ObservableObject {
     private let strategySelectionModes = ["turnover", "surge"]
     private var notificationStatusClearTask: Task<Void, Never>?
     private var dataManagementStatusClearTask: Task<Void, Never>?
+    private var appSettingsRefreshTask: Task<Void, Never>?
     private var deliveredNotificationKeys: [String] = []
     private let maxDeliveredNotificationKeys = 200
     private static let iso8601WithFractional: ISO8601DateFormatter = {
@@ -127,6 +128,8 @@ final class MonitoringStore: ObservableObject {
         notificationStatusClearTask = nil
         dataManagementStatusClearTask?.cancel()
         dataManagementStatusClearTask = nil
+        appSettingsRefreshTask?.cancel()
+        appSettingsRefreshTask = nil
         for task in chartFetchTasks.values {
             task.cancel()
         }
@@ -250,6 +253,7 @@ final class MonitoringStore: ObservableObject {
             )
             dataManagementPanelStatus = .success("자동 백업 설정이 저장되었습니다.")
             scheduleStatusMessageClear(for: .dataManagement)
+            scheduleAppSettingsRefresh()
             appSettingsErrorMessage = nil
         } catch {
             appSettings = previous
@@ -288,6 +292,7 @@ final class MonitoringStore: ObservableObject {
             )
             dataManagementPanelStatus = .success("로그 보관 기간이 저장되었습니다.")
             scheduleStatusMessageClear(for: .dataManagement)
+            scheduleAppSettingsRefresh()
             appSettingsErrorMessage = nil
         } catch {
             appSettings = previous
@@ -1019,6 +1024,15 @@ final class MonitoringStore: ObservableObject {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 self?.dataManagementPanelStatus = nil
             }
+        }
+    }
+
+    private func scheduleAppSettingsRefresh() {
+        appSettingsRefreshTask?.cancel()
+        appSettingsRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self else { return }
+            await self.reloadAppSettings()
         }
     }
 
