@@ -84,7 +84,15 @@
   - `API 연결`, `알림 설정`, `데이터 관리`, `정보` 패널로 구성
   - `API 연결` 패널에 마스킹 계좌 식별자 표시(`runtime.account_summary.masked_account` 우선)
   - `design_ref/figma_web_export/src/app/pages/SettingsPage.tsx` 정보구조를 SwiftUI로 반영
-  - 토글/설정값은 현재 읽기 전용 표시이며 저장/제어 기능은 미연결
+  - 데이터 소스:
+    - `GET /api/monitoring/runtime`: 연결/계좌/모드/환경 상태
+    - `GET /api/monitoring/app-settings`: 알림/데이터관리 현재값
+    - `PATCH /api/monitoring/app-settings`: 토글/보관기간 즉시 저장
+  - 알림 토글은 macOS 알림 권한과 함께 동작한다.
+    - 권한이 없으면 토글 ON 시 권한을 요청하고, 거부 상태면 저장을 롤백한다.
+    - 체결/신호/시스템 오류 알림은 각 토글이 켜져 있을 때만 local notification을 보낸다.
+  - 데이터 관리 패널은 `자동 백업`, `로그 보관 기간`, `실사용 저장공간`을 실제 서버 응답 기준으로 표시한다.
+  - WebSocket 끊김 시 앱이 자동 재연결을 시도한다.
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`
   - Strategy 3단계는 `Basic Strategy + Advanced Settings` 2계층 편집 화면

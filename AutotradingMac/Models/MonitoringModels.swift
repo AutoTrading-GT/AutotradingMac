@@ -387,6 +387,37 @@ struct StrategySettingsResponseEnvelope: Decodable {
     }
 }
 
+struct AppSettingsResponseEnvelope: Decodable {
+    let data: AppSettingsSnapshot
+    let defaults: AppSettingsSnapshot
+    let updatedAt: Date
+}
+
+struct AppSettingsUpdateResponseEnvelope: Decodable {
+    let message: String
+    let data: AppSettingsSnapshot
+    let defaults: AppSettingsSnapshot
+    let updatedAt: Date
+}
+
+struct AppSettingsSnapshot: Decodable, Equatable {
+    var notifications: NotificationSettingsSnapshot
+    var dataManagement: DataManagementSettingsSnapshot
+}
+
+struct NotificationSettingsSnapshot: Decodable, Equatable {
+    var tradeFillNotificationsEnabled: Bool
+    var tradeSignalNotificationsEnabled: Bool
+    var systemErrorNotificationsEnabled: Bool
+}
+
+struct DataManagementSettingsSnapshot: Decodable, Equatable {
+    var autoBackupEnabled: Bool
+    var logRetentionDays: Int
+    var storageUsageBytes: Int?
+    var storageUsageLabel: String?
+}
+
 struct StrategyApplyStatusSnapshot: Decodable {
     let savedVersion: Int
     let savedAt: Date
@@ -625,6 +656,22 @@ struct StrategySettingsUpdatePayload: Encodable {
     let scanner: ScannerSettingsUpdatePayload?
     let signal: SignalSettingsUpdatePayload?
     let risk: RiskSettingsUpdatePayload?
+}
+
+struct AppSettingsUpdatePayload: Encodable {
+    let notifications: NotificationSettingsUpdatePayload?
+    let dataManagement: DataManagementSettingsUpdatePayload?
+}
+
+struct NotificationSettingsUpdatePayload: Encodable {
+    let tradeFillNotificationsEnabled: Bool?
+    let tradeSignalNotificationsEnabled: Bool?
+    let systemErrorNotificationsEnabled: Bool?
+}
+
+struct DataManagementSettingsUpdatePayload: Encodable {
+    let autoBackupEnabled: Bool?
+    let logRetentionDays: Int?
 }
 
 struct BasicStrategySettingsUpdatePayload: Encodable {

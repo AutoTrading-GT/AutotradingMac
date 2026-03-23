@@ -5,10 +5,20 @@
 
 import Foundation
 import Combine
+import UserNotifications
 
 @MainActor
 final class MonitoringStore: ObservableObject {
     @Published private(set) var runtime: RuntimeStatusSnapshot?
+    @Published private(set) var appSettings: AppSettingsSnapshot?
+    @Published private(set) var appSettingsDefaults: AppSettingsSnapshot?
+    @Published private(set) var appSettingsUpdatedAt: Date?
+    @Published private(set) var appSettingsLoading = false
+    @Published private(set) var appSettingsSavingKeys: Set<String> = []
+    @Published private(set) var appSettingsErrorMessage: String?
+    @Published private(set) var notificationPermissionStatus: AppNotificationAuthorizationStatus = .unknown
+    @Published private(set) var notificationPanelStatus: AppSettingsStatusMessage?
+    @Published private(set) var dataManagementPanelStatus: AppSettingsStatusMessage?
     @Published private(set) var strategySettings: StrategySettingsSnapshot?
     @Published private(set) var strategyDefaults: StrategySettingsSnapshot?
     @Published private(set) var strategyDraft: StrategySettingsSnapshot?
@@ -56,6 +66,7 @@ final class MonitoringStore: ObservableObject {
 
     private let apiClient: MonitoringAPIClientProtocol
     private let webSocketClient: MonitoringWebSocketClient
+    private let localNotificationService: LocalNotificationServiceProtocol
     private var started = false
     private let maxRecentItems = 100
     private var runtimeRefreshTask: Task<Void, Never>?
@@ -69,6 +80,10 @@ final class MonitoringStore: ObservableObject {
     private let scannerMaxLimit = 30
     private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained"]
     private let strategySelectionModes = ["turnover", "surge"]
+    private var notificationStatusClearTask: Task<Void, Never>?
+    private var dataManagementStatusClearTask: Task<Void, Never>?
+    private var deliveredNotificationKeys: [String] = []
+    private let maxDeliveredNotificationKeys = 200
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -82,10 +97,12 @@ final class MonitoringStore: ObservableObject {
 
     init(
         apiClient: MonitoringAPIClientProtocol = MonitoringAPIClient(),
-        webSocketClient: MonitoringWebSocketClient = MonitoringWebSocketClient()
+        webSocketClient: MonitoringWebSocketClient = MonitoringWebSocketClient(),
+        localNotificationService: LocalNotificationServiceProtocol = LocalNotificationService()
     ) {
         self.apiClient = apiClient
         self.webSocketClient = webSocketClient
+        self.localNotificationService = localNotificationService
         bindWebSocketCallbacks()
     }
 
@@ -93,6 +110,8 @@ final class MonitoringStore: ObservableObject {
         guard !started else { return }
         started = true
         await reloadSnapshot()
+        await reloadAppSettings()
+        await refreshNotificationAuthorizationStatus()
         scheduleSnapshotRetryIfNeeded()
         webSocketClient.connect()
     }
@@ -104,6 +123,10 @@ final class MonitoringStore: ObservableObject {
         snapshotRetryTask = nil
         chartFetchDebounceTask?.cancel()
         chartFetchDebounceTask = nil
+        notificationStatusClearTask?.cancel()
+        notificationStatusClearTask = nil
+        dataManagementStatusClearTask?.cancel()
+        dataManagementStatusClearTask = nil
         for task in chartFetchTasks.values {
             task.cancel()
         }
@@ -137,6 +160,31 @@ final class MonitoringStore: ObservableObject {
         await reloadStrategySettings()
     }
 
+    func reloadAppSettings() async {
+        appSettingsLoading = true
+        defer { appSettingsLoading = false }
+
+        do {
+            let envelope = try await apiClient.fetchAppSettings()
+            applyAppSettingsEnvelope(
+                data: envelope.data,
+                defaults: envelope.defaults,
+                updatedAt: envelope.updatedAt
+            )
+            appSettingsErrorMessage = nil
+        } catch {
+            appSettingsErrorMessage = appSettingsErrorText(
+                prefix: "설정 조회 실패",
+                error: error
+            )
+        }
+    }
+
+    func refreshNotificationAuthorizationStatus() async {
+        notificationPermissionStatus = await localNotificationService.authorizationStatus()
+        await reconcileNotificationSettingsWithAuthorizationIfNeeded()
+    }
+
     func reconnectWebSocket() {
         webSocketClient.disconnect()
         webSocketClient.connect()
@@ -153,6 +201,106 @@ final class MonitoringStore: ObservableObject {
                 error: error
             )
         }
+    }
+
+    func updateTradeFillNotifications(_ enabled: Bool) async {
+        await updateNotificationSetting(
+            key: .tradeFillNotificationsEnabled,
+            enabled: enabled
+        )
+    }
+
+    func updateTradeSignalNotifications(_ enabled: Bool) async {
+        await updateNotificationSetting(
+            key: .tradeSignalNotificationsEnabled,
+            enabled: enabled
+        )
+    }
+
+    func updateSystemErrorNotifications(_ enabled: Bool) async {
+        await updateNotificationSetting(
+            key: .systemErrorNotificationsEnabled,
+            enabled: enabled
+        )
+    }
+
+    func updateAutoBackupEnabled(_ enabled: Bool) async {
+        guard let current = appSettings else { return }
+        let previous = current
+        var next = current
+        next.dataManagement.autoBackupEnabled = enabled
+        appSettings = next
+        appSettingsSavingKeys.insert(AppSettingsSaveKey.autoBackupEnabled.rawValue)
+        dataManagementPanelStatus = .saving("저장 중...")
+
+        do {
+            let response = try await apiClient.updateAppSettings(
+                AppSettingsUpdatePayload(
+                    notifications: nil,
+                    dataManagement: DataManagementSettingsUpdatePayload(
+                        autoBackupEnabled: enabled,
+                        logRetentionDays: nil
+                    )
+                )
+            )
+            applyAppSettingsEnvelope(
+                data: response.data,
+                defaults: response.defaults,
+                updatedAt: response.updatedAt
+            )
+            dataManagementPanelStatus = .success("자동 백업 설정이 저장되었습니다.")
+            scheduleStatusMessageClear(for: .dataManagement)
+            appSettingsErrorMessage = nil
+        } catch {
+            appSettings = previous
+            let message = appSettingsErrorText(prefix: "자동 백업 설정 저장 실패", error: error)
+            appSettingsErrorMessage = message
+            dataManagementPanelStatus = .error(message)
+        }
+
+        appSettingsSavingKeys.remove(AppSettingsSaveKey.autoBackupEnabled.rawValue)
+    }
+
+    func updateLogRetentionDays(_ days: Int) async {
+        guard let current = appSettings else { return }
+        let normalized = min(max(days, 1), 365)
+        let previous = current
+        var next = current
+        next.dataManagement.logRetentionDays = normalized
+        appSettings = next
+        appSettingsSavingKeys.insert(AppSettingsSaveKey.logRetentionDays.rawValue)
+        dataManagementPanelStatus = .saving("저장 중...")
+
+        do {
+            let response = try await apiClient.updateAppSettings(
+                AppSettingsUpdatePayload(
+                    notifications: nil,
+                    dataManagement: DataManagementSettingsUpdatePayload(
+                        autoBackupEnabled: nil,
+                        logRetentionDays: normalized
+                    )
+                )
+            )
+            applyAppSettingsEnvelope(
+                data: response.data,
+                defaults: response.defaults,
+                updatedAt: response.updatedAt
+            )
+            dataManagementPanelStatus = .success("로그 보관 기간이 저장되었습니다.")
+            scheduleStatusMessageClear(for: .dataManagement)
+            appSettingsErrorMessage = nil
+        } catch {
+            appSettings = previous
+            let message = appSettingsErrorText(prefix: "로그 보관 기간 저장 실패", error: error)
+            appSettingsErrorMessage = message
+            dataManagementPanelStatus = .error(message)
+        }
+
+        appSettingsSavingKeys.remove(AppSettingsSaveKey.logRetentionDays.rawValue)
+    }
+
+    func isSavingAppSetting(_ key: AppSettingsSaveKey) -> Bool {
+        appSettingsSavingKeys.contains(key.rawValue)
     }
 
     func updateStrategyScannerDefaultMode(_ mode: String) {
@@ -757,6 +905,137 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
+    private func applyAppSettingsEnvelope(
+        data: AppSettingsSnapshot,
+        defaults: AppSettingsSnapshot,
+        updatedAt: Date
+    ) {
+        appSettings = data
+        appSettingsDefaults = defaults
+        appSettingsUpdatedAt = updatedAt
+    }
+
+    private func updateNotificationSetting(
+        key: NotificationToggleKey,
+        enabled: Bool
+    ) async {
+        guard let current = appSettings else { return }
+
+        if enabled {
+            let authorization = await localNotificationService.requestAuthorizationIfNeeded()
+            notificationPermissionStatus = authorization
+            guard authorization.canDeliverNotifications else {
+                let message = "알림 권한이 필요합니다. 시스템 설정 > 알림에서 AutotradingMac 알림을 허용하세요."
+                appSettingsErrorMessage = message
+                notificationPanelStatus = .error(message)
+                return
+            }
+        }
+
+        let previous = current
+        var next = current
+        switch key {
+        case .tradeFillNotificationsEnabled:
+            next.notifications.tradeFillNotificationsEnabled = enabled
+        case .tradeSignalNotificationsEnabled:
+            next.notifications.tradeSignalNotificationsEnabled = enabled
+        case .systemErrorNotificationsEnabled:
+            next.notifications.systemErrorNotificationsEnabled = enabled
+        }
+        appSettings = next
+        appSettingsSavingKeys.insert(key.rawValue)
+        notificationPanelStatus = .saving("저장 중...")
+
+        do {
+            let payload = NotificationSettingsUpdatePayload(
+                tradeFillNotificationsEnabled: key == .tradeFillNotificationsEnabled ? enabled : nil,
+                tradeSignalNotificationsEnabled: key == .tradeSignalNotificationsEnabled ? enabled : nil,
+                systemErrorNotificationsEnabled: key == .systemErrorNotificationsEnabled ? enabled : nil
+            )
+            let response = try await apiClient.updateAppSettings(
+                AppSettingsUpdatePayload(
+                    notifications: payload,
+                    dataManagement: nil
+                )
+            )
+            applyAppSettingsEnvelope(
+                data: response.data,
+                defaults: response.defaults,
+                updatedAt: response.updatedAt
+            )
+            appSettingsErrorMessage = nil
+            notificationPanelStatus = .success("알림 설정이 저장되었습니다.")
+            scheduleStatusMessageClear(for: .notifications)
+        } catch {
+            appSettings = previous
+            let message = appSettingsErrorText(prefix: "알림 설정 저장 실패", error: error)
+            appSettingsErrorMessage = message
+            notificationPanelStatus = .error(message)
+        }
+
+        appSettingsSavingKeys.remove(key.rawValue)
+    }
+
+    private func reconcileNotificationSettingsWithAuthorizationIfNeeded() async {
+        guard let current = appSettings else { return }
+        guard notificationPermissionStatus == .denied else { return }
+
+        if current.notifications.tradeFillNotificationsEnabled
+            || current.notifications.tradeSignalNotificationsEnabled
+            || current.notifications.systemErrorNotificationsEnabled {
+            let disabled = AppSettingsUpdatePayload(
+                notifications: NotificationSettingsUpdatePayload(
+                    tradeFillNotificationsEnabled: false,
+                    tradeSignalNotificationsEnabled: false,
+                    systemErrorNotificationsEnabled: false
+                ),
+                dataManagement: nil
+            )
+            do {
+                let response = try await apiClient.updateAppSettings(disabled)
+                applyAppSettingsEnvelope(
+                    data: response.data,
+                    defaults: response.defaults,
+                    updatedAt: response.updatedAt
+                )
+                notificationPanelStatus = .error("알림 권한이 없어 알림 토글을 비활성 상태로 맞췄습니다.")
+            } catch {
+                appSettingsErrorMessage = appSettingsErrorText(prefix: "알림 권한 동기화 실패", error: error)
+            }
+        }
+    }
+
+    private func scheduleStatusMessageClear(for section: AppSettingsPanelSection) {
+        switch section {
+        case .notifications:
+            notificationStatusClearTask?.cancel()
+            notificationStatusClearTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                self?.notificationPanelStatus = nil
+            }
+        case .dataManagement:
+            dataManagementStatusClearTask?.cancel()
+            dataManagementStatusClearTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                self?.dataManagementPanelStatus = nil
+            }
+        }
+    }
+
+    private func appSettingsErrorText(prefix: String, error: Error) -> String {
+        let detail = error.localizedDescription.lowercased()
+        if detail.contains("401") || detail.contains("403") || detail.contains("unauthorized") || detail.contains("forbidden") {
+            return "\(prefix): 인증 상태를 확인하세요."
+        }
+        if detail.contains("timed out") || detail.contains("network") || detail.contains("could not connect") {
+            return "\(prefix): 서버 연결을 확인한 뒤 다시 시도하세요."
+        }
+        if detail.contains("422") {
+            return "\(prefix): 입력값을 다시 확인하세요."
+        }
+        return "\(prefix): 잠시 후 다시 시도하세요."
+    }
+
     private func mutateStrategyDraft(_ mutate: (inout StrategySettingsSnapshot) -> Void) {
         guard var draft = strategyDraft ?? strategySettings else { return }
         mutate(&draft)
@@ -1200,6 +1479,11 @@ final class MonitoringStore: ObservableObject {
         webSocketClient.onError = { [weak self] message in
             Task { @MainActor in
                 self?.lastErrorMessage = message
+                await self?.notifySystemErrorIfNeeded(
+                    title: "연결 오류",
+                    body: "실시간 연결이 끊어졌습니다. 재연결을 시도합니다.",
+                    key: "ws-error:\(message)"
+                )
             }
         }
 
@@ -1275,10 +1559,32 @@ final class MonitoringStore: ObservableObject {
         case "worker.status":
             if let payload = decodePayload(WorkerStatusPayload.self, from: event.data) {
                 applyWorkerStatus(payload: payload)
+                if let error = payload.error, !error.isEmpty {
+                    Task {
+                        await notifySystemErrorIfNeeded(
+                            title: "워커 오류",
+                            body: "\(payload.worker) 상태를 확인하세요.",
+                            key: "worker-error:\(payload.worker):\(error)"
+                        )
+                    }
+                }
             }
         case "engine.health":
             if let payload = decodePayload(EngineHealthPayload.self, from: event.data) {
                 applyEngineHealth(payload: payload)
+                if payload.healthy == false {
+                    let errorText = payload.details?["engine_last_error"]?.stringValue
+                        ?? payload.details?["startup_error"]?.stringValue
+                        ?? payload.details?["engine_message"]?.stringValue
+                        ?? "엔진 상태를 확인하세요."
+                    Task {
+                        await notifySystemErrorIfNeeded(
+                            title: "시스템 상태 경고",
+                            body: errorText,
+                            key: "engine-health:\(errorText)"
+                        )
+                    }
+                }
             }
         case "market.rank_snapshot":
             if let payload = decodePayload(MarketRankSnapshotPayload.self, from: event.data) {
@@ -1292,6 +1598,9 @@ final class MonitoringStore: ObservableObject {
         case "signal.generated":
             if let payload = decodePayload(SignalGeneratedPayload.self, from: event.data) {
                 appendSignal(payload: payload)
+                Task {
+                    await notifyTradeSignalIfNeeded(payload: payload)
+                }
             }
         case "risk.blocked", "risk.approved":
             if let payload = decodePayload(RiskDecisionPayload.self, from: event.data) {
@@ -1310,6 +1619,9 @@ final class MonitoringStore: ObservableObject {
             if let payload = decodePayload(FillReceivedPayload.self, from: event.data) {
                 appendFill(payload: payload)
                 scheduleRuntimeRefresh()
+                Task {
+                    await notifyFillIfNeeded(payload: payload)
+                }
             }
         case "position.updated":
             if let payload = decodePayload(PositionUpdatedPayload.self, from: event.data) {
@@ -1678,6 +1990,93 @@ final class MonitoringStore: ObservableObject {
         )
     }
 
+    private func notifyTradeSignalIfNeeded(payload: SignalGeneratedPayload) async {
+        guard appSettings?.notifications.tradeSignalNotificationsEnabled == true else { return }
+        guard notificationPermissionStatus.canDeliverNotifications else { return }
+        let symbol = payload.symbol ?? payload.code
+        let signalText = localizedSignalLabel(payload.signalType)
+        await postLocalNotificationIfNeeded(
+            key: "signal:\(payload.code):\(payload.signalType):\(payload.timestamp.timeIntervalSince1970)",
+            title: "매매 신호",
+            subtitle: symbol,
+            body: "\(signalText) 신호가 생성되었습니다."
+        )
+    }
+
+    private func notifyFillIfNeeded(payload: FillReceivedPayload) async {
+        guard appSettings?.notifications.tradeFillNotificationsEnabled == true else { return }
+        guard notificationPermissionStatus.canDeliverNotifications else { return }
+        let symbol = payload.symbol ?? payload.code
+        let sideText = localizedSideLabel(payload.side)
+        let body = "\(sideText) 체결 \(DisplayFormatters.number(payload.filledQty))주 @ \(DisplayFormatters.krw(payload.filledPrice))"
+        await postLocalNotificationIfNeeded(
+            key: "fill:\(payload.orderId):\(payload.fillId?.description ?? "none"):\(payload.timestamp.timeIntervalSince1970)",
+            title: "거래 체결",
+            subtitle: symbol,
+            body: body
+        )
+    }
+
+    private func notifySystemErrorIfNeeded(
+        title: String,
+        body: String,
+        key: String
+    ) async {
+        guard appSettings?.notifications.systemErrorNotificationsEnabled == true else { return }
+        guard notificationPermissionStatus.canDeliverNotifications else { return }
+        await postLocalNotificationIfNeeded(
+            key: key,
+            title: title,
+            subtitle: nil,
+            body: body
+        )
+    }
+
+    private func postLocalNotificationIfNeeded(
+        key: String,
+        title: String,
+        subtitle: String?,
+        body: String
+    ) async {
+        guard !deliveredNotificationKeys.contains(key) else { return }
+        deliveredNotificationKeys.append(key)
+        if deliveredNotificationKeys.count > maxDeliveredNotificationKeys {
+            deliveredNotificationKeys.removeFirst(deliveredNotificationKeys.count - maxDeliveredNotificationKeys)
+        }
+        await localNotificationService.deliverNotification(
+            title: title,
+            subtitle: subtitle,
+            body: body,
+            identifier: key
+        )
+    }
+
+    private func localizedSignalLabel(_ signalType: String) -> String {
+        switch signalType.lowercased() {
+        case "new_entry":
+            return "신규 진입"
+        case "rank_jump":
+            return "순위 급상승"
+        case "rank_maintained":
+            return "상위권 유지"
+        case "exit_signal":
+            return "청산"
+        default:
+            return signalType
+        }
+    }
+
+    private func localizedSideLabel(_ side: String?) -> String {
+        switch side?.lowercased() {
+        case "buy":
+            return "매수"
+        case "sell":
+            return "매도"
+        default:
+            return "주문"
+        }
+    }
+
     private func decodePayload<T: Decodable>(_ type: T.Type, from data: [String: JSONValue]) -> T? {
         let payload = data.mapValues(\.anyValue)
         guard JSONSerialization.isValidJSONObject(payload) else {
@@ -1928,4 +2327,156 @@ enum EngineControlAction: Equatable {
 enum RuntimeModeSwitchTarget: Equatable {
     case orderMode
     case accountMode
+}
+
+enum AppNotificationAuthorizationStatus: Equatable {
+    case unknown
+    case notDetermined
+    case denied
+    case authorized
+    case provisional
+
+    var canDeliverNotifications: Bool {
+        switch self {
+        case .authorized, .provisional:
+            return true
+        case .unknown, .notDetermined, .denied:
+            return false
+        }
+    }
+}
+
+struct AppSettingsStatusMessage: Equatable {
+    let text: String
+    let kind: Kind
+
+    enum Kind: Equatable {
+        case saving
+        case success
+        case error
+    }
+
+    static func saving(_ text: String) -> AppSettingsStatusMessage {
+        AppSettingsStatusMessage(text: text, kind: .saving)
+    }
+
+    static func success(_ text: String) -> AppSettingsStatusMessage {
+        AppSettingsStatusMessage(text: text, kind: .success)
+    }
+
+    static func error(_ text: String) -> AppSettingsStatusMessage {
+        AppSettingsStatusMessage(text: text, kind: .error)
+    }
+}
+
+enum AppSettingsPanelSection {
+    case notifications
+    case dataManagement
+}
+
+enum NotificationToggleKey: String {
+    case tradeFillNotificationsEnabled = "notifications.trade_fill_notifications_enabled"
+    case tradeSignalNotificationsEnabled = "notifications.trade_signal_notifications_enabled"
+    case systemErrorNotificationsEnabled = "notifications.system_error_notifications_enabled"
+}
+
+enum AppSettingsSaveKey: String {
+    case autoBackupEnabled = "data_management.auto_backup_enabled"
+    case logRetentionDays = "data_management.log_retention_days"
+}
+
+protocol LocalNotificationServiceProtocol {
+    func authorizationStatus() async -> AppNotificationAuthorizationStatus
+    func requestAuthorizationIfNeeded() async -> AppNotificationAuthorizationStatus
+    func deliverNotification(
+        title: String,
+        subtitle: String?,
+        body: String,
+        identifier: String
+    ) async
+}
+
+final class LocalNotificationService: LocalNotificationServiceProtocol {
+    private let center: UNUserNotificationCenter
+
+    init(center: UNUserNotificationCenter = .current()) {
+        self.center = center
+    }
+
+    func authorizationStatus() async -> AppNotificationAuthorizationStatus {
+        let settings = await notificationSettings()
+        return mapAuthorizationStatus(settings.authorizationStatus)
+    }
+
+    func requestAuthorizationIfNeeded() async -> AppNotificationAuthorizationStatus {
+        let current = await authorizationStatus()
+        switch current {
+        case .authorized, .provisional, .denied:
+            return current
+        case .unknown, .notDetermined:
+            let granted = await requestAuthorization()
+            if granted {
+                return .authorized
+            }
+            return await authorizationStatus()
+        }
+    }
+
+    func deliverNotification(
+        title: String,
+        subtitle: String?,
+        body: String,
+        identifier: String
+    ) async {
+        guard await authorizationStatus().canDeliverNotifications else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        if let subtitle, !subtitle.isEmpty {
+            content.subtitle = subtitle
+        }
+        content.body = body
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: nil
+        )
+        await withCheckedContinuation { continuation in
+            center.add(request) { _ in
+                continuation.resume(returning: ())
+            }
+        }
+    }
+
+    private func notificationSettings() async -> UNNotificationSettings {
+        await withCheckedContinuation { continuation in
+            center.getNotificationSettings { settings in
+                continuation.resume(returning: settings)
+            }
+        }
+    }
+
+    private func requestAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+
+    private func mapAuthorizationStatus(_ status: UNAuthorizationStatus) -> AppNotificationAuthorizationStatus {
+        switch status {
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .authorized:
+            return .authorized
+        case .provisional:
+            return .provisional
+        @unknown default:
+            return .unknown
+        }
+    }
 }

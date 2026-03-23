@@ -17,6 +17,9 @@ final class MonitoringWebSocketClient {
     private let url: URL
     private var task: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var shouldReconnect = false
+    private var reconnectAttempt = 0
 
     var onStateChange: ((WebSocketConnectionState) -> Void)?
     var onEvent: ((EventEnvelope) -> Void)?
@@ -32,12 +35,16 @@ final class MonitoringWebSocketClient {
 
     func connect() {
         guard task == nil else { return }
+        shouldReconnect = true
+        reconnectTask?.cancel()
+        reconnectTask = nil
         print("[MonitoringWebSocketClient] connect attempt url=\(url.absoluteString)")
         onStateChange?(.connecting)
 
         let task = session.webSocketTask(with: url)
         self.task = task
         task.resume()
+        reconnectAttempt = 0
         print("[MonitoringWebSocketClient] open url=\(url.absoluteString)")
         onStateChange?(.connected)
         receiveTask = Task { [weak self] in
@@ -46,6 +53,13 @@ final class MonitoringWebSocketClient {
     }
 
     func disconnect() {
+        shouldReconnect = false
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        cleanupConnection(emitStateChange: true)
+    }
+
+    private func cleanupConnection(emitStateChange: Bool) {
         receiveTask?.cancel()
         receiveTask = nil
         if let task {
@@ -55,7 +69,9 @@ final class MonitoringWebSocketClient {
             print("[MonitoringWebSocketClient] close code=<no-task> reason=<no-task>")
         }
         task = nil
-        onStateChange?(.disconnected)
+        if emitStateChange {
+            onStateChange?(.disconnected)
+        }
     }
 
     private func receiveLoop() async {
@@ -78,11 +94,11 @@ final class MonitoringWebSocketClient {
                 print("[MonitoringWebSocketClient] error=\(error.localizedDescription) closeCode=\(closeCode) closeReason=\(closeReason)")
                 onError?("WebSocket receive failed: \(error.localizedDescription)")
                 onStateChange?(.error)
+                cleanupConnection(emitStateChange: false)
+                scheduleReconnect()
                 break
             }
         }
-
-        disconnect()
     }
 
     private func handleIncoming(data: Data) throws {
@@ -95,5 +111,18 @@ final class MonitoringWebSocketClient {
             return "<none>"
         }
         return String(decoding: reasonData, as: UTF8.self)
+    }
+
+    private func scheduleReconnect() {
+        guard shouldReconnect else { return }
+        guard reconnectTask == nil else { return }
+        reconnectAttempt += 1
+        let delayNanoseconds = min(UInt64(reconnectAttempt), 5) * 1_000_000_000
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+            guard let self, !Task.isCancelled else { return }
+            self.reconnectTask = nil
+            self.connect()
+        }
     }
 }

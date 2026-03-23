@@ -23,6 +23,13 @@ struct SettingsView: View {
             }
             .padding(DesignTokens.Layout.pagePadding)
         }
+        .task {
+            guard mode == .settings else { return }
+            if store.appSettings == nil {
+                await store.reloadAppSettings()
+            }
+            await store.refreshNotificationAuthorizationStatus()
+        }
         .safeAreaInset(edge: .bottom) {
             if mode == .stategy {
                 strategyActionBar
@@ -2331,19 +2338,66 @@ struct SettingsView: View {
 
     private var notificationPanel: some View {
         settingsPanel(title: "알림 설정") {
-            toggleRow(icon: "bell", title: "거래 체결 알림", isOn: true)
-            toggleRow(icon: "bell", title: "매매 신호 알림", isOn: true)
-            toggleRow(icon: "bell", title: "시스템 오류 알림", isOn: false)
-            readOnlyCaption
+            interactiveToggleRow(
+                icon: "bell.badge",
+                title: "거래 체결 알림",
+                isOn: notificationBinding(.tradeFillNotificationsEnabled),
+                isSaving: store.isSavingAppSetting(.tradeFillNotificationsEnabled),
+                disabled: store.appSettings == nil
+            )
+            interactiveToggleRow(
+                icon: "waveform.path.ecg",
+                title: "매매 신호 알림",
+                isOn: notificationBinding(.tradeSignalNotificationsEnabled),
+                isSaving: store.isSavingAppSetting(.tradeSignalNotificationsEnabled),
+                disabled: store.appSettings == nil
+            )
+            interactiveToggleRow(
+                icon: "exclamationmark.bubble",
+                title: "시스템 오류 알림",
+                isOn: notificationBinding(.systemErrorNotificationsEnabled),
+                isSaving: store.isSavingAppSetting(.systemErrorNotificationsEnabled),
+                disabled: store.appSettings == nil
+            )
+            Divider().opacity(0.25)
+            settingsRow(
+                icon: "app.badge",
+                title: "알림 권한",
+                value: notificationPermissionText,
+                tone: notificationPermissionTone
+            )
+            if let status = store.notificationPanelStatus {
+                settingsStatusCaption(status)
+            } else if let error = store.appSettingsErrorMessage, store.appSettings == nil {
+                settingsStatusCaption(.error(error))
+            }
         }
     }
 
     private var dataManagementPanel: some View {
         settingsPanel(title: "데이터 관리") {
-            toggleRow(icon: "externaldrive", title: "자동 백업", isOn: true)
-            settingsRow(icon: "calendar.badge.clock", title: "로그 보관 기간", value: "30일")
+            interactiveToggleRow(
+                icon: "externaldrive",
+                title: "자동 백업",
+                isOn: autoBackupBinding,
+                isSaving: store.isSavingAppSetting(.autoBackupEnabled),
+                disabled: store.appSettings == nil
+            )
+            stepperSettingsRow(
+                icon: "calendar.badge.clock",
+                title: "로그 보관 기간",
+                value: logRetentionDaysBinding,
+                range: 1...365,
+                suffix: "일",
+                isSaving: store.isSavingAppSetting(.logRetentionDays),
+                disabled: store.appSettings == nil
+            )
             settingsRow(icon: "internaldrive", title: "사용 중인 저장공간", value: storageUsageText)
-            readOnlyCaption
+            if let status = store.dataManagementPanelStatus {
+                settingsStatusCaption(status)
+            } else if let error = store.appSettingsErrorMessage, store.appSettings == nil {
+                settingsStatusCaption(.error(error))
+            }
         }
     }
 
@@ -2427,7 +2481,13 @@ struct SettingsView: View {
         .padding(.vertical, 9)
     }
 
-    private func toggleRow(icon: String, title: String, isOn: Bool) -> some View {
+    private func interactiveToggleRow(
+        icon: String,
+        title: String,
+        isOn: Binding<Bool>,
+        isSaving: Bool,
+        disabled: Bool
+    ) -> some View {
         HStack(spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
@@ -2439,27 +2499,62 @@ struct SettingsView: View {
                     .foregroundStyle(DesignTokens.Colors.textSecondary)
             }
             Spacer(minLength: 8)
-            togglePill(isOn: isOn)
+            if isSaving {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .disabled(disabled || isSaving)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
     }
 
-    private func togglePill(isOn: Bool) -> some View {
-        ZStack(alignment: isOn ? .trailing : .leading) {
-            RoundedRectangle(cornerRadius: 999)
-                .fill(isOn ? DesignTokens.Colors.success : DesignTokens.Colors.surface2)
-                .frame(width: 34, height: 20)
-            Circle()
-                .fill(Color.white.opacity(isOn ? 1.0 : 0.7))
-                .frame(width: 15, height: 15)
-                .padding(.horizontal, 2.5)
+    private func stepperSettingsRow(
+        icon: String,
+        title: String,
+        value: Binding<Int>,
+        range: ClosedRange<Int>,
+        suffix: String,
+        isSaving: Bool,
+        disabled: Bool
+    ) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(width: 14)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+            Spacer(minLength: 8)
+            if isSaving {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Text("\(value.wrappedValue)\(suffix)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(DesignTokens.Colors.textPrimary)
+                .frame(minWidth: 48, alignment: .trailing)
+            Stepper("", value: value, in: range)
+                .labelsHidden()
+                .disabled(disabled || isSaving)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 999)
-                .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-        )
-        .accessibilityLabel(Text(isOn ? "활성" : "비활성"))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
+    private func settingsStatusCaption(_ status: AppSettingsStatusMessage) -> some View {
+        Text(status.text)
+            .font(.caption2)
+            .foregroundStyle(settingsStatusColor(status))
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
     }
 
     private var readOnlyCaption: some View {
@@ -2472,9 +2567,12 @@ struct SettingsView: View {
     }
 
     private var connectionStatusTone: StatusTone {
+        if store.runtime?.startupError?.isEmpty == false {
+            return .danger
+        }
         switch store.connectionState {
         case .connected:
-            return .success
+            return store.runtime?.readinessStatus == "ready" ? .success : .warning
         case .connecting:
             return .warning
         case .error:
@@ -2498,9 +2596,15 @@ struct SettingsView: View {
     }
 
     private var connectionHealthText: String {
+        if let startupError = store.runtime?.startupError, !startupError.isEmpty {
+            if startupError.lowercased().contains("auth") {
+                return "인증 확인 필요"
+            }
+            return "초기화 확인 필요"
+        }
         switch store.connectionState {
         case .connected:
-            return "정상"
+            return store.runtime?.readinessStatus == "ready" ? "정상" : "주의 필요"
         case .connecting:
             return "확인 중"
         case .error, .disconnected:
@@ -2536,9 +2640,91 @@ struct SettingsView: View {
     }
 
     private var storageUsageText: String {
-        let approxCount = store.recentOrders.count + store.recentFills.count + store.recentSignals.count + store.recentRiskDecisions.count
-        let estimateMb = max(24, approxCount / 2)
-        return "\(estimateMb) MB"
+        store.appSettings?.dataManagement.storageUsageLabel ?? "-"
+    }
+
+    private var autoBackupBinding: Binding<Bool> {
+        Binding(
+            get: { store.appSettings?.dataManagement.autoBackupEnabled ?? false },
+            set: { newValue in
+                Task {
+                    await store.updateAutoBackupEnabled(newValue)
+                }
+            }
+        )
+    }
+
+    private var logRetentionDaysBinding: Binding<Int> {
+        Binding(
+            get: { store.appSettings?.dataManagement.logRetentionDays ?? 30 },
+            set: { newValue in
+                Task {
+                    await store.updateLogRetentionDays(newValue)
+                }
+            }
+        )
+    }
+
+    private func notificationBinding(_ key: NotificationToggleKey) -> Binding<Bool> {
+        Binding(
+            get: {
+                switch key {
+                case .tradeFillNotificationsEnabled:
+                    return store.appSettings?.notifications.tradeFillNotificationsEnabled ?? false
+                case .tradeSignalNotificationsEnabled:
+                    return store.appSettings?.notifications.tradeSignalNotificationsEnabled ?? false
+                case .systemErrorNotificationsEnabled:
+                    return store.appSettings?.notifications.systemErrorNotificationsEnabled ?? false
+                }
+            },
+            set: { newValue in
+                Task {
+                    switch key {
+                    case .tradeFillNotificationsEnabled:
+                        await store.updateTradeFillNotifications(newValue)
+                    case .tradeSignalNotificationsEnabled:
+                        await store.updateTradeSignalNotifications(newValue)
+                    case .systemErrorNotificationsEnabled:
+                        await store.updateSystemErrorNotifications(newValue)
+                    }
+                }
+            }
+        )
+    }
+
+    private var notificationPermissionText: String {
+        switch store.notificationPermissionStatus {
+        case .authorized, .provisional:
+            return "허용됨"
+        case .notDetermined:
+            return "요청 전"
+        case .denied:
+            return "권한 필요"
+        case .unknown:
+            return "확인 중"
+        }
+    }
+
+    private var notificationPermissionTone: StatusTone {
+        switch store.notificationPermissionStatus {
+        case .authorized, .provisional:
+            return .success
+        case .denied:
+            return .warning
+        case .notDetermined, .unknown:
+            return .neutral
+        }
+    }
+
+    private func settingsStatusColor(_ status: AppSettingsStatusMessage) -> Color {
+        switch status.kind {
+        case .saving:
+            return DesignTokens.Colors.textSecondary
+        case .success:
+            return DesignTokens.Colors.success
+        case .error:
+            return DesignTokens.Colors.warning
+        }
     }
 
     private func settingsValueColor(for tone: StatusTone) -> Color {

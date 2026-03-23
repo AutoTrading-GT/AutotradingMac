@@ -33,6 +33,10 @@ enum AppConfig {
         apiEndpoint("monitoring/strategy-settings")
     }
 
+    static var appSettingsURL: URL {
+        apiEndpoint("monitoring/app-settings")
+    }
+
     static func scannerRanksURL(mode: String, limit: Int) -> URL {
         var components = URLComponents(
             url: apiEndpoint("monitoring/scanner/ranks"),
