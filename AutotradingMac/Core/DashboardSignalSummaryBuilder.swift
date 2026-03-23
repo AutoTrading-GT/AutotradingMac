@@ -51,6 +51,8 @@ struct DashboardSignalSummaryRow: Identifiable {
 }
 
 enum DashboardSignalSummaryBuilder {
+    private static let flowCoalescingWindow: TimeInterval = 180
+
     static func build(
         signals: [SignalSnapshotItem],
         riskDecisions: [RiskDecisionSnapshotItem],
@@ -178,12 +180,7 @@ enum DashboardSignalSummaryBuilder {
 
         return candidatesByCode.values
             .compactMap { candidates in
-                candidates.max { lhs, rhs in
-                    if lhs.timestamp != rhs.timestamp {
-                        return lhs.timestamp < rhs.timestamp
-                    }
-                    return lhs.priority < rhs.priority
-                }
+                candidates.max(by: isLessImportant)
             }
             .sorted(by: { $0.timestamp > $1.timestamp })
             .prefix(limit)
@@ -330,6 +327,20 @@ enum DashboardSignalSummaryBuilder {
 
     private static func normalize(_ value: String?) -> String {
         (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private static func isLessImportant(_ lhs: Candidate, _ rhs: Candidate) -> Bool {
+        if lhs.action == rhs.action {
+            let delta = abs(lhs.timestamp.timeIntervalSince(rhs.timestamp))
+            if delta <= flowCoalescingWindow, lhs.priority != rhs.priority {
+                return lhs.priority < rhs.priority
+            }
+        }
+
+        if lhs.timestamp != rhs.timestamp {
+            return lhs.timestamp < rhs.timestamp
+        }
+        return lhs.priority < rhs.priority
     }
 
     private struct Candidate {

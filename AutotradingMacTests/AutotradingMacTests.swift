@@ -253,4 +253,64 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(rows.first?.status, .blocked)
         XCTAssertEqual(rows.first?.summary, "일일 거래 한도 도달")
     }
+
+    func test_dashboardSignalSummary_prefersExecutedOverNearbyPendingInSameFlow() {
+        let now = Date()
+        let rows = DashboardSignalSummaryBuilder.build(
+            signals: [],
+            riskDecisions: [
+                .init(
+                    riskEventId: 14,
+                    code: "035720",
+                    symbol: "카카오",
+                    decision: "approved",
+                    blocked: false,
+                    reason: "ok",
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    signalId: 3,
+                    signalType: "new_entry",
+                    relatedSignalReference: "strategy_signal:3",
+                    createdAt: now.addingTimeInterval(-20)
+                )
+            ],
+            orders: [
+                .init(
+                    orderId: 41,
+                    code: "035720",
+                    symbol: "카카오",
+                    side: "buy",
+                    orderQty: 5,
+                    orderPrice: 52300,
+                    status: "submitted",
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    sourceSignalReference: "strategy_signal:3",
+                    brokerOrderId: nil,
+                    createdAt: now.addingTimeInterval(-5),
+                    updatedAt: now.addingTimeInterval(-5)
+                )
+            ],
+            fills: [
+                .init(
+                    fillId: 51,
+                    orderId: 41,
+                    code: "035720",
+                    symbol: "카카오",
+                    side: "buy",
+                    filledQty: 5,
+                    filledPrice: 52300,
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    filledAt: now.addingTimeInterval(-8)
+                )
+            ],
+            closedPositions: [],
+            symbolByCode: ["035720": "카카오"]
+        )
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.status, .executed)
+        XCTAssertEqual(rows.first?.summary, "매수 주문 체결 완료")
+    }
 }

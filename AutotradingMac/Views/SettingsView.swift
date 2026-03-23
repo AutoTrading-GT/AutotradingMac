@@ -8,9 +8,6 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: MonitoringStore
     let mode: SettingsPageMode
-    @State private var showScannerHelp = false
-    @State private var showSignalHelp = false
-    @State private var showRiskHelp = false
     @State private var showAdvancedSettings = false
 
     var body: some View {
@@ -155,6 +152,8 @@ struct SettingsView: View {
                 }
             }
         }
+        .frame(maxWidth: strategyContentMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .task {
             if store.strategySettings == nil {
                 await store.reloadStrategySettings()
@@ -163,419 +162,473 @@ struct SettingsView: View {
     }
 
     private func strategyOverviewPanel(_ draft: StrategySettingsSnapshot) -> some View {
-        settingsPanel(title: "현재 전략 요약") {
-            settingsRow(
-                icon: "scope",
-                title: "후보 선정",
-                value: localizedScannerMode(draft.basic.entry.selectionMode)
-            )
-            settingsRow(
-                icon: "target",
-                title: "청산 기준",
-                value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct))"
-            )
-            settingsRow(
-                icon: "shield",
-                title: "리스크 한도",
-                value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)), 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct)), 일일 거래 \(draft.basic.risk.dailyTradeLimitEnabled ? "최대 \(draft.basic.risk.dailyTradeLimitCount)회" : "무제한")"
-            )
-            settingsRow(
-                icon: "clock.badge.exclamationmark",
-                title: "반영 정책",
-                value: store.strategyApplyPolicy ?? "저장 후 다음 평가 사이클부터 반영"
-            )
-            settingsRow(
-                icon: "tray.and.arrow.down",
-                title: "마지막 저장",
-                value: store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-"
-            )
-            settingsRow(
-                icon: "checkmark.circle",
-                title: "마지막 적용",
-                value: store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "아직 적용 이력 없음",
-                tone: .neutral
-            )
-            settingsRow(
-                icon: "figure.walk.motion",
-                title: "진입 전략 반영",
-                value: strategyGroupStatusText("entry"),
-                tone: strategyGroupStatusTone("entry")
-            )
-            settingsRow(
-                icon: "flag.checkered",
-                title: "청산 전략 반영",
-                value: strategyGroupStatusText("exit"),
-                tone: strategyGroupStatusTone("exit")
-            )
-            settingsRow(
-                icon: "shield",
-                title: "리스크 전략 반영",
-                value: strategyGroupStatusText("risk"),
-                tone: strategyGroupStatusTone("risk")
-            )
-            settingsRow(
-                icon: "number.circle",
-                title: "일일 거래 제한 상태",
-                value: riskDailyTradeLimitRuntimeText,
-                tone: strategyGroupStatusTone("risk")
-            )
-            settingsRow(
-                icon: "chart.line.downtrend.xyaxis",
-                title: "일일 손실 한도 상태",
-                value: riskDailyLossRuntimeText,
-                tone: riskDailyLossRuntimeTone
-            )
+        strategyPanel(
+            title: "현재 전략 요약",
+            subtitle: "핵심 운용 기준과 실제 적용 상태를 묶어서 확인합니다."
+        ) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                strategySummaryBlock(
+                    title: "전략 핵심 요약",
+                    subtitle: "후보 선정, 청산 기준, 리스크 한도를 빠르게 확인합니다."
+                ) {
+                    strategySummaryMetric(
+                        title: "후보 선정",
+                        value: localizedScannerMode(draft.basic.entry.selectionMode),
+                        detail: "관찰 \(draft.basic.entry.topN)개 · 신호 \(draft.basic.entry.enabledSignalTypes.count)종 사용",
+                        tone: .neutral
+                    )
+                    strategySummaryMetric(
+                        title: "청산 기준",
+                        value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct))",
+                        detail: "보유 \(draft.basic.exit.maxHoldingMinutes)분 · \(draft.basic.exit.forceCloseOnMarketClose ? "장 마감 전 강제 청산" : "시간 기준만 사용")",
+                        tone: .neutral
+                    )
+                    strategySummaryMetric(
+                        title: "리스크 한도",
+                        value: "손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)) · 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct))",
+                        detail: draft.basic.risk.dailyTradeLimitEnabled
+                            ? "일일 최대 \(draft.basic.risk.dailyTradeLimitCount)회 · 동시 보유 \(draft.basic.risk.maxConcurrentPositions)개"
+                            : "일일 거래 무제한 · 동시 보유 \(draft.basic.risk.maxConcurrentPositions)개",
+                        tone: .neutral
+                    )
+                }
+
+                strategySummaryBlock(
+                    title: "적용 상태",
+                    subtitle: "저장/반영 흐름과 오늘 기준 리스크 상태를 봅니다.",
+                    trailing: {
+                        StatusBadge(
+                            text: strategyOverallApplyStatusText,
+                            tone: strategyOverallApplyStatusTone
+                        )
+                    }
+                ) {
+                    strategyStatusLine(
+                        title: "반영 정책",
+                        detail: store.strategyApplyPolicy ?? "저장 후 다음 평가 사이클부터 반영",
+                        tone: .neutral
+                    )
+                    strategyStatusLine(
+                        title: "마지막 적용",
+                        detail: store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "아직 적용 이력 없음",
+                        tone: .neutral
+                    )
+                    strategyStatusLine(
+                        title: "일일 거래 제한",
+                        badge: riskDailyTradeLimitBadgeText,
+                        detail: riskDailyTradeLimitRuntimeText,
+                        tone: riskDailyTradeLimitTone
+                    )
+                    strategyStatusLine(
+                        title: "일일 손실 한도",
+                        badge: riskDailyLossRuntimeBadgeText,
+                        detail: riskDailyLossRuntimeText,
+                        tone: riskDailyLossRuntimeTone
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
         }
     }
 
     private func basicStrategyPanel(_ basic: BasicStrategySettingsSnapshot) -> some View {
-        settingsPanel(title: "Basic Strategy") {
-            strategyGroup(title: "진입 전략") {
-                strategySegmentControlRow(
-                    title: "후보 선정 방식",
-                    control: AnyView(
-                        AppSegmentedControl(
-                            options: [
-                                AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
-                                AppSegmentedOption(value: "surge", title: "급등률 중심"),
-                            ],
-                            selection: Binding(
-                                get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
-                                set: { store.updateStrategyBasicSelectionMode($0) }
-                            ),
-                            minSegmentWidth: 140,
-                            height: 34
-                        )
-                    )
-                )
-                compactNumberControl(
-                    title: "관찰 후보 수(Top-N)",
-                    value: basic.entry.topN,
-                    range: 1...30,
-                    step: 1,
-                    onChange: { store.updateStrategyBasicTopN($0) }
-                )
-                strategyGroup(title: "주요 진입 신호 유형") {
-                    strategySignalToggleGrid(
-                        selected: basic.entry.enabledSignalTypes,
-                        binding: basicSignalEnabledBinding
-                    )
+        strategyPanel(
+            title: "Basic Strategy",
+            subtitle: "실제 엔진에 직접 연결되는 핵심 운용 기준입니다."
+        ) {
+            VStack(alignment: .leading, spacing: 18) {
+                strategyCategoryBlock(
+                    title: "진입 전략",
+                    summary: "무엇을 우선 감시하고 어떤 신호로 진입할지 정합니다."
+                ) {
+                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                        strategyGroup(
+                            title: "후보 선정",
+                            subtitle: "후보 모집단과 감시 범위를 정합니다."
+                        ) {
+                            strategySegmentControlRow(
+                                title: "후보 선정 방식",
+                                subtitle: "기본 정렬 기준",
+                                control: AnyView(
+                                    AppSegmentedControl(
+                                        options: [
+                                            AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
+                                            AppSegmentedOption(value: "surge", title: "급등률 중심"),
+                                        ],
+                                        selection: Binding(
+                                            get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
+                                            set: { store.updateStrategyBasicSelectionMode($0) }
+                                        ),
+                                        minSegmentWidth: 132,
+                                        height: 34
+                                    )
+                                )
+                            )
+                            compactNumberControl(
+                                title: "관찰 후보 수",
+                                subtitle: "감시 Top-N",
+                                value: basic.entry.topN,
+                                range: 1...30,
+                                step: 1,
+                                onChange: { store.updateStrategyBasicTopN($0) }
+                            )
+                        }
+
+                        strategyGroup(
+                            title: "진입 신호",
+                            subtitle: "실제 진입에 사용할 신호만 남깁니다."
+                        ) {
+                            strategySignalToggleGrid(
+                                selected: basic.entry.enabledSignalTypes,
+                                binding: basicSignalEnabledBinding
+                            )
+                        }
+                    }
+                }
+
+                strategyCategoryBlock(
+                    title: "청산 전략",
+                    summary: "손익 기준과 시간 기준을 분리해 읽기 쉽게 정리합니다."
+                ) {
+                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                        strategyGroup(
+                            title: "손익 기준",
+                            subtitle: "수익 실현과 손절 기준입니다."
+                        ) {
+                            editableDoubleTextRow(
+                                title: "목표 수익률",
+                                unit: "%",
+                                text: basicTargetProfitText,
+                                onChange: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
+                            )
+                            editableDoubleTextRow(
+                                title: "손절 기준",
+                                unit: "%",
+                                text: basicStopLossText,
+                                onChange: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
+                            )
+                        }
+
+                        strategyGroup(
+                            title: "시간 기준",
+                            subtitle: "보유 시간과 장 종료 전 정리 규칙입니다."
+                        ) {
+                            compactNumberControl(
+                                title: "보유 시간 제한",
+                                subtitle: "분",
+                                value: basic.exit.maxHoldingMinutes,
+                                range: 1...10_080,
+                                step: 1,
+                                onChange: { store.updateStrategyBasicMaxHoldingMinutes($0) }
+                            )
+                            strategyToggleRow(
+                                title: "장 마감 5분 전 전체 청산",
+                                subtitle: "정규장 종료 전에 보유 포지션을 모두 정리합니다.",
+                                isOn: Binding(
+                                    get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? basic.exit.forceCloseOnMarketClose },
+                                    set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
+                                )
+                            )
+                        }
+                    }
+                }
+
+                strategyCategoryBlock(
+                    title: "리스크 관리",
+                    summary: "손실 한도와 거래 제한을 묶어서 관리합니다."
+                ) {
+                    LazyVGrid(columns: strategyAdaptiveColumns(minimum: 280), alignment: .leading, spacing: 12) {
+                        strategyGroup(
+                            title: "손실/비중",
+                            subtitle: "계좌 손실 허용치와 1회 진입 비중입니다."
+                        ) {
+                            editableDoubleTextRow(
+                                title: "최대 손실 한도",
+                                unit: "%",
+                                text: basicMaxLossLimitText,
+                                onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
+                            )
+                            editableDoubleTextRow(
+                                title: "1회 포지션 크기",
+                                unit: "%",
+                                description: "전체 자산 대비",
+                                text: basicPositionSizePctText,
+                                onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
+                            )
+                        }
+
+                        strategyGroup(
+                            title: "거래 제한",
+                            subtitle: "일일 거래량과 동시 보유 한도를 정합니다."
+                        ) {
+                            strategyToggleRow(
+                                title: "일일 거래 횟수 제한 사용",
+                                subtitle: "꺼져 있으면 거래 횟수는 무제한입니다.",
+                                isOn: Binding(
+                                    get: { store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled },
+                                    set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
+                                )
+                            )
+                            compactNumberControl(
+                                title: "최대 거래 횟수",
+                                subtitle: "회",
+                                value: basic.risk.dailyTradeLimitCount,
+                                range: 1...1_000,
+                                step: 1,
+                                onChange: { store.updateStrategyBasicDailyTradeLimitCount($0) }
+                            )
+                            .disabled(!(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled))
+                            .opacity((store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled) ? 1.0 : 0.45)
+
+                            compactNumberControl(
+                                title: "동시 보유 종목 수",
+                                subtitle: "개",
+                                value: basic.risk.maxConcurrentPositions,
+                                range: 1...50,
+                                step: 1,
+                                onChange: { store.updateStrategyBasicMaxConcurrentPositions($0) }
+                            )
+                        }
+                    }
                 }
             }
-
-            strategyGroup(title: "청산 전략") {
-                editableDoubleTextRow(
-                    title: "목표 수익률 (%)",
-                    icon: "arrow.up.circle",
-                    text: basicTargetProfitText,
-                    onChange: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
-                )
-                editableDoubleTextRow(
-                    title: "손절 기준 (%)",
-                    icon: "arrow.down.circle",
-                    text: basicStopLossText,
-                    onChange: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
-                )
-                compactNumberControl(
-                    title: "보유 시간 제한(분)",
-                    value: basic.exit.maxHoldingMinutes,
-                    range: 1...10_080,
-                    step: 1,
-                    onChange: { store.updateStrategyBasicMaxHoldingMinutes($0) }
-                )
-                Toggle(
-                    "장 마감 5분 전 전체 청산",
-                    isOn: Binding(
-                        get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? basic.exit.forceCloseOnMarketClose },
-                        set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
-                    )
-                )
-                .toggleStyle(.switch)
-                .tint(DesignTokens.Colors.warning)
-                .font(.caption)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-            }
-
-            strategyGroup(title: "리스크 관리") {
-                editableDoubleTextRow(
-                    title: "최대 손실 한도 (%)",
-                    icon: "shield.lefthalf.filled.badge.checkmark",
-                    text: basicMaxLossLimitText,
-                    onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
-                )
-                editableDoubleTextRow(
-                    title: "1회 포지션 크기 (전체 자산 대비 %)",
-                    icon: "number",
-                    text: basicPositionSizePctText,
-                    onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
-                )
-                Toggle(
-                    "일일 거래 횟수 제한 사용",
-                    isOn: Binding(
-                        get: { store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled },
-                        set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
-                    )
-                )
-                .toggleStyle(.switch)
-                .tint(DesignTokens.Colors.warning)
-                .font(.caption)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-
-                compactNumberControl(
-                    title: "최대 거래 횟수",
-                    value: basic.risk.dailyTradeLimitCount,
-                    range: 1...1_000,
-                    step: 1,
-                    onChange: { store.updateStrategyBasicDailyTradeLimitCount($0) }
-                )
-                .disabled(!(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled))
-                .opacity((store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled) ? 1.0 : 0.45)
-                if !(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled) {
-                    strategyHelpText("일일 거래 횟수 제한이 꺼져 있어 무제한으로 동작합니다.")
-                }
-                compactNumberControl(
-                    title: "동시 보유 종목 수 제한",
-                    value: basic.risk.maxConcurrentPositions,
-                    range: 1...50,
-                    step: 1,
-                    onChange: { store.updateStrategyBasicMaxConcurrentPositions($0) }
-                )
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
         }
     }
 
     private func advancedSettingsPanel(_ draft: StrategySettingsSnapshot) -> some View {
-        settingsPanel(title: "Advanced Settings") {
-            HStack(spacing: 10) {
-                Text("스캐너 가중치/신호 임계값/리스크 시간창 같은 상세 튜닝 파라미터입니다.")
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-                Spacer()
-                Button {
-                    showAdvancedSettings.toggle()
-                } label: {
-                    Label(
-                        showAdvancedSettings ? "Advanced 숨기기" : "Advanced 펼치기",
-                        systemImage: showAdvancedSettings ? "chevron.up" : "chevron.down"
-                    )
+        strategyPanel(
+            title: "Advanced Settings",
+            subtitle: "Basic Strategy를 보완하는 상세 튜닝 영역입니다.",
+            prominence: .secondary
+        ) {
+            DisclosureGroup(isExpanded: $showAdvancedSettings) {
+                VStack(alignment: .leading, spacing: 14) {
+                    scannerSettingsPanel(draft.advanced.scanner)
+                    signalSettingsPanel(draft.advanced.signal)
+                    riskSettingsPanel(draft.advanced.risk)
+                    strategyHelpPanel
                 }
-                .buttonStyle(AppToolButtonStyle())
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 16)
+            } label: {
+                HStack(spacing: 10) {
+                    StatusBadge(text: "선택 사항", tone: .neutral)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("상세 튜닝 펼치기")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        Text("스캐너 가중치, 신호 임계값, 리스크 시간창을 조정합니다.")
+                            .font(.caption2)
+                            .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    }
+                    Spacer()
+                    Text(showAdvancedSettings ? "펴짐" : "접힘")
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-
-            if showAdvancedSettings {
-                scannerSettingsPanel(draft.advanced.scanner)
-                signalSettingsPanel(draft.advanced.signal)
-                riskSettingsPanel(draft.advanced.risk)
-                strategyHelpPanel
-            }
+            .tint(DesignTokens.Colors.textSecondary)
         }
     }
 
     private func scannerSettingsPanel(_ scanner: ScannerSettingsSnapshot) -> some View {
-        settingsPanel(title: "Scanner Settings") {
-            strategySectionSummary(
-                icon: "scope",
-                summary: "후보를 빠르게 훑고 우선순위를 정하는 기준",
-                helpBinding: $showScannerHelp
-            )
-            if showScannerHelp {
-                strategyHelpText(
-                    "스캔 점수는 실전 매수 확률 점수가 아니라, 순위/거래대금/등락률을 조합한 후보 우선순위 점수입니다."
-                )
-            }
-            strategyGroup(title: "기본 기준") {
-                strategySegmentControlRow(
-                    title: "기본 스캔 기준",
-                    control: AnyView(
-                        AppSegmentedControl(
-                            options: [
-                                AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
-                                AppSegmentedOption(value: "surge", title: "급등률 순위"),
-                            ],
-                            selection: scannerDefaultModeBinding(),
-                            minSegmentWidth: 128,
-                            height: 34
+        advancedSectionCard(
+            title: "Scanner",
+            summary: "후보 우선순위와 필터 기준을 조정합니다."
+        ) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 260), alignment: .leading, spacing: 12) {
+                strategyGroup(title: "기본 기준", subtitle: "스캔 기준과 평가 범위") {
+                    strategySegmentControlRow(
+                        title: "기본 스캔 기준",
+                        subtitle: "기본 랭킹 모드",
+                        control: AnyView(
+                            AppSegmentedControl(
+                                options: [
+                                    AppSegmentedOption(value: "turnover", title: "거래대금 순위"),
+                                    AppSegmentedOption(value: "surge", title: "급등률 순위"),
+                                ],
+                                selection: scannerDefaultModeBinding(),
+                                minSegmentWidth: 120,
+                                height: 34
+                            )
                         )
                     )
-                )
-                compactNumberControl(
-                    title: "상위 후보 평가 범위(Top-N)",
-                    value: scanner.topN,
-                    range: 1...30,
-                    step: 1,
-                    onChange: { store.updateStrategyScannerTopN($0) }
-                )
-            }
-            strategyGroup(title: "필터") {
-                editableDoubleTextRow(
-                    title: "최소 거래대금 (원)",
-                    icon: "line.3.horizontal.decrease.circle",
-                    text: scannerMinTurnoverText,
-                    onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
-                )
-                editableDoubleTextRow(
-                    title: "최소 등락률 (%)",
-                    icon: "percent",
-                    text: scannerMinChangePctText,
-                    onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
-                )
-            }
-            strategyGroup(title: "가중치") {
-                scannerWeightEditor(
-                    title: "거래대금 순위 기준",
-                    mode: "turnover",
-                    weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
-                )
-                scannerWeightEditor(
-                    title: "급등률 순위 기준",
-                    mode: "surge",
-                    weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
-                )
+                    compactNumberControl(
+                        title: "상위 후보 평가 범위",
+                        subtitle: "Top-N",
+                        value: scanner.topN,
+                        range: 1...30,
+                        step: 1,
+                        onChange: { store.updateStrategyScannerTopN($0) }
+                    )
+                }
+                strategyGroup(title: "필터", subtitle: "최소 거래 조건") {
+                    editableDoubleTextRow(
+                        title: "최소 거래대금",
+                        unit: "원",
+                        text: scannerMinTurnoverText,
+                        onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
+                    )
+                    editableDoubleTextRow(
+                        title: "최소 등락률",
+                        unit: "%",
+                        text: scannerMinChangePctText,
+                        onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
+                    )
+                }
+                strategyGroup(title: "가중치", subtitle: "후보 점수 구성 비율") {
+                    scannerWeightEditor(
+                        title: "거래대금 순위 기준",
+                        mode: "turnover",
+                        weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+                    )
+                    scannerWeightEditor(
+                        title: "급등률 순위 기준",
+                        mode: "surge",
+                        weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
+                    )
+                }
             }
         }
     }
 
     private func signalSettingsPanel(_ signal: SignalSettingsSnapshot) -> some View {
-        settingsPanel(title: "Signal Settings") {
-            strategySectionSummary(
-                icon: "dot.scope",
-                summary: "후보 중 실제 관찰 신호로 올릴 대상을 거르는 기준",
-                helpBinding: $showSignalHelp
-            )
-            if showSignalHelp {
-                strategyHelpText("신호 판단 범위와 급상승/유지 조건, 활성 신호 유형을 조정합니다.")
-            }
-            strategyGroup(title: "신호 판단 범위") {
-                compactNumberControl(
-                    title: "신호 판단 범위(Top-N)",
-                    value: signal.topN,
-                    range: 1...30,
-                    step: 1,
-                    onChange: { store.updateStrategySignalTopN($0) }
-                )
-            }
-            strategyGroup(title: "급상승/유지 조건") {
-                compactNumberControl(
-                    title: "급상승 임계값(순위 단계)",
-                    value: signal.rankJumpThreshold,
-                    range: 1...50,
-                    step: 1,
-                    onChange: { store.updateStrategyRankJumpThreshold($0) }
-                )
-                compactNumberControl(
-                    title: "급상승 윈도우(초)",
-                    value: signal.rankJumpWindowSeconds,
-                    range: 10...86_400,
-                    step: 10,
-                    onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
-                )
-                compactNumberControl(
-                    title: "상위권 유지 편차",
-                    value: signal.rankHoldTolerance,
-                    range: 0...20,
-                    step: 1,
-                    onChange: { store.updateStrategyRankHoldTolerance($0) }
-                )
-            }
-            strategyGroup(title: "활성 신호 유형") {
-                strategySignalToggleGrid(
-                    selected: signal.enabledSignalTypes,
-                    binding: signalEnabledBinding
-                )
+        advancedSectionCard(
+            title: "Signal",
+            summary: "후보 중 실제 신호로 인정할 범위와 임계값입니다."
+        ) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 260), alignment: .leading, spacing: 12) {
+                strategyGroup(title: "신호 판단 범위", subtitle: "신호 평가 대상 범위") {
+                    compactNumberControl(
+                        title: "신호 판단 범위",
+                        subtitle: "Top-N",
+                        value: signal.topN,
+                        range: 1...30,
+                        step: 1,
+                        onChange: { store.updateStrategySignalTopN($0) }
+                    )
+                }
+                strategyGroup(title: "급상승/유지 조건", subtitle: "순위 변화 판단 기준") {
+                    compactNumberControl(
+                        title: "급상승 임계값",
+                        subtitle: "순위 단계",
+                        value: signal.rankJumpThreshold,
+                        range: 1...50,
+                        step: 1,
+                        onChange: { store.updateStrategyRankJumpThreshold($0) }
+                    )
+                    compactNumberControl(
+                        title: "급상승 윈도우",
+                        subtitle: "초",
+                        value: signal.rankJumpWindowSeconds,
+                        range: 10...86_400,
+                        step: 10,
+                        onChange: { store.updateStrategyRankJumpWindowSeconds($0) }
+                    )
+                    compactNumberControl(
+                        title: "상위권 유지 편차",
+                        subtitle: "순위 단계",
+                        value: signal.rankHoldTolerance,
+                        range: 0...20,
+                        step: 1,
+                        onChange: { store.updateStrategyRankHoldTolerance($0) }
+                    )
+                }
+                strategyGroup(title: "활성 신호 유형", subtitle: "추가 감시할 신호 선택") {
+                    strategySignalToggleGrid(
+                        selected: signal.enabledSignalTypes,
+                        binding: signalEnabledBinding
+                    )
+                }
             }
         }
     }
 
     private func riskSettingsPanel(_ risk: RiskSettingsSnapshot) -> some View {
-        settingsPanel(title: "Risk Settings") {
-            strategySectionSummary(
-                icon: "shield",
-                summary: "신호가 나와도 과도한 진입을 보수적으로 제한하는 기준",
-                helpBinding: $showRiskHelp
-            )
-            if showRiskHelp {
-                strategyHelpText("허용 신호, 동시 후보 수, 시간 제한을 통해 진입 리스크를 제어합니다.")
-            }
-            strategyGroup(title: "허용 신호") {
-                strategySignalToggleGrid(
-                    selected: risk.allowedSignalTypes,
-                    binding: riskAllowedBinding
-                )
-            }
-            strategyGroup(title: "동시 후보 제한") {
-                compactNumberControl(
-                    title: "최대 동시 후보 수",
-                    value: risk.maxConcurrentCandidates,
-                    range: 1...50,
-                    step: 1,
-                    onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
-                )
-                Toggle(
-                    "보유 시 신규 진입 차단",
-                    isOn: Binding(
-                        get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
-                        set: { store.updateStrategyBlockWhenPositionExists($0) }
+        advancedSectionCard(
+            title: "Risk",
+            summary: "고급 리스크 게이트와 시간 제한을 조정합니다."
+        ) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 260), alignment: .leading, spacing: 12) {
+                strategyGroup(title: "허용 신호", subtitle: "리스크 게이트가 통과시킬 신호") {
+                    strategySignalToggleGrid(
+                        selected: risk.allowedSignalTypes,
+                        binding: riskAllowedBinding
                     )
-                )
-                .toggleStyle(.switch)
-                .tint(DesignTokens.Colors.warning)
-                .font(.caption)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-            }
-            strategyGroup(title: "재진입/시간 제한") {
-                compactNumberControl(
-                    title: "재진입 대기 시간(분)",
-                    value: risk.cooldownMinutes,
-                    range: 1...1_440,
-                    step: 1,
-                    onChange: { store.updateStrategyCooldownMinutes($0) }
-                )
-                compactNumberControl(
-                    title: "신호 유효 시간(분)",
-                    value: risk.signalWindowMinutes,
-                    range: 1...1_440,
-                    step: 1,
-                    onChange: { store.updateStrategySignalWindowMinutes($0) }
-                )
-                compactNumberControl(
-                    title: "동시성 계산 시간창(분)",
-                    value: risk.concurrencyWindowMinutes,
-                    range: 1...1_440,
-                    step: 1,
-                    onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
-                )
+                }
+                strategyGroup(title: "동시 후보 제한", subtitle: "과도한 동시 진입 방지") {
+                    compactNumberControl(
+                        title: "최대 동시 후보 수",
+                        subtitle: "개",
+                        value: risk.maxConcurrentCandidates,
+                        range: 1...50,
+                        step: 1,
+                        onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
+                    )
+                    strategyToggleRow(
+                        title: "보유 시 신규 진입 차단",
+                        subtitle: "기존 포지션이 있으면 추가 진입을 막습니다.",
+                        isOn: Binding(
+                            get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
+                            set: { store.updateStrategyBlockWhenPositionExists($0) }
+                        )
+                    )
+                }
+                strategyGroup(title: "재진입/시간 제한", subtitle: "보수적 재진입 판단") {
+                    compactNumberControl(
+                        title: "재진입 대기 시간",
+                        subtitle: "분",
+                        value: risk.cooldownMinutes,
+                        range: 1...1_440,
+                        step: 1,
+                        onChange: { store.updateStrategyCooldownMinutes($0) }
+                    )
+                    compactNumberControl(
+                        title: "신호 유효 시간",
+                        subtitle: "분",
+                        value: risk.signalWindowMinutes,
+                        range: 1...1_440,
+                        step: 1,
+                        onChange: { store.updateStrategySignalWindowMinutes($0) }
+                    )
+                    compactNumberControl(
+                        title: "동시성 계산 시간창",
+                        subtitle: "분",
+                        value: risk.concurrencyWindowMinutes,
+                        range: 1...1_440,
+                        step: 1,
+                        onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
+                    )
+                }
             }
         }
     }
 
     private var strategyHelpPanel: some View {
-        settingsPanel(title: "도움말") {
-            settingsRow(
-                icon: "info.circle",
-                title: "스캔 점수",
-                value: "실전 매수 확률 점수가 아니라 후보 우선순위 점수입니다.",
-                tone: .neutral,
-                multiline: true
-            )
-            settingsRow(
-                icon: "clock.arrow.circlepath",
-                title: "반영 시점",
-                value: "저장된 값은 다음 평가 사이클부터 적용됩니다.",
-                tone: .neutral,
-                multiline: true
-            )
-            settingsRow(
-                icon: "exclamationmark.shield",
-                title: "안전 원칙",
-                value: "값 변경 후 저장 전에는 서버 설정이 바뀌지 않습니다.",
-                tone: .neutral,
-                multiline: true
-            )
+        advancedSectionCard(
+            title: "도움말",
+            summary: "긴 설명 대신 필요한 운영 원칙만 남깁니다."
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                strategyCompactNote(
+                    title: "스캔 점수",
+                    detail: "실전 승률이 아니라 후보 우선순위 점수입니다."
+                )
+                strategyCompactNote(
+                    title: "반영 시점",
+                    detail: "저장된 값은 다음 평가 사이클부터 적용됩니다."
+                )
+                strategyCompactNote(
+                    title: "안전 원칙",
+                    detail: "저장 전에는 서버 설정이 바뀌지 않습니다."
+                )
+            }
         }
     }
 
@@ -632,54 +685,245 @@ struct SettingsView: View {
         .appToolbarChrome(cornerRadius: DesignTokens.Radius.xl)
     }
 
-    private func strategySectionSummary(
-        icon: String,
-        summary: String,
-        helpBinding: Binding<Bool>
-    ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-                .frame(width: 14)
-            Text(summary)
-                .font(.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Spacer()
-            Button {
-                helpBinding.wrappedValue.toggle()
-            } label: {
-                Label(
-                    helpBinding.wrappedValue ? "도움말 닫기" : "도움말",
-                    systemImage: "questionmark.circle"
-                )
-                .labelStyle(.titleAndIcon)
-            }
-            .buttonStyle(AppToolButtonStyle())
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+    private var strategyContentMaxWidth: CGFloat { 980 }
+
+    private func strategyAdaptiveColumns(minimum: CGFloat) -> [GridItem] {
+        [GridItem(.adaptive(minimum: minimum, maximum: 420), spacing: 12, alignment: .top)]
     }
 
-    private func strategyHelpText(_ message: String) -> some View {
-        Text(message)
-            .font(.caption)
-            .foregroundStyle(DesignTokens.Colors.textTertiary)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 8)
+    private func strategyPanel<Content: View>(
+        title: String,
+        subtitle: String? = nil,
+        prominence: StrategyPanelProminence = .primary,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
+                Text(title)
+                    .font(DesignTokens.Typography.sectionTitle)
+                    .foregroundStyle(prominence == .primary ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+
+            Divider().opacity(prominence == .primary ? 0.3 : 0.18)
+
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
+                .fill(strategyPanelBackground(prominence: prominence))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
+                .stroke(strategyPanelBorder(prominence: prominence), lineWidth: 1)
+        )
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(prominence == .primary ? 0.04 : 0.02), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(height: prominence == .primary ? 30 : 22)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.Radius.xl, style: .continuous))
+        }
+    }
+
+    private func strategyPanelBackground(prominence: StrategyPanelProminence) -> LinearGradient {
+        switch prominence {
+        case .primary:
+            return LinearGradient(
+                colors: [
+                    AppTheme.panelBackground.opacity(0.98),
+                    DesignTokens.Colors.bgElevated.opacity(0.88),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .secondary:
+            return LinearGradient(
+                colors: [
+                    DesignTokens.Colors.surface1.opacity(0.74),
+                    DesignTokens.Colors.bgElevated.opacity(0.5),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    private func strategyPanelBorder(prominence: StrategyPanelProminence) -> Color {
+        switch prominence {
+        case .primary:
+            return AppTheme.panelBorder
+        case .secondary:
+            return DesignTokens.Colors.borderSubtle.opacity(0.65)
+        }
+    }
+
+    private func advancedSectionCard<Content: View>(
+        title: String,
+        summary: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Text(summary)
+                    .font(.caption2)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            content()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(DesignTokens.Colors.surface1.opacity(0.38))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.55), lineWidth: 0.9)
+        )
+    }
+
+    private func strategySummaryBlock<Trailing: View, Content: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder trailing: () -> Trailing,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                trailing()
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                content()
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(DesignTokens.Colors.surface1.opacity(0.52))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.82), lineWidth: 0.9)
+        )
+    }
+
+    private func strategySummaryBlock<Content: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        strategySummaryBlock(title: title, subtitle: subtitle, trailing: { EmptyView() }, content: content)
+    }
+
+    private func strategySummaryMetric(
+        title: String,
+        value: String,
+        detail: String,
+        tone: StatusTone
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(DesignTokens.Colors.textQuaternary)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(settingsValueColor(for: tone))
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func strategyStatusLine(
+        title: String,
+        badge: String? = nil,
+        detail: String,
+        tone: StatusTone
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                if let badge {
+                    StatusBadge(text: badge, tone: tone)
+                }
+                Spacer(minLength: 0)
+            }
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(settingsValueColor(for: tone))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func strategyCategoryBlock<Content: View>(
+        title: String,
+        summary: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            content()
+        }
     }
 
     private func strategyGroup<Content: View>(
         title: String,
+        subtitle: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
             content()
         }
         .background(
@@ -690,36 +934,65 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
                 .stroke(DesignTokens.Colors.borderSubtle.opacity(0.9), lineWidth: 0.9)
         )
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
     }
 
     private func strategySegmentControlRow(
         title: String,
+        subtitle: String? = nil,
         control: AnyView
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                }
+            }
             control
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
+    }
+
+    private func strategyFormRow<Control: View>(
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 3) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            control()
+                .frame(minWidth: 124, alignment: .trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private func compactNumberControl(
         title: String,
+        subtitle: String? = nil,
         value: Int,
         range: ClosedRange<Int>,
         step: Int,
         onChange: @escaping (Int) -> Void
     ) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-            Spacer(minLength: 8)
+        strategyFormRow(title: title, subtitle: subtitle) {
             HStack(spacing: 8) {
                 Button {
                     let next = max(range.lowerBound, value - step)
@@ -754,30 +1027,34 @@ struct SettingsView: View {
             .padding(.vertical, 4)
             .appSurfaceStyle(cornerRadius: DesignTokens.Radius.md)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+    }
+
+    private func strategyToggleRow(
+        title: String,
+        subtitle: String? = nil,
+        isOn: Binding<Bool>
+    ) -> some View {
+        strategyFormRow(title: title, subtitle: subtitle) {
+            Toggle("", isOn: isOn)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .tint(DesignTokens.Colors.warning)
+        }
     }
 
     private func strategySignalToggleGrid(
         selected: [String],
         binding: @escaping (String) -> Binding<Bool>
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(strategySignalTypeOptions, id: \.self) { type in
-                HStack(spacing: 8) {
-                    Toggle(localizedSignalType(type), isOn: binding(type))
-                        .toggleStyle(.switch)
-                        .tint(DesignTokens.Colors.accent)
-                        .font(.caption)
-                    Spacer()
-                    if selected.contains(type) {
-                        StatusBadge(text: "활성", tone: .success)
-                    }
-                }
+                strategyToggleRow(
+                    title: localizedSignalType(type),
+                    subtitle: localizedSignalDescription(type),
+                    isOn: binding(type)
+                )
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
     }
 
     private var strategySignalTypeOptions: [String] {
@@ -882,7 +1159,7 @@ struct SettingsView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
 
     private func weightStepper(label: String, value: Binding<Double>) -> some View {
@@ -925,33 +1202,32 @@ struct SettingsView: View {
 
     private func editableDoubleTextRow(
         title: String,
-        icon: String? = nil,
+        unit: String? = nil,
+        description: String? = nil,
         text: String,
         onChange: @escaping (String) -> Void
     ) -> some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.caption)
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        .frame(width: 14)
-                }
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.Colors.textSecondary)
-            }
-            Spacer()
-            TextField(
-                "미설정",
-                text: Binding(
-                    get: { text },
-                    set: onChange
+        strategyFormRow(title: title, subtitle: description) {
+            HStack(spacing: 6) {
+                TextField(
+                    "미설정",
+                    text: Binding(
+                        get: { text },
+                        set: onChange
+                    )
                 )
-            )
-            .textFieldStyle(.plain)
+                .textFieldStyle(.plain)
+                .font(.caption.monospacedDigit())
+                .frame(width: 88)
+
+                if let unit {
+                    Text(unit)
+                        .font(.caption2)
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                }
+            }
             .padding(.horizontal, 10)
-            .frame(height: 30)
+            .frame(height: 34)
             .background(
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
                     .fill(DesignTokens.Colors.surface1.opacity(0.85))
@@ -960,11 +1236,18 @@ struct SettingsView: View {
                 RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
                     .stroke(DesignTokens.Colors.borderSubtle.opacity(0.95), lineWidth: 0.9)
             )
-            .frame(width: 140)
-            .font(.caption.monospacedDigit())
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+    }
+
+    private func strategyCompactNote(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(DesignTokens.Colors.textSecondary)
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+        }
     }
 
     private func parseOptionalDouble(_ text: String) -> Double? {
@@ -979,13 +1262,26 @@ struct SettingsView: View {
     private func localizedSignalType(_ type: String) -> String {
         switch type.lowercased() {
         case "new_entry":
-            return "신규 진입 후보"
+            return "신규 진입"
         case "rank_jump":
             return "순위 급상승"
         case "rank_maintained":
             return "상위권 유지"
         default:
             return type
+        }
+    }
+
+    private func localizedSignalDescription(_ type: String) -> String {
+        switch type.lowercased() {
+        case "new_entry":
+            return "상위 후보 중 즉시 진입 가능한 신규 종목"
+        case "rank_jump":
+            return "짧은 시간 내 순위가 빠르게 상승한 종목"
+        case "rank_maintained":
+            return "상위권을 유지하며 추세가 이어지는 종목"
+        default:
+            return "사용자 정의 신호"
         }
     }
 
@@ -1032,6 +1328,73 @@ struct SettingsView: View {
         default:
             return .neutral
         }
+    }
+
+    private var strategyOverallApplyStatusText: String {
+        if store.strategyDirty {
+            return "저장 전 변경 있음"
+        }
+
+        let statuses = ["entry", "exit", "risk"].compactMap { store.strategyGroupApplyStatus($0)?.appliedStatus.lowercased() }
+        if statuses.contains("partial") {
+            return "부분 반영"
+        }
+        if statuses.contains("pending_next_cycle") {
+            return "다음 사이클 반영 대기"
+        }
+        if statuses.allSatisfy({ $0 == "applied" }) && !statuses.isEmpty {
+            return "반영 완료"
+        }
+        return "상태 확인 필요"
+    }
+
+    private var strategyOverallApplyStatusTone: StatusTone {
+        if store.strategyDirty {
+            return .warning
+        }
+
+        let statuses = ["entry", "exit", "risk"].compactMap { store.strategyGroupApplyStatus($0)?.appliedStatus.lowercased() }
+        if statuses.contains("partial") || statuses.contains("pending_next_cycle") {
+            return .warning
+        }
+        if statuses.allSatisfy({ $0 == "applied" }) && !statuses.isEmpty {
+            return .success
+        }
+        return .neutral
+    }
+
+    private var riskDailyTradeLimitBadgeText: String {
+        let configuredRisk = store.strategyDraft?.basic.risk
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+            ?? configuredRisk?.dailyTradeLimitEnabled
+            ?? false
+        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+
+        if !enabled {
+            return "무제한"
+        }
+        if let remaining, remaining <= 0 {
+            return "한도 도달"
+        }
+        return "활성"
+    }
+
+    private var riskDailyTradeLimitTone: StatusTone {
+        let configuredRisk = store.strategyDraft?.basic.risk
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+            ?? configuredRisk?.dailyTradeLimitEnabled
+            ?? false
+        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+
+        if !enabled {
+            return .neutral
+        }
+        if let remaining, remaining <= 0 {
+            return .danger
+        }
+        return .success
     }
 
     private var riskDailyTradeLimitRuntimeText: String {
@@ -1082,6 +1445,17 @@ struct SettingsView: View {
             return "오늘 손실률 \(lossText) / 한도 \(limitText) (\(state))"
         }
         return "한도 \(limitText) · 오늘 손실률 계산 대기"
+    }
+
+    private var riskDailyLossRuntimeBadgeText: String {
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+        if (effective?["daily_loss_limit_reached"]?.boolValue ?? false) {
+            return "한도 도달"
+        }
+        if effective?["today_loss_pct"]?.doubleValue == nil {
+            return "계산 대기"
+        }
+        return "정상"
     }
 
     private var riskDailyLossRuntimeTone: StatusTone {
@@ -1336,6 +1710,11 @@ struct SettingsView: View {
             return tone.foreground
         }
     }
+}
+
+private enum StrategyPanelProminence {
+    case primary
+    case secondary
 }
 
 enum SettingsPageMode {
