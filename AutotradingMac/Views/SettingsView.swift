@@ -189,7 +189,7 @@ struct SettingsView: View {
                 }
             }
         ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 220), alignment: .leading, spacing: 14) {
+            LazyVGrid(columns: strategyOverviewColumns, alignment: .leading, spacing: 12) {
                 strategySnapshotCard(
                     title: "후보 선정",
                     value: localizedScannerMode(draft.basic.entry.selectionMode),
@@ -710,6 +710,10 @@ struct SettingsView: View {
         [GridItem(.adaptive(minimum: minimum, maximum: 520), spacing: 14, alignment: .top)]
     }
 
+    private var strategyOverviewColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 0, maximum: .infinity), spacing: 12, alignment: .top), count: 5)
+    }
+
     private func strategyPanel<Trailing: View, Content: View>(
         title: String,
         subtitle: String? = nil,
@@ -969,10 +973,10 @@ struct SettingsView: View {
         badge: String? = nil,
         tone: StatusTone
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
                 Text(title)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
                 Spacer(minLength: 8)
                 if let badge {
@@ -981,21 +985,22 @@ struct SettingsView: View {
             }
 
             Text(value)
-                .font(.system(size: 14.5, weight: .semibold))
+                .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(settingsValueColor(for: tone))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let detail, !detail.isEmpty {
                 Text(detail)
-                    .font(.system(size: 12.5, weight: .regular))
+                    .font(.system(size: 11.5, weight: .regular))
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
         .background(
             RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
                 .fill(
