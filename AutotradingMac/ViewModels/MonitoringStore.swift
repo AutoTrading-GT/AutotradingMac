@@ -2022,13 +2022,52 @@ final class MonitoringStore: ObservableObject {
         guard notificationPermissionStatus.canDeliverNotifications else { return }
         let symbol = payload.symbol ?? payload.code
         let sideText = localizedSideLabel(payload.side)
-        let body = "\(sideText) 체결 \(DisplayFormatters.number(payload.filledQty))주 @ \(DisplayFormatters.krw(payload.filledPrice))"
+        let body = await fillNotificationBody(payload: payload, sideText: sideText)
         await postLocalNotificationIfNeeded(
             key: "fill:\(payload.orderId):\(payload.fillId?.description ?? "none"):\(payload.timestamp.timeIntervalSince1970)",
             title: "거래 체결",
             subtitle: symbol,
             body: body
         )
+    }
+
+    private func fillNotificationBody(payload: FillReceivedPayload, sideText: String) async -> String {
+        var body = "\(sideText) 체결 \(DisplayFormatters.number(payload.filledQty))주 @ \(DisplayFormatters.krw(payload.filledPrice))"
+        guard payload.side?.lowercased() == "sell" else {
+            return body
+        }
+        guard let closedPosition = await matchingClosedPosition(for: payload) else {
+            return body
+        }
+
+        let pnlText = DisplayFormatters.pnl(closedPosition.realizedPnl)
+        guard pnlText != "-" else {
+            return body
+        }
+
+        body += " · 손익 \(pnlText)"
+        let pnlPctText = DisplayFormatters.percent(closedPosition.realizedPnlPct)
+        if pnlPctText != "-" {
+            body += " (\(pnlPctText))"
+        }
+        return body
+    }
+
+    private func matchingClosedPosition(for payload: FillReceivedPayload) async -> ClosedPositionSnapshotItem? {
+        for attempt in 0..<4 {
+            if let match = recentClosedPositions.first(where: { candidate in
+                guard candidate.sourceOrderId == payload.orderId else { return false }
+                if let candidateCode = candidate.code {
+                    return candidateCode == payload.code
+                }
+                return true
+            }) {
+                return match
+            }
+            guard attempt < 3 else { break }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return nil
     }
 
     private func notifySystemErrorIfNeeded(
