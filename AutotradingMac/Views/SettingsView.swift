@@ -236,25 +236,27 @@ struct SettingsView: View {
                     title: "진입 전략",
                     summary: "후보 선정, 감시 범위, 진입 신호를 한 패널에서 정리합니다."
                 ) {
-                    strategyBandPanel(first: {
-                        strategyBandSegment(
-                            title: "후보 선정 방식",
-                            tooltip: "스캐너 상위 후보를 어떤 기준으로 우선 감시할지 정합니다."
-                        ) {
-                            strategySegmentedControl(
-                                options: [
-                                    AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
-                                    AppSegmentedOption(value: "surge", title: "급등률 중심"),
-                                ],
-                                selection: Binding(
-                                    get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
-                                    set: { store.updateStrategyBasicSelectionMode($0) }
-                                ),
-                                minSegmentWidth: 138,
-                                height: 38
-                            )
-                        }
-                    }, second: {
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(
+                                title: "후보 선정 방식",
+                                tooltip: "스캐너 상위 후보를 어떤 기준으로 우선 감시할지 정합니다."
+                            ) {
+                                strategySegmentedControl(
+                                    options: [
+                                        AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
+                                        AppSegmentedOption(value: "surge", title: "급등률 중심"),
+                                    ],
+                                    selection: Binding(
+                                        get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
+                                        set: { store.updateStrategyBasicSelectionMode($0) }
+                                    ),
+                                    minSegmentWidth: 138,
+                                    height: 38
+                                )
+                            }
+                        },
+                        second: {
                             strategyBandSegment(title: "관찰 후보 수") {
                                 strategyBandStepperControl(
                                     value: basic.entry.topN,
@@ -264,8 +266,8 @@ struct SettingsView: View {
                                     onChange: { store.updateStrategyBasicTopN($0) }
                                 )
                             }
-                        }
-                    }, third: {
+                        },
+                        third: {
                             strategyBandSegment(
                                 title: "진입 신호",
                                 tooltip: "실제 진입 판단에 사용할 신호만 활성화합니다. 상위권 유지는 상위 순위를 유지하며 추세가 이어질 때 진입 후보로 사용합니다."
@@ -275,31 +277,34 @@ struct SettingsView: View {
                                     binding: basicSignalEnabledBinding
                                 )
                             }
-                        })
+                        }
+                    )
                 }
 
                 strategyCategoryBlock(
                     title: "청산 전략",
                     summary: "손익, 보유 시간, 장 종료 전 정리 규칙을 한 패널에서 봅니다."
                 ) {
-                    strategyBandPanel(first: {
-                        strategyBandSegment(title: "익절 / 손절") {
-                            HStack(alignment: .top, spacing: 12) {
-                                strategyBandNumericField(
-                                    label: "익절",
-                                    unit: "%",
-                                    text: basicTargetProfitText,
-                                    onChange: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
-                                )
-                                strategyBandNumericField(
-                                    label: "손절",
-                                    unit: "%",
-                                    text: basicStopLossText,
-                                    onChange: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
-                                )
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(title: "익절 / 손절") {
+                                HStack(alignment: .top, spacing: 12) {
+                                    strategyBandNumericField(
+                                        label: "익절",
+                                        unit: "%",
+                                        text: basicTargetProfitText,
+                                        onChange: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
+                                    )
+                                    strategyBandNumericField(
+                                        label: "손절",
+                                        unit: "%",
+                                        text: basicStopLossText,
+                                        onChange: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
+                                    )
+                                }
                             }
-                        }
-                    }, second: {
+                        },
+                        second: {
                             strategyBandSegment(title: "보유 시간 제한") {
                                 strategyBandStepperControl(
                                     value: basic.exit.maxHoldingMinutes,
@@ -309,8 +314,8 @@ struct SettingsView: View {
                                     onChange: { store.updateStrategyBasicMaxHoldingMinutes($0) }
                                 )
                             }
-                        }
-                    }, third: {
+                        },
+                        third: {
                             strategyBandSegment(title: "장마감 청산") {
                                 strategyBandToggleControl(
                                     title: "장 마감 5분 전 전체 청산",
@@ -320,23 +325,26 @@ struct SettingsView: View {
                                     )
                                 )
                             }
-                        })
+                        }
+                    )
                 }
 
                 strategyCategoryBlock(
                     title: "리스크 관리",
                     summary: "손실 한도, 포지션 비중, 거래 제한을 한 패널에서 묶어 봅니다."
                 ) {
-                    strategyBandPanel(first: {
-                        strategyBandSegment(title: "최대 손실 한도") {
-                            strategyBandNumericField(
-                                label: "손실 한도",
-                                unit: "%",
-                                text: basicMaxLossLimitText,
-                                onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
-                            )
-                        }
-                    }, second: {
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(title: "최대 손실 한도") {
+                                strategyBandNumericField(
+                                    label: "손실 한도",
+                                    unit: "%",
+                                    text: basicMaxLossLimitText,
+                                    onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
+                                )
+                            }
+                        },
+                        second: {
                             strategyBandSegment(
                                 title: "포지션 크기",
                                 tooltip: "신규 진입 한 번에 전체 자산 대비 얼마를 사용할지 정합니다."
@@ -348,7 +356,8 @@ struct SettingsView: View {
                                     onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
                                 )
                             }
-                    }, third: {
+                        },
+                        third: {
                             let limitEnabled = store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled
                             strategyBandSegment(
                                 title: "거래 제한",
@@ -385,7 +394,9 @@ struct SettingsView: View {
                                         )
                                     }
                                 }
-                            })
+                            }
+                        }
+                    )
                 }
             }
             .padding(.horizontal, 18)
