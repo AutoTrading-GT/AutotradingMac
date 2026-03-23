@@ -94,12 +94,15 @@
   - 데이터 관리 패널은 `자동 백업`, `로그 보관 기간`, `실사용 저장공간`을 실제 서버 응답 기준으로 표시한다.
   - Settings 진입 시 `app-settings`를 다시 조회해 저장공간/maintenance 상태를 갱신한다.
   - 데이터 관리 패널은 아래 운영 메타를 함께 표시한다.
+    - `백업 보관 개수`
     - `최근 로그 정리`
     - `최근 자동 백업`
   - 저장 직후에는 지연 재조회로 background maintenance 결과를 다시 반영한다.
   - 서버 정책 의미:
     - `로그 보관 기간`은 현재 `engine_events`, `risk_events`, `strategy_signals` cleanup에 적용된다.
     - `자동 백업`은 SQLite 파일 복사 또는 PostgreSQL `pg_dump` 실행 on/off에 직접 연결된다.
+    - backup rotation은 새 backup 생성 후 최신 N개만 유지하는 방식으로 동작한다(기본 7개).
+    - rotation 실패 시 최신 backup은 유지되고 상태는 warning 성격으로 표시된다.
   - WebSocket 끊김 시 앱이 자동 재연결을 시도한다.
 - Stategy 페이지(사이드바 독립 화면)
   - 사이드바 메뉴명/페이지 제목은 `Stategy`

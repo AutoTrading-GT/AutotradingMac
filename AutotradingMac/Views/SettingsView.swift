@@ -2390,6 +2390,11 @@ struct SettingsView: View {
                 isSaving: store.isSavingAppSetting(.logRetentionDays),
                 disabled: store.appSettings == nil
             )
+            settingsRow(
+                icon: "tray.full",
+                title: "백업 보관 개수",
+                value: backupRetentionCountText
+            )
             settingsRow(icon: "internaldrive", title: "사용 중인 저장공간", value: storageUsageText)
             settingsRow(
                 icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",
@@ -2655,6 +2660,11 @@ struct SettingsView: View {
         store.appSettings?.dataManagement.storageUsageLabel ?? "-"
     }
 
+    private var backupRetentionCountText: String {
+        guard let count = store.appSettings?.dataManagement.backupRetentionCount else { return "-" }
+        return "최신 \(count)개 유지"
+    }
+
     private var cleanupStatusText: String {
         guard let dataManagement = store.appSettings?.dataManagement else { return "-" }
         let summary = dataManagement.lastCleanupSummary ?? "아직 실행 기록이 없습니다."
@@ -2695,6 +2705,8 @@ struct SettingsView: View {
         switch store.appSettings?.dataManagement.lastBackupStatus?.lowercased() {
         case "success":
             return .success
+        case "partial_failure":
+            return .warning
         case "failed":
             return .warning
         case "pending":

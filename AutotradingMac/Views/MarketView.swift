@@ -956,6 +956,7 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
             dataManagement: DataManagementSettingsSnapshot(
                 autoBackupEnabled: true,
                 logRetentionDays: 30,
+                backupRetentionCount: 7,
                 storageUsageBytes: 25 * 1024 * 1024,
                 storageUsageLabel: "25.0 MB"
             )
