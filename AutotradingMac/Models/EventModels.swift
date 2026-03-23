@@ -151,6 +151,9 @@ struct PositionClosedPayload: Decodable {
     let exitPrice: Double
     let realizedPnl: Double
     let realizedPnlPct: Double
+    let holdingSeconds: Double?
+    let sourceOrderId: Int?
+    let sourceSignalReference: String?
     let reason: String
     let orderMode: String?
     let executionMode: String?

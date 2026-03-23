@@ -296,7 +296,7 @@ struct DashboardView: View {
                 panelEmptyState("표시할 최근 로그가 없습니다.")
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(logItems.prefix(8)), id: \.id) { (item: DashboardLogItem) in
+                    ForEach(Array(logItems.prefix(5)), id: \.id) { (item: DashboardLogItem) in
                         dashboardRow {
                             HStack(spacing: 10) {
                                 Text(timeString(item.timestamp))
@@ -441,28 +441,54 @@ struct DashboardView: View {
     }
 
     private var signalItems: [SignalItem] {
-        Array(store.recentSignals.prefix(6)).map { row in
-            let style = EventVisualStyleResolver.signal(signalType: row.signalType)
-            let label: String
-            if row.signalType.contains("buy") || row.signalType.contains("entry") {
-                label = "매수"
-            } else if row.signalType.contains("sell") || row.signalType.contains("exit") {
-                label = "매도"
-            } else {
-                label = "관망"
-            }
+        let approvedDecisions = store.recentRiskDecisions.filter { row in
+            row.decision.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "approved"
+        }
+        let approvedSignalIDs = Set(approvedDecisions.compactMap(\.signalId))
 
-            let reason = row.signalType
+        var items: [SignalItem] = approvedDecisions.map { row in
+            let displayName = row.symbol ?? row.code ?? "종목"
+            let signalType = row.signalType ?? "entry"
+            let signalStyle = EventVisualStyleResolver.signal(signalType: signalType)
+            let statusTone: StatusTone = signalType.lowercased().contains("sell") || signalType.lowercased().contains("exit")
+                ? .info
+                : .success
             return SignalItem(
-                id: row.id,
-                name: row.symbol ?? row.code,
-                signalLabel: label,
-                signalTone: style.tone,
-                reason: reason,
-                statusText: "모니터링",
-                statusTone: .neutral
+                id: "approved-\(row.id)",
+                timestamp: row.createdAt,
+                name: displayName,
+                signalLabel: signalTypeLabel(signalType),
+                signalTone: signalStyle.tone,
+                reason: row.reason,
+                statusText: "실행 승인",
+                statusTone: statusTone
             )
         }
+
+        items.append(
+            contentsOf: store.recentSignals.compactMap { row in
+                guard ResultFeedReducer.isActionableSignalType(row.signalType) else { return nil }
+                if let signalId = row.signalId, approvedSignalIDs.contains(signalId) {
+                    return nil
+                }
+                let style = EventVisualStyleResolver.signal(signalType: row.signalType)
+                return SignalItem(
+                    id: row.id,
+                    timestamp: row.createdAt,
+                    name: row.symbol ?? row.code,
+                    signalLabel: signalTypeLabel(row.signalType),
+                    signalTone: style.tone,
+                    reason: row.signalType,
+                    statusText: "신호 생성",
+                    statusTone: .neutral
+                )
+            }
+        )
+
+        return items
+            .sorted(by: { $0.timestamp > $1.timestamp })
+            .prefix(6)
+            .map { $0 }
     }
 
     private var openOrderItems: [OpenOrderItem] {
@@ -498,7 +524,13 @@ struct DashboardView: View {
                     timestamp: row.filledAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(DisplayFormatters.number(row.filledQty))주 \(row.sideText) 체결 @ \(DisplayFormatters.number(row.filledPrice))"
+                    message: "\(row.symbol ?? row.code) \(DisplayFormatters.number(row.filledQty))주 \(row.sideText) 체결 @ \(DisplayFormatters.number(row.filledPrice))",
+                    kind: .fill,
+                    code: row.code,
+                    orderId: row.orderId,
+                    sourceOrderId: nil,
+                    side: row.side,
+                    status: nil
                 )
             }
         )
@@ -510,19 +542,32 @@ struct DashboardView: View {
                     timestamp: row.updatedAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(row.sideText) 주문 \(row.status)"
+                    message: "\(row.symbol ?? row.code) \(row.sideText) 주문 \(row.status)",
+                    kind: .order,
+                    code: row.code,
+                    orderId: row.orderId,
+                    sourceOrderId: nil,
+                    side: row.side,
+                    status: row.status
                 )
             }
         )
         items.append(
-            contentsOf: store.recentSignals.map { row in
+            contentsOf: store.recentSignals.compactMap { row in
+                guard ResultFeedReducer.isActionableSignalType(row.signalType) else { return nil }
                 let style = EventVisualStyleResolver.signal(signalType: row.signalType)
                 return DashboardLogItem(
                     id: "signal-\(row.id)",
                     timestamp: row.createdAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(row.signalType) 신호 생성"
+                    message: "\(row.symbol ?? row.code) \(row.signalType) 신호 생성",
+                    kind: .signal,
+                    code: row.code,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: nil,
+                    status: row.signalType
                 )
             }
         )
@@ -537,7 +582,13 @@ struct DashboardView: View {
                     iconColor: style.iconColor,
                     message: "\(row.symbol ?? row.code) \(reasonText)",
                     trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
-                    trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl)
+                    trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl),
+                    kind: .close,
+                    code: row.code,
+                    orderId: nil,
+                    sourceOrderId: row.sourceOrderId,
+                    side: "sell",
+                    status: row.reason
                 )
             }
         )
@@ -549,11 +600,31 @@ struct DashboardView: View {
                     timestamp: store.lastUpdatedAt ?? Date(),
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: value
+                    message: value,
+                    kind: .error,
+                    code: nil,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: nil,
+                    status: nil
                 )
             }
         )
-        return items.sorted(by: { $0.timestamp > $1.timestamp })
+        let sortedItems = items.sorted(by: { $0.timestamp > $1.timestamp })
+        let candidates = sortedItems.map { item in
+            ResultFeedEventCandidate(
+                id: item.id,
+                timestamp: item.timestamp,
+                kind: item.kind,
+                code: item.code,
+                side: item.side,
+                status: item.status,
+                orderId: item.orderId,
+                sourceOrderId: item.sourceOrderId
+            )
+        }
+        let visibleIDs = ResultFeedReducer.visibleEventIDs(for: candidates)
+        return sortedItems.filter { visibleIDs.contains($0.id) }
     }
 
     private func scannerScore(for row: MarketRow) -> Int {
@@ -655,6 +726,18 @@ struct DashboardView: View {
         if normalized.contains("max_holding") || normalized.contains("holding") || normalized.contains("time") { return "보유시간 만료 청산" }
         return "포지션 청산"
     }
+
+    private func signalTypeLabel(_ signalType: String) -> String {
+        let normalized = signalType.lowercased()
+        if normalized.contains("sell") || normalized.contains("exit") {
+            return "매도"
+        }
+        if normalized.contains("buy") || normalized.contains("entry") || normalized.contains("jump") {
+            return "매수"
+        }
+        return "신호"
+    }
+
 }
 
 private enum DashboardScannerColumns {
@@ -687,6 +770,7 @@ private struct HoldingItem: Identifiable {
 
 private struct SignalItem: Identifiable {
     let id: String
+    let timestamp: Date
     let name: String
     let signalLabel: String
     let signalTone: StatusTone
@@ -713,6 +797,12 @@ private struct DashboardLogItem: Identifiable {
     let iconName: String
     let iconColor: Color
     let message: String
+    let kind: ResultFeedEventKind
+    let code: String?
+    let orderId: Int?
+    let sourceOrderId: Int?
+    let side: String?
+    let status: String?
     let trailingAmount: String?
     let trailingAmountColor: Color?
 
@@ -722,6 +812,12 @@ private struct DashboardLogItem: Identifiable {
         iconName: String,
         iconColor: Color,
         message: String,
+        kind: ResultFeedEventKind,
+        code: String?,
+        orderId: Int?,
+        sourceOrderId: Int?,
+        side: String?,
+        status: String?,
         trailingAmount: String? = nil,
         trailingAmountColor: Color? = nil
     ) {
@@ -730,6 +826,12 @@ private struct DashboardLogItem: Identifiable {
         self.iconName = iconName
         self.iconColor = iconColor
         self.message = message
+        self.kind = kind
+        self.code = code
+        self.orderId = orderId
+        self.sourceOrderId = sourceOrderId
+        self.side = side
+        self.status = status
         self.trailingAmount = trailingAmount
         self.trailingAmountColor = trailingAmountColor
     }

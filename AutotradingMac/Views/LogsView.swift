@@ -108,6 +108,13 @@ struct LogsView: View {
 
     private var allLogEntries: [LogEntry] {
         var rows: [LogEntry] = []
+        let ordersByID = Dictionary(uniqueKeysWithValues: store.recentOrders.map { ($0.orderId, $0) })
+        let latestFillByOrderID = Dictionary(
+            grouping: store.recentFills,
+            by: \.orderId
+        ).compactMapValues { group in
+            group.max(by: { $0.filledAt < $1.filledAt })
+        }
 
         rows.append(
             contentsOf: store.recentSignals.map { signal in
@@ -138,7 +145,11 @@ struct LogsView: View {
                         .init(key: "confidence", value: DisplayFormatters.number(signal.confidence)),
                         .init(key: "source_snapshot_id", value: optionalInt(signal.sourceSnapshotId)),
                         .init(key: "previous_snapshot_id", value: optionalInt(signal.previousSnapshotId))
-                    ]
+                    ],
+                    eventKind: .signal,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: nil
                 )
             }
         )
@@ -179,7 +190,11 @@ struct LogsView: View {
                         .init(key: "signal_type", value: risk.signalType ?? "-"),
                         .init(key: "signal_id", value: optionalInt(risk.signalId)),
                         .init(key: "related_signal_reference", value: risk.relatedSignalReference ?? "-")
-                    ]
+                    ],
+                    eventKind: .risk,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: nil
                 )
             }
         )
@@ -219,7 +234,11 @@ struct LogsView: View {
                         .init(key: "order_mode", value: order.orderMode ?? order.executionMode ?? "-"),
                         .init(key: "source_signal_reference", value: order.sourceSignalReference ?? "-"),
                         .init(key: "broker_order_id", value: order.brokerOrderId ?? "-")
-                    ]
+                    ],
+                    eventKind: .order,
+                    orderId: order.orderId,
+                    sourceOrderId: nil,
+                    side: order.side
                 )
             }
         )
@@ -256,7 +275,11 @@ struct LogsView: View {
                         .init(key: "filled_qty", value: DisplayFormatters.number(fill.filledQty)),
                         .init(key: "filled_price", value: DisplayFormatters.number(fill.filledPrice)),
                         .init(key: "order_mode", value: fill.orderMode ?? fill.executionMode ?? "-")
-                    ]
+                    ],
+                    eventKind: .fill,
+                    orderId: fill.orderId,
+                    sourceOrderId: nil,
+                    side: fill.side
                 )
             }
         )
@@ -292,7 +315,11 @@ struct LogsView: View {
                         .init(key: "mark_price_source", value: position.markPriceSource ?? "-"),
                         .init(key: "unrealized_pnl", value: DisplayFormatters.pnl(position.unrealizedPnl)),
                         .init(key: "unrealized_pnl_pct", value: DisplayFormatters.percent(position.unrealizedPnlPct))
-                    ]
+                    ],
+                    eventKind: .position,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: position.side
                 )
             }
         )
@@ -302,6 +329,26 @@ struct LogsView: View {
                 let title = instrumentTitle(symbol: closed.symbol, code: closed.code)
                 let displayName = instrumentDisplayName(symbol: closed.symbol, code: closed.code)
                 let style = EventVisualStyleResolver.close(reason: closed.reason, realizedPnl: closed.realizedPnl)
+                let relatedOrder = closed.sourceOrderId.flatMap { ordersByID[$0] }
+                let relatedFill = closed.sourceOrderId.flatMap { latestFillByOrderID[$0] }
+                var closeMetaPairs: [LogMetaPair] = [
+                    .init(key: "position_id", value: optionalInt(closed.positionId)),
+                    .init(key: "closed_qty", value: DisplayFormatters.number(closed.closedQty)),
+                    .init(key: "avg_entry_price", value: DisplayFormatters.number(closed.avgEntryPrice)),
+                    .init(key: "exit_price", value: DisplayFormatters.number(closed.exitPrice)),
+                    .init(key: "realized_pnl", value: DisplayFormatters.pnl(closed.realizedPnl)),
+                    .init(key: "realized_pnl_pct", value: DisplayFormatters.percent(closed.realizedPnlPct)),
+                    .init(key: "reason", value: closed.reason ?? "-"),
+                    .init(key: "holding_seconds", value: DisplayFormatters.number(closed.holdingSeconds))
+                ]
+                closeMetaPairs.append(
+                    contentsOf: closeFlowMetaPairs(
+                        sourceOrderId: closed.sourceOrderId,
+                        sourceSignalReference: closed.sourceSignalReference,
+                        order: relatedOrder,
+                        fill: relatedFill
+                    )
+                )
                 return LogEntry(
                     id: "position-closed-\(closed.id)",
                     timestamp: closed.createdAt,
@@ -321,21 +368,30 @@ struct LogsView: View {
                     iconName: style.iconName,
                     iconColor: style.iconColor,
                     iconTone: style.tone,
-                    metaPairs: [
-                        .init(key: "position_id", value: optionalInt(closed.positionId)),
-                        .init(key: "closed_qty", value: DisplayFormatters.number(closed.closedQty)),
-                        .init(key: "avg_entry_price", value: DisplayFormatters.number(closed.avgEntryPrice)),
-                        .init(key: "exit_price", value: DisplayFormatters.number(closed.exitPrice)),
-                        .init(key: "realized_pnl", value: DisplayFormatters.pnl(closed.realizedPnl)),
-                        .init(key: "realized_pnl_pct", value: DisplayFormatters.percent(closed.realizedPnlPct)),
-                        .init(key: "reason", value: closed.reason ?? "-")
-                    ]
+                    metaPairs: closeMetaPairs,
+                    eventKind: .close,
+                    orderId: nil,
+                    sourceOrderId: closed.sourceOrderId,
+                    side: "sell"
                 )
             }
         )
 
-        return rows
-            .sorted(by: { $0.timestamp > $1.timestamp })
+        let sorted = rows.sorted(by: { $0.timestamp > $1.timestamp })
+        let candidates = sorted.map { entry in
+            ResultFeedEventCandidate(
+                id: entry.id,
+                timestamp: entry.timestamp,
+                kind: entry.eventKind,
+                code: entry.code,
+                side: entry.side,
+                status: entry.status,
+                orderId: entry.orderId,
+                sourceOrderId: entry.sourceOrderId
+            )
+        }
+        let visibleIDs = ResultFeedReducer.visibleEventIDs(for: candidates)
+        return sorted.filter { visibleIDs.contains($0.id) }
             .prefix(120)
             .map { $0 }
     }
@@ -387,6 +443,41 @@ struct LogsView: View {
             return normalized
         }
         return "unknown"
+    }
+
+    private func closeFlowMetaPairs(
+        sourceOrderId: Int?,
+        sourceSignalReference: String?,
+        order: OrderSnapshotItem?,
+        fill: FillSnapshotItem?
+    ) -> [LogMetaPair] {
+        var pairs: [LogMetaPair] = [
+            .init(key: "source_order_id", value: optionalInt(sourceOrderId)),
+            .init(key: "source_signal_reference", value: sourceSignalReference ?? "-")
+        ]
+
+        if let order {
+            pairs.append(.init(key: "related_order_status", value: order.status))
+            pairs.append(.init(key: "related_order_side", value: order.side))
+            pairs.append(.init(key: "related_order_qty", value: DisplayFormatters.number(order.orderQty)))
+            pairs.append(.init(key: "related_order_price", value: DisplayFormatters.number(order.orderPrice)))
+            pairs.append(.init(key: "related_order_updated_at", value: DisplayFormatters.dateTime(order.updatedAt)))
+        } else {
+            pairs.append(.init(key: "related_order_status", value: "-"))
+        }
+
+        if let fill {
+            pairs.append(.init(key: "related_fill_qty", value: DisplayFormatters.number(fill.filledQty)))
+            pairs.append(.init(key: "related_fill_price", value: DisplayFormatters.number(fill.filledPrice)))
+            pairs.append(.init(key: "related_fill_at", value: DisplayFormatters.dateTime(fill.filledAt)))
+        } else {
+            pairs.append(.init(key: "related_fill_qty", value: "-"))
+        }
+
+        if sourceOrderId != nil || order != nil || fill != nil {
+            pairs.append(.init(key: "compaction_note", value: "기본 목록에서는 주문/체결 단계를 청산 결과에 흡수해 표시"))
+        }
+        return pairs
     }
 
     private func signalFeedMessage(instrumentName: String, signalType: String, confidence: Double?) -> String {
@@ -579,6 +670,10 @@ private struct LogEntry: Identifiable {
     let iconColor: Color
     let iconTone: StatusTone
     let metaPairs: [LogMetaPair]
+    let eventKind: ResultFeedEventKind
+    let orderId: Int?
+    let sourceOrderId: Int?
+    let side: String?
 }
 
 private struct LogFeedRow: View {
