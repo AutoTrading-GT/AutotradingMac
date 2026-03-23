@@ -170,68 +170,56 @@ struct SettingsView: View {
     private func strategyOverviewPanel(_ draft: StrategySettingsSnapshot) -> some View {
         strategyPanel(
             title: "현재 전략 요약",
-            subtitle: "핵심 운용 기준과 실제 적용 상태를 묶어서 확인합니다."
-        ) {
-            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 336), alignment: .leading, spacing: 14) {
-                strategySummaryBlock(
-                    title: "전략 핵심 요약",
-                    subtitle: "후보 선정, 청산 기준, 리스크 한도를 빠르게 확인합니다."
-                ) {
-                    strategySummaryMetric(
-                        title: "후보 선정",
-                        value: localizedScannerMode(draft.basic.entry.selectionMode),
-                        detail: "관찰 \(draft.basic.entry.topN)개 · 신호 \(draft.basic.entry.enabledSignalTypes.count)종 사용",
-                        tone: .neutral
-                    )
-                    strategySummaryMetric(
-                        title: "청산 기준",
-                        value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct))",
-                        detail: "보유 \(draft.basic.exit.maxHoldingMinutes)분 · \(draft.basic.exit.forceCloseOnMarketClose ? "장 마감 전 강제 청산" : "시간 기준만 사용")",
-                        tone: .neutral
-                    )
-                    strategySummaryMetric(
-                        title: "리스크 한도",
-                        value: "손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)) · 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct))",
-                        detail: draft.basic.risk.dailyTradeLimitEnabled
-                            ? "일일 최대 \(draft.basic.risk.dailyTradeLimitCount)회 · 동시 보유 \(draft.basic.risk.maxConcurrentPositions)개"
-                            : "일일 거래 무제한 · 동시 보유 \(draft.basic.risk.maxConcurrentPositions)개",
-                        tone: .neutral
-                    )
-                }
-
-                strategySummaryBlock(
-                    title: "적용 상태",
-                    subtitle: "저장/반영 흐름과 오늘 기준 리스크 상태를 봅니다.",
-                    trailing: {
-                        strategyBadge(
-                            text: strategyOverallApplyStatusText,
-                            tone: strategyOverallApplyStatusTone
-                        )
+            subtitle: "현재 운용 전략을 한눈에 보는 스냅샷입니다.",
+            trailing: {
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("마지막 적용")
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                        Text(strategyLastAppliedSummaryText)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(DesignTokens.Colors.textSecondary)
                     }
-                ) {
-                    strategyStatusLine(
-                        title: "반영 정책",
-                        detail: store.strategyApplyPolicy ?? "저장 후 다음 평가 사이클부터 반영",
-                        tone: .neutral
-                    )
-                    strategyStatusLine(
-                        title: "마지막 적용",
-                        detail: store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "아직 적용 이력 없음",
-                        tone: .neutral
-                    )
-                    strategyStatusLine(
-                        title: "일일 거래 제한",
-                        badge: riskDailyTradeLimitBadgeText,
-                        detail: riskDailyTradeLimitRuntimeText,
-                        tone: riskDailyTradeLimitTone
-                    )
-                    strategyStatusLine(
-                        title: "일일 손실 한도",
-                        badge: riskDailyLossRuntimeBadgeText,
-                        detail: riskDailyLossRuntimeText,
-                        tone: riskDailyLossRuntimeTone
-                    )
+
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .help(strategyApplyPolicyTooltipText)
                 }
+            }
+        ) {
+            LazyVGrid(columns: strategyAdaptiveColumns(minimum: 220), alignment: .leading, spacing: 14) {
+                strategySnapshotCard(
+                    title: "후보 선정",
+                    value: localizedScannerMode(draft.basic.entry.selectionMode),
+                    detail: "관찰 \(draft.basic.entry.topN)개 · 신호 \(draft.basic.entry.enabledSignalTypes.count)종",
+                    tone: .neutral
+                )
+                strategySnapshotCard(
+                    title: "청산 기준",
+                    value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct))",
+                    detail: draft.basic.exit.forceCloseOnMarketClose ? "보유 \(draft.basic.exit.maxHoldingMinutes)분 · 장 마감 전 청산" : "보유 \(draft.basic.exit.maxHoldingMinutes)분",
+                    tone: .neutral
+                )
+                strategySnapshotCard(
+                    title: "리스크 한도",
+                    value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)) · 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct))",
+                    detail: "동시 보유 \(draft.basic.risk.maxConcurrentPositions)개",
+                    tone: .neutral
+                )
+                strategySnapshotCard(
+                    title: "일일 거래 제한",
+                    value: riskDailyTradeLimitSnapshotText,
+                    badge: riskDailyTradeLimitBadgeText,
+                    tone: riskDailyTradeLimitTone
+                )
+                strategySnapshotCard(
+                    title: "일일 손실 한도",
+                    value: riskDailyLossSnapshotText,
+                    badge: riskDailyLossRuntimeBadgeText,
+                    tone: riskDailyLossRuntimeTone
+                )
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 18)
@@ -722,24 +710,29 @@ struct SettingsView: View {
         [GridItem(.adaptive(minimum: minimum, maximum: 520), spacing: 14, alignment: .top)]
     }
 
-    private func strategyPanel<Content: View>(
+    private func strategyPanel<Trailing: View, Content: View>(
         title: String,
         subtitle: String? = nil,
         prominence: StrategyPanelProminence = .primary,
+        @ViewBuilder trailing: () -> Trailing,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
-                Text(title)
-                    .font(.system(size: prominence == .primary ? 17 : 16, weight: .semibold))
-                    .tracking(-0.1)
-                    .foregroundStyle(prominence == .primary ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                        .lineLimit(2)
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: subtitle == nil ? 0 : 4) {
+                    Text(title)
+                        .font(.system(size: prominence == .primary ? 17 : 16, weight: .semibold))
+                        .tracking(-0.1)
+                        .foregroundStyle(prominence == .primary ? DesignTokens.Colors.textPrimary : DesignTokens.Colors.textSecondary)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(DesignTokens.Colors.textTertiary)
+                            .lineLimit(2)
+                    }
                 }
+                Spacer(minLength: 16)
+                trailing()
             }
             .padding(.horizontal, 18)
             .padding(.top, 16)
@@ -781,6 +774,15 @@ struct SettingsView: View {
             x: 0,
             y: prominence == .primary ? 5 : 2
         )
+    }
+
+    private func strategyPanel<Content: View>(
+        title: String,
+        subtitle: String? = nil,
+        prominence: StrategyPanelProminence = .primary,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        strategyPanel(title: title, subtitle: subtitle, prominence: prominence, trailing: { EmptyView() }, content: content)
     }
 
     private func strategyPanelBackground(prominence: StrategyPanelProminence) -> LinearGradient {
@@ -958,6 +960,65 @@ struct SettingsView: View {
                 .foregroundStyle(settingsValueColor(for: tone))
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private func strategySnapshotCard(
+        title: String,
+        value: String,
+        detail: String? = nil,
+        badge: String? = nil,
+        tone: StatusTone
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                Spacer(minLength: 8)
+                if let badge {
+                    strategyBadge(text: badge, tone: tone, size: .compact)
+                }
+            }
+
+            Text(value)
+                .font(.system(size: 14.5, weight: .semibold))
+                .foregroundStyle(settingsValueColor(for: tone))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: 12.5, weight: .regular))
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.9),
+                            DesignTokens.Colors.surface1.opacity(0.56),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.84), lineWidth: 0.9)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.03), lineWidth: 0.7)
+                .padding(1)
+        )
+        .shadow(color: Color.black.opacity(0.11), radius: 5, x: 0, y: 2)
     }
 
     private func strategyBadge(
@@ -1727,6 +1788,14 @@ struct SettingsView: View {
         return .neutral
     }
 
+    private var strategyApplyPolicyTooltipText: String {
+        "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다."
+    }
+
+    private var strategyLastAppliedSummaryText: String {
+        store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "아직 적용 이력 없음"
+    }
+
     private var riskDailyTradeLimitBadgeText: String {
         let configuredRisk = store.strategyDraft?.basic.risk
         let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
@@ -1759,6 +1828,31 @@ struct SettingsView: View {
             return .danger
         }
         return .success
+    }
+
+    private var riskDailyTradeLimitSnapshotText: String {
+        let configuredRisk = store.strategyDraft?.basic.risk
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+
+        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+            ?? configuredRisk?.dailyTradeLimitEnabled
+            ?? false
+        let limit = effective?["daily_trade_limit_count"]?.intValue
+            ?? configuredRisk?.dailyTradeLimitCount
+            ?? 0
+        let todayUsed = effective?["today_trade_count"]?.intValue
+        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+
+        if !enabled {
+            return "무제한"
+        }
+        if let todayUsed, let remaining {
+            return "오늘 \(todayUsed)/\(limit)회 · 남은 \(remaining)회"
+        }
+        if let todayUsed {
+            return "오늘 \(todayUsed)/\(limit)회"
+        }
+        return "최대 \(limit)회"
     }
 
     private var riskDailyTradeLimitRuntimeText: String {
@@ -1809,6 +1903,21 @@ struct SettingsView: View {
             return "오늘 손실률 \(lossText) / 한도 \(limitText) (\(state))"
         }
         return "한도 \(limitText) · 오늘 손실률 계산 대기"
+    }
+
+    private var riskDailyLossSnapshotText: String {
+        let configuredRisk = store.strategyDraft?.basic.risk
+        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+
+        let maxLossLimitPct = effective?["max_loss_limit_pct"]?.doubleValue
+            ?? configuredRisk?.maxLossLimitPct
+            ?? 0.0
+        let todayLossPct = effective?["today_loss_pct"]?.doubleValue ?? 0.0
+
+        if effective?["today_loss_pct"]?.doubleValue == nil {
+            return "한도 \(DisplayFormatters.percent(maxLossLimitPct))"
+        }
+        return "손실률 \(DisplayFormatters.percent(todayLossPct)) / 한도 \(DisplayFormatters.percent(maxLossLimitPct))"
     }
 
     private var riskDailyLossRuntimeBadgeText: String {
