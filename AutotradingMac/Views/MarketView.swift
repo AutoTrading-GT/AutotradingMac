@@ -946,6 +946,37 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
         try await fetchStrategySettings()
     }
 
+    func fetchAppSettings() async throws -> AppSettingsResponseEnvelope {
+        let snapshot = AppSettingsSnapshot(
+            notifications: NotificationSettingsSnapshot(
+                tradeFillNotificationsEnabled: true,
+                tradeSignalNotificationsEnabled: true,
+                systemErrorNotificationsEnabled: false
+            ),
+            dataManagement: DataManagementSettingsSnapshot(
+                autoBackupEnabled: true,
+                logRetentionDays: 30,
+                storageUsageBytes: 25 * 1024 * 1024,
+                storageUsageLabel: "25.0 MB"
+            )
+        )
+        return AppSettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            updatedAt: Date()
+        )
+    }
+
+    func updateAppSettings(_ payload: AppSettingsUpdatePayload) async throws -> AppSettingsUpdateResponseEnvelope {
+        let response = try await fetchAppSettings()
+        return AppSettingsUpdateResponseEnvelope(
+            message: "preview app settings updated",
+            data: response.data,
+            defaults: response.defaults,
+            updatedAt: response.updatedAt
+        )
+    }
+
     func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse {
         let normalized = mode.lowercased() == "surge" ? "surge" : "turnover"
         let all = Self.previewSnapshot.marketTopRanks
