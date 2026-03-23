@@ -474,7 +474,7 @@ struct DashboardView: View {
             .prefix(6)
             .map { row in
                 let style = EventVisualStyleResolver.order(side: row.side, status: row.status)
-                OpenOrderItem(
+                return OpenOrderItem(
                     id: row.orderId,
                     name: row.symbol ?? row.code,
                     qty: row.orderQty,
@@ -493,7 +493,7 @@ struct DashboardView: View {
         items.append(
             contentsOf: store.recentFills.map { row in
                 let style = EventVisualStyleResolver.fill(side: row.side)
-                DashboardLogItem(
+                return DashboardLogItem(
                     id: "fill-\(row.fillId)",
                     timestamp: row.filledAt,
                     iconName: style.iconName,
@@ -505,7 +505,7 @@ struct DashboardView: View {
         items.append(
             contentsOf: store.recentOrders.map { row in
                 let style = EventVisualStyleResolver.order(side: row.side, status: row.status)
-                DashboardLogItem(
+                return DashboardLogItem(
                     id: "order-\(row.orderId)-\(row.updatedAt.timeIntervalSince1970)",
                     timestamp: row.updatedAt,
                     iconName: style.iconName,
@@ -517,7 +517,7 @@ struct DashboardView: View {
         items.append(
             contentsOf: store.recentSignals.map { row in
                 let style = EventVisualStyleResolver.signal(signalType: row.signalType)
-                DashboardLogItem(
+                return DashboardLogItem(
                     id: "signal-\(row.id)",
                     timestamp: row.createdAt,
                     iconName: style.iconName,
@@ -544,7 +544,7 @@ struct DashboardView: View {
         items.append(
             contentsOf: store.recentErrorItems.enumerated().map { idx, value in
                 let style = EventVisualStyleResolver.risk(decision: "blocked", reason: value, signalType: nil)
-                DashboardLogItem(
+                return DashboardLogItem(
                     id: "err-\(idx)",
                     timestamp: store.lastUpdatedAt ?? Date(),
                     iconName: style.iconName,
