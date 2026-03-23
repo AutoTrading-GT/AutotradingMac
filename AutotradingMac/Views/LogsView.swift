@@ -93,6 +93,30 @@ struct LogsView: View {
         logEntries.map(\.id)
     }
 
+    private var symbolByCode: [String: String] {
+        var map: [String: String] = [:]
+        func merge(code: String?, symbol: String?) {
+            guard
+                let code,
+                !code.isEmpty,
+                let symbol,
+                !symbol.isEmpty
+            else { return }
+            if map[code] == nil {
+                map[code] = symbol
+            }
+        }
+
+        store.recentSignals.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentRiskDecisions.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentOrders.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentFills.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.currentPositions.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentClosedPositions.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.marketRows.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        return map
+    }
+
     private func syncSelection() {
         if logEntries.isEmpty {
             selectedLogID = nil
@@ -413,18 +437,26 @@ struct LogsView: View {
 
     private func instrumentTitle(symbol: String?, code: String?) -> String {
         let codeText = code ?? "-"
-        guard let symbol, !symbol.isEmpty else { return codeText }
-        return "\(symbol) (\(codeText))"
+        guard let resolvedSymbol = resolvedSymbol(symbol: symbol, code: code) else { return codeText }
+        return "\(resolvedSymbol) (\(codeText))"
     }
 
     private func instrumentDisplayName(symbol: String?, code: String?) -> String {
-        if let symbol, !symbol.isEmpty {
-            return symbol
+        if let resolvedSymbol = resolvedSymbol(symbol: symbol, code: code) {
+            return resolvedSymbol
         }
         if let code, !code.isEmpty {
             return code
         }
         return "종목"
+    }
+
+    private func resolvedSymbol(symbol: String?, code: String?) -> String? {
+        if let symbol, !symbol.isEmpty {
+            return symbol
+        }
+        guard let code, !code.isEmpty else { return nil }
+        return symbolByCode[code]
     }
 
     private func optionalInt(_ value: Int?) -> String {
