@@ -104,4 +104,153 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertFalse(ResultFeedReducer.isActionableSignalType("watch"))
         XCTAssertFalse(ResultFeedReducer.isActionableSignalType("관망"))
     }
+
+    func test_dashboardSignalSummary_usesLatestMeaningfulStatePerSymbol() {
+        let now = Date()
+        let rows = DashboardSignalSummaryBuilder.build(
+            signals: [
+                .init(
+                    signalId: 1,
+                    code: "005930",
+                    symbol: "삼성전자",
+                    signalType: "new_entry",
+                    confidence: 0.91,
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    sourceSnapshotId: nil,
+                    previousSnapshotId: nil,
+                    createdAt: now.addingTimeInterval(-30)
+                )
+            ],
+            riskDecisions: [
+                .init(
+                    riskEventId: 11,
+                    code: "005930",
+                    symbol: "삼성전자",
+                    decision: "approved",
+                    blocked: false,
+                    reason: "ok",
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    signalId: 1,
+                    signalType: "new_entry",
+                    relatedSignalReference: "strategy_signal:1",
+                    createdAt: now.addingTimeInterval(-20)
+                )
+            ],
+            orders: [
+                .init(
+                    orderId: 21,
+                    code: "005930",
+                    symbol: "삼성전자",
+                    side: "buy",
+                    orderQty: 10,
+                    orderPrice: 71200,
+                    status: "submitted",
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    sourceSignalReference: "strategy_signal:1",
+                    brokerOrderId: nil,
+                    createdAt: now.addingTimeInterval(-15),
+                    updatedAt: now.addingTimeInterval(-15)
+                )
+            ],
+            fills: [
+                .init(
+                    fillId: 31,
+                    orderId: 21,
+                    code: "005930",
+                    symbol: "삼성전자",
+                    side: "buy",
+                    filledQty: 10,
+                    filledPrice: 71200,
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    filledAt: now
+                )
+            ],
+            closedPositions: [],
+            symbolByCode: ["005930": "삼성전자"]
+        )
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.name, "삼성전자")
+        XCTAssertEqual(rows.first?.action, .buy)
+        XCTAssertEqual(rows.first?.status, .executed)
+        XCTAssertEqual(rows.first?.summary, "매수 주문 체결 완료")
+    }
+
+    func test_dashboardSignalSummary_excludesWatchAndGenericHoldBlocked() {
+        let now = Date()
+        let rows = DashboardSignalSummaryBuilder.build(
+            signals: [
+                .init(
+                    signalId: 1,
+                    code: "000660",
+                    symbol: "SK하이닉스",
+                    signalType: "rank_maintained",
+                    confidence: 0.7,
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    sourceSnapshotId: nil,
+                    previousSnapshotId: nil,
+                    createdAt: now.addingTimeInterval(-20)
+                )
+            ],
+            riskDecisions: [
+                .init(
+                    riskEventId: 12,
+                    code: "000660",
+                    symbol: "SK하이닉스",
+                    decision: "blocked",
+                    blocked: true,
+                    reason: "already_holding_position",
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    signalId: 1,
+                    signalType: "rank_maintained",
+                    relatedSignalReference: "strategy_signal:1",
+                    createdAt: now
+                )
+            ],
+            orders: [],
+            fills: [],
+            closedPositions: [],
+            symbolByCode: ["000660": "SK하이닉스"]
+        )
+
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    func test_dashboardSignalSummary_keepsImportantBlockedState() {
+        let now = Date()
+        let rows = DashboardSignalSummaryBuilder.build(
+            signals: [],
+            riskDecisions: [
+                .init(
+                    riskEventId: 13,
+                    code: "035420",
+                    symbol: "NAVER",
+                    decision: "blocked",
+                    blocked: true,
+                    reason: "daily_trade_limit_reached:3",
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    signalId: 2,
+                    signalType: "new_entry",
+                    relatedSignalReference: "strategy_signal:2",
+                    createdAt: now
+                )
+            ],
+            orders: [],
+            fills: [],
+            closedPositions: [],
+            symbolByCode: ["035420": "NAVER"]
+        )
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.action, .buy)
+        XCTAssertEqual(rows.first?.status, .blocked)
+        XCTAssertEqual(rows.first?.summary, "일일 거래 한도 도달")
+    }
 }

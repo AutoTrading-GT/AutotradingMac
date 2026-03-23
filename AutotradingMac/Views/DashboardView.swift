@@ -226,24 +226,27 @@ struct DashboardView: View {
     private var signalsPanel: some View {
         dashboardPanel(title: "매매 신호", noPadding: true) {
             if signalItems.isEmpty {
-                panelEmptyState("최근 생성된 매매신호가 없습니다.")
+                panelEmptyState("현재 요약할 매매 액션이 없습니다.")
             } else {
                 VStack(spacing: 0) {
                     ForEach(signalItems) { item in
                         dashboardRow {
-                            HStack(spacing: 10) {
-                                VStack(alignment: .leading, spacing: 2) {
+                            HStack(alignment: .center, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 3) {
                                     Text(item.name)
                                         .font(.subheadline.weight(.medium))
                                         .lineLimit(1)
-                                    Text(item.reason)
+                                    Text(item.summary)
                                         .font(.caption2)
                                         .foregroundStyle(DesignTokens.Colors.textQuaternary)
                                         .lineLimit(1)
+                                        .truncationMode(.tail)
                                 }
                                 Spacer(minLength: 8)
-                                signalBadge(item.signalLabel, tone: item.signalTone)
-                                StatusBadge(text: item.statusText, tone: item.statusTone)
+                                HStack(spacing: 6) {
+                                    signalBadge(item.action.label, tone: actionTone(item.action))
+                                    StatusBadge(text: item.status.label, tone: statusTone(item.status))
+                                }
                             }
                         }
                     }
@@ -291,7 +294,7 @@ struct DashboardView: View {
     }
 
     private var recentLogsPanel: some View {
-        dashboardPanel(title: "최근 매매/이벤트", noPadding: true) {
+        dashboardPanel(title: "최근 로그", noPadding: true) {
             if logItems.isEmpty {
                 panelEmptyState("표시할 최근 로그가 없습니다.")
             } else {
@@ -464,55 +467,15 @@ struct DashboardView: View {
         }
     }
 
-    private var signalItems: [SignalItem] {
-        let approvedDecisions = store.recentRiskDecisions.filter { row in
-            row.decision.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "approved"
-        }
-        let approvedSignalIDs = Set(approvedDecisions.compactMap(\.signalId))
-
-        var items: [SignalItem] = approvedDecisions.map { row in
-            let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: "종목")
-            let signalType = row.signalType ?? "entry"
-            let signalStyle = EventVisualStyleResolver.signal(signalType: signalType)
-            let statusTone: StatusTone = signalType.lowercased().contains("sell") || signalType.lowercased().contains("exit")
-                ? .info
-                : .success
-            return SignalItem(
-                id: "approved-\(row.id)",
-                timestamp: row.createdAt,
-                name: displayName,
-                signalLabel: signalTypeLabel(signalType),
-                signalTone: signalStyle.tone,
-                reason: row.reason,
-                statusText: "실행 승인",
-                statusTone: statusTone
-            )
-        }
-
-        items.append(
-            contentsOf: store.recentSignals.compactMap { row in
-                guard ResultFeedReducer.isActionableSignalType(row.signalType) else { return nil }
-                if let signalId = row.signalId, approvedSignalIDs.contains(signalId) {
-                    return nil
-                }
-                let style = EventVisualStyleResolver.signal(signalType: row.signalType)
-                return SignalItem(
-                    id: row.id,
-                    timestamp: row.createdAt,
-                    name: instrumentName(symbol: row.symbol, code: row.code, fallback: row.code),
-                    signalLabel: signalTypeLabel(row.signalType),
-                    signalTone: style.tone,
-                    reason: row.signalType,
-                    statusText: "신호 생성",
-                    statusTone: .neutral
-                )
-            }
+    private var signalItems: [DashboardSignalSummaryRow] {
+        DashboardSignalSummaryBuilder.build(
+            signals: store.recentSignals,
+            riskDecisions: store.recentRiskDecisions,
+            orders: store.recentOrders,
+            fills: store.recentFills,
+            closedPositions: store.recentClosedPositions,
+            symbolByCode: symbolByCode
         )
-
-        return items
-            .sorted(by: { $0.timestamp > $1.timestamp })
-            .prefix(6)
-            .map { $0 }
     }
 
     private var openOrderItems: [OpenOrderItem] {
@@ -579,8 +542,35 @@ struct DashboardView: View {
             }
         )
         items.append(
-            contentsOf: store.recentSignals.compactMap { row in
-                guard ResultFeedReducer.isActionableSignalType(row.signalType) else { return nil }
+            contentsOf: store.recentRiskDecisions.map { row in
+                let style = EventVisualStyleResolver.risk(
+                    decision: row.decision,
+                    reason: row.reason,
+                    signalType: row.signalType
+                )
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code ?? "종목")
+                return DashboardLogItem(
+                    id: "risk-\(row.id)",
+                    timestamp: row.createdAt,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    message: riskLogMessage(
+                        instrumentName: displayName,
+                        decision: row.decision,
+                        reason: row.reason,
+                        signalType: row.signalType
+                    ),
+                    kind: .risk,
+                    code: row.code,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: row.signalType.map(signalSide),
+                    status: row.decision
+                )
+            }
+        )
+        items.append(
+            contentsOf: store.recentSignals.map { row in
                 let style = EventVisualStyleResolver.signal(signalType: row.signalType)
                 let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code)
                 return DashboardLogItem(
@@ -588,7 +578,10 @@ struct DashboardView: View {
                     timestamp: row.createdAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(displayName) \(row.signalType) 신호 생성",
+                    message: signalLogMessage(
+                        instrumentName: displayName,
+                        signalType: row.signalType
+                    ),
                     kind: .signal,
                     code: row.code,
                     orderId: nil,
@@ -746,6 +739,28 @@ struct DashboardView: View {
         return .flat
     }
 
+    private func actionTone(_ action: DashboardSignalAction) -> StatusTone {
+        switch action {
+        case .buy:
+            return .danger
+        case .sell:
+            return .info
+        }
+    }
+
+    private func statusTone(_ status: DashboardSignalStatus) -> StatusTone {
+        switch status {
+        case .executed:
+            return .success
+        case .pending:
+            return .warning
+        case .monitoring:
+            return .neutral
+        case .blocked:
+            return .warning
+        }
+    }
+
     private func instrumentName(symbol: String?, code: String?, fallback: String) -> String {
         if let symbol, !symbol.isEmpty {
             return symbol
@@ -768,15 +783,53 @@ struct DashboardView: View {
         return "포지션 청산"
     }
 
-    private func signalTypeLabel(_ signalType: String) -> String {
+    private func signalSide(_ signalType: String) -> String {
         let normalized = signalType.lowercased()
         if normalized.contains("sell") || normalized.contains("exit") {
-            return "매도"
+            return "sell"
         }
-        if normalized.contains("buy") || normalized.contains("entry") || normalized.contains("jump") {
-            return "매수"
+        return "buy"
+    }
+
+    private func signalLogMessage(instrumentName: String, signalType: String) -> String {
+        let normalized = signalType.lowercased()
+        if normalized.contains("watch") || normalized.contains("maintained") || normalized.contains("wait") || normalized.contains("hold") || normalized.contains("관망") {
+            return "\(instrumentName) 관망 신호"
         }
-        return "신호"
+        if normalized.contains("sell") || normalized.contains("exit") {
+            return "\(instrumentName) 매도 신호 생성"
+        }
+        return "\(instrumentName) 매수 신호 생성"
+    }
+
+    private func riskLogMessage(instrumentName: String, decision: String, reason: String, signalType: String?) -> String {
+        let normalizedDecision = decision.lowercased()
+        let normalizedReason = reason.lowercased()
+        let normalizedSignalType = signalType?.lowercased() ?? ""
+
+        if normalizedDecision == "approved" {
+            if normalizedSignalType.contains("sell") || normalizedSignalType.contains("exit") {
+                return "\(instrumentName) 청산 승인"
+            }
+            return "\(instrumentName) 진입 승인"
+        }
+
+        if normalizedReason.contains("daily_trade_limit_reached") {
+            return "\(instrumentName) 일일 거래 한도로 차단"
+        }
+        if normalizedReason.contains("daily_loss_limit_reached") {
+            return "\(instrumentName) 일일 손실 한도로 차단"
+        }
+        if normalizedReason.contains("max_concurrent") {
+            return "\(instrumentName) 동시 보유 한도로 차단"
+        }
+        if normalizedReason.contains("already_holding") || normalizedReason.contains("position_exists") || normalizedReason.contains("block_when_position_exists") {
+            return "\(instrumentName) 보유 중으로 진입 보류"
+        }
+        if normalizedReason.contains("cooldown") || normalizedReason.contains("recent") {
+            return "\(instrumentName) 재진입 대기 중"
+        }
+        return "\(instrumentName) 리스크 규칙으로 차단"
     }
 
 }
@@ -807,17 +860,6 @@ private struct HoldingItem: Identifiable {
     let pnl: Double?
     let pnlPercent: Double?
     var id: String { code }
-}
-
-private struct SignalItem: Identifiable {
-    let id: String
-    let timestamp: Date
-    let name: String
-    let signalLabel: String
-    let signalTone: StatusTone
-    let reason: String
-    let statusText: String
-    let statusTone: StatusTone
 }
 
 private struct OpenOrderItem: Identifiable {
