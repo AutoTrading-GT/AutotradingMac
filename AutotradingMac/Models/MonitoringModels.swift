@@ -415,7 +415,6 @@ struct DataManagementSettingsSnapshot: Decodable, Equatable {
     var autoBackupEnabled: Bool
     var logRetentionDays: Int
     var backupRetentionCount: Int
-    var backupDirectory: String
     var storageUsageBytes: Int?
     var storageUsageLabel: String?
     var lastCleanupAt: Date?
@@ -681,7 +680,6 @@ struct NotificationSettingsUpdatePayload: Encodable {
 struct DataManagementSettingsUpdatePayload: Encodable {
     let autoBackupEnabled: Bool?
     let logRetentionDays: Int?
-    let backupDirectory: String?
 }
 
 struct BasicStrategySettingsUpdatePayload: Encodable {
