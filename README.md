@@ -56,6 +56,16 @@
   - 좌측: 로그 피드(`시간 + 아이콘 + 한 줄 핵심 메시지`)
   - 좌측 각 행에 mode 배지(`PAPER`/`LIVE`/`UNKNOWN`) 표시
   - 상단 mode 필터(`전체`/`PAPER`/`LIVE`/`UNKNOWN`) 지원
+  - 공통 이벤트 스타일 시스템 적용:
+    - 매수 계열: 빨강 아이콘
+    - 매도 계열: 파랑 아이콘
+    - 관망: 회색 아이콘
+    - 보류/차단: 경고색 아이콘
+    - 청산: 공통 청산 아이콘 + 손익/사유 기반 색상
+  - 손익 숫자 색상 규칙:
+    - 이익(+): 빨강
+    - 손실(-): 파랑
+    - 보합(0): 회색
   - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
   - 우측 상세에 `execution_mode`를 명시해 mode 혼선을 줄임
@@ -184,6 +194,7 @@
   - 종목명이 길어도 점수 칩/우측 숫자 컬럼 x/y 정렬이 흔들리지 않도록 `rowMinHeight` 적용
 - 스타일: `design_ref/figma_web_export/src/app/pages/Dashboard.tsx` 정보구조를 SwiftUI 패널/행 컴포지션으로 반영
 - 데이터가 비어 있는 경우 각 섹션은 빈 상태 메시지를 표시
+- `최근 로그`/`미체결 주문`은 Logs 페이지와 동일한 공통 이벤트 스타일 매핑(아이콘/색상)을 사용
 - 계좌 KPI 데이터 소스:
   - `runtime.account_summary.total_account_value`
   - `runtime.account_summary.cash_balance`

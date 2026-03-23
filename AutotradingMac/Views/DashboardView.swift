@@ -261,6 +261,10 @@ struct DashboardView: View {
                     ForEach(openOrderItems) { item in
                         dashboardRow {
                             HStack(spacing: 10) {
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(item.iconColor)
+                                    .frame(width: 14)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.name)
                                         .font(.subheadline.weight(.medium))
@@ -299,12 +303,21 @@ struct DashboardView: View {
                                     .font(.caption.monospacedDigit())
                                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                                     .frame(width: 62, alignment: .leading)
-                                Circle()
-                                    .fill(item.tone.foreground)
-                                    .frame(width: 7, height: 7)
-                                Text(item.message)
-                                    .font(.callout)
-                                    .lineLimit(1)
+                                Image(systemName: item.iconName)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(item.iconColor)
+                                    .frame(width: 14)
+                                HStack(spacing: 3) {
+                                    Text(item.message)
+                                        .font(.callout)
+                                        .lineLimit(1)
+                                    if let trailingAmount = item.trailingAmount {
+                                        Text(trailingAmount)
+                                            .font(.callout.monospacedDigit())
+                                            .lineLimit(1)
+                                            .foregroundStyle(item.trailingAmountColor ?? DesignTokens.Colors.textTertiary)
+                                    }
+                                }
                                 Spacer(minLength: 0)
                             }
                         }
@@ -429,6 +442,7 @@ struct DashboardView: View {
 
     private var signalItems: [SignalItem] {
         Array(store.recentSignals.prefix(6)).map { row in
+            let style = EventVisualStyleResolver.signal(signalType: row.signalType)
             let label: String
             if row.signalType.contains("buy") || row.signalType.contains("entry") {
                 label = "매수"
@@ -443,7 +457,7 @@ struct DashboardView: View {
                 id: row.id,
                 name: row.symbol ?? row.code,
                 signalLabel: label,
-                signalTone: toneForSignalLabel(label),
+                signalTone: style.tone,
                 reason: reason,
                 statusText: "모니터링",
                 statusTone: .neutral
@@ -459,12 +473,15 @@ struct DashboardView: View {
             }
             .prefix(6)
             .map { row in
+                let style = EventVisualStyleResolver.order(side: row.side, status: row.status)
                 OpenOrderItem(
                     id: row.orderId,
                     name: row.symbol ?? row.code,
                     qty: row.orderQty,
                     typeText: row.side == "buy" ? "매수 주문" : "매도 주문",
                     priceText: DisplayFormatters.number(row.orderPrice),
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
                     statusText: row.status,
                     statusTone: .fromStatus(row.status)
                 )
@@ -475,40 +492,63 @@ struct DashboardView: View {
         var items: [DashboardLogItem] = []
         items.append(
             contentsOf: store.recentFills.map { row in
+                let style = EventVisualStyleResolver.fill(side: row.side)
                 DashboardLogItem(
                     id: "fill-\(row.fillId)",
                     timestamp: row.filledAt,
-                    tone: .success,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
                     message: "\(row.symbol ?? row.code) \(DisplayFormatters.number(row.filledQty))주 \(row.sideText) 체결 @ \(DisplayFormatters.number(row.filledPrice))"
                 )
             }
         )
         items.append(
             contentsOf: store.recentOrders.map { row in
+                let style = EventVisualStyleResolver.order(side: row.side, status: row.status)
                 DashboardLogItem(
                     id: "order-\(row.orderId)-\(row.updatedAt.timeIntervalSince1970)",
                     timestamp: row.updatedAt,
-                    tone: .fromStatus(row.status),
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
                     message: "\(row.symbol ?? row.code) \(row.sideText) 주문 \(row.status)"
                 )
             }
         )
         items.append(
             contentsOf: store.recentSignals.map { row in
+                let style = EventVisualStyleResolver.signal(signalType: row.signalType)
                 DashboardLogItem(
                     id: "signal-\(row.id)",
                     timestamp: row.createdAt,
-                    tone: .info,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
                     message: "\(row.symbol ?? row.code) \(row.signalType) 신호 생성"
                 )
             }
         )
         items.append(
+            contentsOf: store.recentClosedPositions.map { row in
+                let style = EventVisualStyleResolver.close(reason: row.reason, realizedPnl: row.realizedPnl)
+                let reasonText = closeReasonText(row.reason)
+                return DashboardLogItem(
+                    id: "closed-\(row.id)",
+                    timestamp: row.createdAt,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    message: "\(row.symbol ?? row.code) \(reasonText)",
+                    trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
+                    trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl)
+                )
+            }
+        )
+        items.append(
             contentsOf: store.recentErrorItems.enumerated().map { idx, value in
+                let style = EventVisualStyleResolver.risk(decision: "blocked", reason: value, signalType: nil)
                 DashboardLogItem(
                     id: "err-\(idx)",
                     timestamp: store.lastUpdatedAt ?? Date(),
-                    tone: .danger,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
                     message: value
                 )
             }
@@ -607,15 +647,13 @@ struct DashboardView: View {
         return .flat
     }
 
-    private func toneForSignalLabel(_ label: String) -> StatusTone {
-        switch label {
-        case "매수":
-            return .success
-        case "매도":
-            return .danger
-        default:
-            return .neutral
-        }
+    private func closeReasonText(_ reason: String?) -> String {
+        let normalized = (reason ?? "").lowercased()
+        if normalized.contains("take_profit") || normalized.contains("익절") { return "익절 청산" }
+        if normalized.contains("stop_loss") || normalized.contains("손절") { return "손절 청산" }
+        if normalized.contains("market_close") || normalized.contains("장마감") { return "장마감 청산" }
+        if normalized.contains("max_holding") || normalized.contains("holding") || normalized.contains("time") { return "보유시간 만료 청산" }
+        return "포지션 청산"
     }
 }
 
@@ -663,6 +701,8 @@ private struct OpenOrderItem: Identifiable {
     let qty: Double?
     let typeText: String
     let priceText: String
+    let iconName: String
+    let iconColor: Color
     let statusText: String
     let statusTone: StatusTone
 }
@@ -670,8 +710,29 @@ private struct OpenOrderItem: Identifiable {
 private struct DashboardLogItem: Identifiable {
     let id: String
     let timestamp: Date
-    let tone: StatusTone
+    let iconName: String
+    let iconColor: Color
     let message: String
+    let trailingAmount: String?
+    let trailingAmountColor: Color?
+
+    init(
+        id: String,
+        timestamp: Date,
+        iconName: String,
+        iconColor: Color,
+        message: String,
+        trailingAmount: String? = nil,
+        trailingAmountColor: Color? = nil
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.iconName = iconName
+        self.iconColor = iconColor
+        self.message = message
+        self.trailingAmount = trailingAmount
+        self.trailingAmountColor = trailingAmountColor
+    }
 }
 
 private enum DashboardTrend {

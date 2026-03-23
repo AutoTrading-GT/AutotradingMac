@@ -113,6 +113,7 @@ struct LogsView: View {
             contentsOf: store.recentSignals.map { signal in
                 let title = instrumentTitle(symbol: signal.symbol, code: signal.code)
                 let displayName = instrumentDisplayName(symbol: signal.symbol, code: signal.code)
+                let style = EventVisualStyleResolver.signal(signalType: signal.signalType)
                 return LogEntry(
                     id: "signal-\(signal.id)",
                     timestamp: signal.createdAt,
@@ -129,8 +130,9 @@ struct LogsView: View {
                     status: signal.signalType,
                     executionMode: normalizeExecutionMode(signal.executionMode ?? signal.orderMode),
                     source: "strategy",
-                    iconName: "dot.radiowaves.left.and.right",
-                    iconTone: .info,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
                     metaPairs: [
                         .init(key: "signal_type", value: signal.signalType),
                         .init(key: "confidence", value: DisplayFormatters.number(signal.confidence)),
@@ -145,6 +147,11 @@ struct LogsView: View {
             contentsOf: store.recentRiskDecisions.map { risk in
                 let title = instrumentTitle(symbol: risk.symbol, code: risk.code)
                 let displayName = instrumentDisplayName(symbol: risk.symbol, code: risk.code)
+                let style = EventVisualStyleResolver.risk(
+                    decision: risk.decision,
+                    reason: risk.reason,
+                    signalType: risk.signalType
+                )
                 return LogEntry(
                     id: "risk-\(risk.id)",
                     timestamp: risk.createdAt,
@@ -162,8 +169,9 @@ struct LogsView: View {
                     status: risk.decision,
                     executionMode: normalizeExecutionMode(risk.executionMode ?? risk.orderMode),
                     source: "risk",
-                    iconName: risk.decision.lowercased() == "blocked" ? "exclamationmark.shield" : "checkmark.shield",
-                    iconTone: risk.decision.lowercased() == "blocked" ? .danger : .success,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
                     metaPairs: [
                         .init(key: "decision", value: risk.decision),
                         .init(key: "blocked", value: optionalBool(risk.blocked)),
@@ -180,6 +188,7 @@ struct LogsView: View {
             contentsOf: store.recentOrders.map { order in
                 let title = instrumentTitle(symbol: order.symbol, code: order.code)
                 let displayName = instrumentDisplayName(symbol: order.symbol, code: order.code)
+                let style = EventVisualStyleResolver.order(side: order.side, status: order.status)
                 return LogEntry(
                     id: "order-\(order.orderId)-\(order.updatedAt.timeIntervalSince1970)",
                     timestamp: order.updatedAt,
@@ -198,8 +207,9 @@ struct LogsView: View {
                     status: order.status,
                     executionMode: normalizeExecutionMode(order.executionMode ?? order.orderMode),
                     source: order.orderMode ?? order.executionMode ?? "execution",
-                    iconName: order.status.lowercased() == "rejected" ? "xmark.circle" : "shippingbox",
-                    iconTone: .fromStatus(order.status),
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
                     metaPairs: [
                         .init(key: "order_id", value: "\(order.orderId)"),
                         .init(key: "side", value: order.side),
@@ -218,6 +228,7 @@ struct LogsView: View {
             contentsOf: store.recentFills.map { fill in
                 let title = instrumentTitle(symbol: fill.symbol, code: fill.code)
                 let displayName = instrumentDisplayName(symbol: fill.symbol, code: fill.code)
+                let style = EventVisualStyleResolver.fill(side: fill.side)
                 return LogEntry(
                     id: "fill-\(fill.fillId)",
                     timestamp: fill.filledAt,
@@ -235,8 +246,9 @@ struct LogsView: View {
                     status: fill.side,
                     executionMode: normalizeExecutionMode(fill.executionMode ?? fill.orderMode),
                     source: fill.orderMode ?? fill.executionMode ?? "execution",
-                    iconName: "checkmark.circle.fill",
-                    iconTone: .success,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
                     metaPairs: [
                         .init(key: "fill_id", value: "\(fill.fillId)"),
                         .init(key: "order_id", value: "\(fill.orderId)"),
@@ -253,6 +265,7 @@ struct LogsView: View {
             contentsOf: store.currentPositions.map { position in
                 let title = instrumentTitle(symbol: position.symbol, code: position.code)
                 let displayName = instrumentDisplayName(symbol: position.symbol, code: position.code)
+                let style = EventVisualStyleResolver.position(pnl: position.unrealizedPnl)
                 return LogEntry(
                     id: "position-updated-\(position.id)-\(position.updatedAt.timeIntervalSince1970)",
                     timestamp: position.updatedAt,
@@ -268,8 +281,9 @@ struct LogsView: View {
                     status: position.side,
                     executionMode: "unknown",
                     source: position.markPriceSource ?? "execution",
-                    iconName: "briefcase",
-                    iconTone: .fromStatus(position.side),
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
                     metaPairs: [
                         .init(key: "side", value: position.side),
                         .init(key: "qty", value: DisplayFormatters.number(position.qty)),
@@ -287,6 +301,7 @@ struct LogsView: View {
             contentsOf: store.recentClosedPositions.map { closed in
                 let title = instrumentTitle(symbol: closed.symbol, code: closed.code)
                 let displayName = instrumentDisplayName(symbol: closed.symbol, code: closed.code)
+                let style = EventVisualStyleResolver.close(reason: closed.reason, realizedPnl: closed.realizedPnl)
                 return LogEntry(
                     id: "position-closed-\(closed.id)",
                     timestamp: closed.createdAt,
@@ -303,8 +318,9 @@ struct LogsView: View {
                     status: closed.reason,
                     executionMode: normalizeExecutionMode(closed.executionMode ?? closed.orderMode),
                     source: "execution",
-                    iconName: "flag.checkered",
-                    iconTone: toneForPnL(closed.realizedPnl),
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
                     metaPairs: [
                         .init(key: "position_id", value: optionalInt(closed.positionId)),
                         .init(key: "closed_qty", value: DisplayFormatters.number(closed.closedQty)),
@@ -363,13 +379,6 @@ struct LogsView: View {
     private func optionalBool(_ value: Bool?) -> String {
         guard let value else { return "-" }
         return value ? "true" : "false"
-    }
-
-    private func toneForPnL(_ value: Double?) -> StatusTone {
-        guard let value else { return .neutral }
-        if value > 0 { return .success }
-        if value < 0 { return .danger }
-        return .neutral
     }
 
     private func normalizeExecutionMode(_ raw: String?) -> String {
@@ -567,6 +576,7 @@ private struct LogEntry: Identifiable {
     let executionMode: String
     let source: String
     let iconName: String
+    let iconColor: Color
     let iconTone: StatusTone
     let metaPairs: [LogMetaPair]
 }
@@ -584,7 +594,7 @@ private struct LogFeedRow: View {
 
             Image(systemName: entry.iconName)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(entry.iconTone.foreground)
+                .foregroundStyle(entry.iconColor)
                 .frame(width: 16)
 
             Text(entry.feedMessage)
@@ -641,7 +651,7 @@ private struct LogDetailPanel: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Image(systemName: entry.iconName)
-                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                        .foregroundStyle(entry.iconColor)
                     Text("Log Detail")
                         .font(.title3.bold())
                     Spacer()
