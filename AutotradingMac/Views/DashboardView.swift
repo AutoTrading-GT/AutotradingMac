@@ -291,7 +291,7 @@ struct DashboardView: View {
     }
 
     private var recentLogsPanel: some View {
-        dashboardPanel(title: "최근 로그", noPadding: true) {
+        dashboardPanel(title: "최근 매매/이벤트", noPadding: true) {
             if logItems.isEmpty {
                 panelEmptyState("표시할 최근 로그가 없습니다.")
             } else {
@@ -409,6 +409,30 @@ struct DashboardView: View {
             )
     }
 
+    private var symbolByCode: [String: String] {
+        var map: [String: String] = [:]
+        func merge(code: String?, symbol: String?) {
+            guard
+                let code,
+                !code.isEmpty,
+                let symbol,
+                !symbol.isEmpty
+            else { return }
+            if map[code] == nil {
+                map[code] = symbol
+            }
+        }
+
+        store.marketRows.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentSignals.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentRiskDecisions.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentOrders.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentFills.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.currentPositions.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentClosedPositions.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        return map
+    }
+
     private var scannerItems: [ScannerItem] {
         Array(store.marketRows.prefix(6)).map { row in
             ScannerItem(
@@ -430,7 +454,7 @@ struct DashboardView: View {
             let percent = basis > 0 && pnl != nil ? (pnl! / basis) * 100.0 : nil
             return HoldingItem(
                 code: row.code,
-                name: (row.symbol ?? "-").isEmpty ? row.code : (row.symbol ?? row.code),
+                name: instrumentName(symbol: row.symbol, code: row.code, fallback: row.code),
                 qty: row.qty,
                 avgPrice: row.avgPrice,
                 currentPrice: price,
@@ -447,7 +471,7 @@ struct DashboardView: View {
         let approvedSignalIDs = Set(approvedDecisions.compactMap(\.signalId))
 
         var items: [SignalItem] = approvedDecisions.map { row in
-            let displayName = row.symbol ?? row.code ?? "종목"
+            let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: "종목")
             let signalType = row.signalType ?? "entry"
             let signalStyle = EventVisualStyleResolver.signal(signalType: signalType)
             let statusTone: StatusTone = signalType.lowercased().contains("sell") || signalType.lowercased().contains("exit")
@@ -475,7 +499,7 @@ struct DashboardView: View {
                 return SignalItem(
                     id: row.id,
                     timestamp: row.createdAt,
-                    name: row.symbol ?? row.code,
+                    name: instrumentName(symbol: row.symbol, code: row.code, fallback: row.code),
                     signalLabel: signalTypeLabel(row.signalType),
                     signalTone: style.tone,
                     reason: row.signalType,
@@ -502,7 +526,7 @@ struct DashboardView: View {
                 let style = EventVisualStyleResolver.order(side: row.side, status: row.status)
                 return OpenOrderItem(
                     id: row.orderId,
-                    name: row.symbol ?? row.code,
+                    name: instrumentName(symbol: row.symbol, code: row.code, fallback: row.code),
                     qty: row.orderQty,
                     typeText: row.side == "buy" ? "매수 주문" : "매도 주문",
                     priceText: DisplayFormatters.number(row.orderPrice),
@@ -519,12 +543,13 @@ struct DashboardView: View {
         items.append(
             contentsOf: store.recentFills.map { row in
                 let style = EventVisualStyleResolver.fill(side: row.side)
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code)
                 return DashboardLogItem(
                     id: "fill-\(row.fillId)",
                     timestamp: row.filledAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(DisplayFormatters.number(row.filledQty))주 \(row.sideText) 체결 @ \(DisplayFormatters.number(row.filledPrice))",
+                    message: "\(displayName) \(DisplayFormatters.number(row.filledQty))주 \(row.sideText) 체결 @ \(DisplayFormatters.number(row.filledPrice))",
                     kind: .fill,
                     code: row.code,
                     orderId: row.orderId,
@@ -537,12 +562,13 @@ struct DashboardView: View {
         items.append(
             contentsOf: store.recentOrders.map { row in
                 let style = EventVisualStyleResolver.order(side: row.side, status: row.status)
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code)
                 return DashboardLogItem(
                     id: "order-\(row.orderId)-\(row.updatedAt.timeIntervalSince1970)",
                     timestamp: row.updatedAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(row.sideText) 주문 \(row.status)",
+                    message: "\(displayName) \(row.sideText) 주문 \(row.status)",
                     kind: .order,
                     code: row.code,
                     orderId: row.orderId,
@@ -556,12 +582,13 @@ struct DashboardView: View {
             contentsOf: store.recentSignals.compactMap { row in
                 guard ResultFeedReducer.isActionableSignalType(row.signalType) else { return nil }
                 let style = EventVisualStyleResolver.signal(signalType: row.signalType)
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code)
                 return DashboardLogItem(
                     id: "signal-\(row.id)",
                     timestamp: row.createdAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(row.signalType) 신호 생성",
+                    message: "\(displayName) \(row.signalType) 신호 생성",
                     kind: .signal,
                     code: row.code,
                     orderId: nil,
@@ -575,12 +602,13 @@ struct DashboardView: View {
             contentsOf: store.recentClosedPositions.map { row in
                 let style = EventVisualStyleResolver.close(reason: row.reason, realizedPnl: row.realizedPnl)
                 let reasonText = closeReasonText(row.reason)
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code ?? "종목")
                 return DashboardLogItem(
                     id: "closed-\(row.id)",
                     timestamp: row.createdAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(row.symbol ?? row.code) \(reasonText)",
+                    message: "\(displayName) \(reasonText)",
                     trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
                     trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl),
                     kind: .close,
@@ -716,6 +744,19 @@ struct DashboardView: View {
         if value > 0 { return .up }
         if value < 0 { return .down }
         return .flat
+    }
+
+    private func instrumentName(symbol: String?, code: String?, fallback: String) -> String {
+        if let symbol, !symbol.isEmpty {
+            return symbol
+        }
+        if let code, !code.isEmpty, let mapped = symbolByCode[code] {
+            return mapped
+        }
+        if let code, !code.isEmpty {
+            return code
+        }
+        return fallback
     }
 
     private func closeReasonText(_ reason: String?) -> String {
