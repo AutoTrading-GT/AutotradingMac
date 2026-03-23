@@ -3,12 +3,14 @@
 //  AutotradingMac
 //
 
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var store: MonitoringStore
     let mode: SettingsPageMode
     @State private var showAdvancedSettings = false
+    @State private var backupDirectoryDraft = ""
 
     var body: some View {
         ScrollView {
@@ -27,6 +29,14 @@ struct SettingsView: View {
             guard mode == .settings else { return }
             await store.reloadAppSettings()
             await store.refreshNotificationAuthorizationStatus()
+            backupDirectoryDraft = store.appSettings?.dataManagement.backupDirectory ?? ""
+        }
+        .onChange(of: store.appSettings?.dataManagement.backupDirectory) { _, newValue in
+            guard mode == .settings else { return }
+            let normalized = newValue ?? ""
+            if backupDirectoryDraft != normalized {
+                backupDirectoryDraft = normalized
+            }
         }
         .safeAreaInset(edge: .bottom) {
             if mode == .stategy {
@@ -2390,6 +2400,15 @@ struct SettingsView: View {
                 isSaving: store.isSavingAppSetting(.logRetentionDays),
                 disabled: store.appSettings == nil
             )
+            pathSettingsRow(
+                icon: "folder",
+                title: "백업 디렉토리",
+                text: $backupDirectoryDraft,
+                isSaving: store.isSavingAppSetting(.backupDirectory),
+                disabled: store.appSettings == nil,
+                onSubmit: submitBackupDirectory,
+                onPickDirectory: chooseBackupDirectory
+            )
             settingsRow(
                 icon: "tray.full",
                 title: "백업 보관 개수",
@@ -2565,6 +2584,48 @@ struct SettingsView: View {
         .padding(.vertical, 9)
     }
 
+    private func pathSettingsRow(
+        icon: String,
+        title: String,
+        text: Binding<String>,
+        isSaving: Bool,
+        disabled: Bool,
+        onSubmit: @escaping () -> Void,
+        onPickDirectory: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(width: 14)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+            Spacer(minLength: 8)
+            TextField("서버 백업 경로", text: text)
+                .textFieldStyle(.roundedBorder)
+                .font(.caption.monospaced())
+                .disabled(disabled || isSaving)
+                .frame(minWidth: 220, idealWidth: 320, maxWidth: 380)
+                .onSubmit(onSubmit)
+            if isSaving {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Button("선택…", action: onPickDirectory)
+                .buttonStyle(.borderless)
+                .disabled(disabled || isSaving)
+            Button("적용", action: onSubmit)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(disabled || isSaving || text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
     private func settingsStatusCaption(_ status: AppSettingsStatusMessage) -> some View {
         Text(status.text)
             .font(.caption2)
@@ -2663,6 +2724,30 @@ struct SettingsView: View {
     private var backupRetentionCountText: String {
         guard let count = store.appSettings?.dataManagement.backupRetentionCount else { return "-" }
         return "최신 \(count)개 유지"
+    }
+
+    private func submitBackupDirectory() {
+        let target = backupDirectoryDraft
+        Task {
+            await store.updateBackupDirectory(target)
+        }
+    }
+
+    private func chooseBackupDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "선택"
+        panel.message = "자동 백업을 저장할 서버 경로를 선택하세요."
+        let current = backupDirectoryDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !current.isEmpty {
+            panel.directoryURL = URL(fileURLWithPath: current)
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        backupDirectoryDraft = url.path
+        submitBackupDirectory()
     }
 
     private var cleanupStatusText: String {

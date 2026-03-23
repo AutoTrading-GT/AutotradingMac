@@ -242,7 +242,8 @@ final class MonitoringStore: ObservableObject {
                     notifications: nil,
                     dataManagement: DataManagementSettingsUpdatePayload(
                         autoBackupEnabled: enabled,
-                        logRetentionDays: nil
+                        logRetentionDays: nil,
+                        backupDirectory: nil
                     )
                 )
             )
@@ -281,7 +282,8 @@ final class MonitoringStore: ObservableObject {
                     notifications: nil,
                     dataManagement: DataManagementSettingsUpdatePayload(
                         autoBackupEnabled: nil,
-                        logRetentionDays: normalized
+                        logRetentionDays: normalized,
+                        backupDirectory: nil
                     )
                 )
             )
@@ -302,6 +304,53 @@ final class MonitoringStore: ObservableObject {
         }
 
         appSettingsSavingKeys.remove(AppSettingsSaveKey.logRetentionDays.rawValue)
+    }
+
+    func updateBackupDirectory(_ directory: String) async {
+        guard let current = appSettings else { return }
+        let trimmed = directory.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            let message = "백업 경로를 입력하세요."
+            appSettingsErrorMessage = message
+            dataManagementPanelStatus = .error(message)
+            return
+        }
+
+        let previous = current
+        var next = current
+        next.dataManagement.backupDirectory = trimmed
+        appSettings = next
+        appSettingsSavingKeys.insert(AppSettingsSaveKey.backupDirectory.rawValue)
+        dataManagementPanelStatus = .saving("저장 중...")
+
+        do {
+            let response = try await apiClient.updateAppSettings(
+                AppSettingsUpdatePayload(
+                    notifications: nil,
+                    dataManagement: DataManagementSettingsUpdatePayload(
+                        autoBackupEnabled: nil,
+                        logRetentionDays: nil,
+                        backupDirectory: trimmed
+                    )
+                )
+            )
+            applyAppSettingsEnvelope(
+                data: response.data,
+                defaults: response.defaults,
+                updatedAt: response.updatedAt
+            )
+            dataManagementPanelStatus = .success("백업 경로가 저장되었습니다.")
+            scheduleStatusMessageClear(for: .dataManagement)
+            scheduleAppSettingsRefresh()
+            appSettingsErrorMessage = nil
+        } catch {
+            appSettings = previous
+            let message = appSettingsErrorText(prefix: "백업 경로 저장 실패", error: error)
+            appSettingsErrorMessage = message
+            dataManagementPanelStatus = .error(message)
+        }
+
+        appSettingsSavingKeys.remove(AppSettingsSaveKey.backupDirectory.rawValue)
     }
 
     func isSavingAppSetting(_ key: AppSettingsSaveKey) -> Bool {
@@ -2400,6 +2449,7 @@ enum AppSettingsSaveKey: String {
     case systemErrorNotificationsEnabled = "notifications.system_error_notifications_enabled"
     case autoBackupEnabled = "data_management.auto_backup_enabled"
     case logRetentionDays = "data_management.log_retention_days"
+    case backupDirectory = "data_management.backup_directory"
 }
 
 protocol LocalNotificationServiceProtocol {

@@ -957,6 +957,7 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
                 autoBackupEnabled: true,
                 logRetentionDays: 30,
                 backupRetentionCount: 7,
+                backupDirectory: "/tmp/autotrading-backups",
                 storageUsageBytes: 25 * 1024 * 1024,
                 storageUsageLabel: "25.0 MB"
             )
