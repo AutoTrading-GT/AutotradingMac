@@ -242,11 +242,13 @@ struct DashboardView: View {
                                         .lineLimit(1)
                                         .truncationMode(.tail)
                                 }
-                                Spacer(minLength: 8)
-                                HStack(spacing: 6) {
-                                    signalBadge(item.action.label, tone: actionTone(item.action))
-                                    StatusBadge(text: item.status.label, tone: statusTone(item.status))
-                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                signalBadge(item.action.label, tone: actionTone(item.action))
+                                    .frame(width: DashboardSignalColumns.actionWidth, alignment: .center)
+
+                                StatusBadge(text: item.status.label, tone: statusTone(item.status))
+                                    .frame(width: DashboardSignalColumns.statusWidth, alignment: .center)
                             }
                         }
                     }
@@ -839,6 +841,11 @@ private enum DashboardScannerColumns {
     static let scoreWidth: CGFloat = 42
     static let priceChangeWidth: CGFloat = 112
     static let metricWidth: CGFloat = 80
+}
+
+private enum DashboardSignalColumns {
+    static let actionWidth: CGFloat = 56
+    static let statusWidth: CGFloat = 74
 }
 
 private struct ScannerItem: Identifiable {
