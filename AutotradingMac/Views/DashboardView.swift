@@ -609,14 +609,14 @@ struct DashboardView: View {
                     iconName: style.iconName,
                     iconColor: style.iconColor,
                     message: "\(displayName) \(reasonText)",
-                    trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
-                    trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl),
                     kind: .close,
                     code: row.code,
                     orderId: nil,
                     sourceOrderId: row.sourceOrderId,
                     side: "sell",
-                    status: row.reason
+                    status: row.reason,
+                    trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
+                    trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl)
                 )
             }
         )
