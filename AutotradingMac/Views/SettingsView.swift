@@ -2185,7 +2185,7 @@ struct SettingsView: View {
         binding: @escaping (String) -> Binding<Bool>
     ) -> some View {
         let resolvedOptions = options.isEmpty ? strategySignalTypeOptions : options
-        VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 8) {
             ForEach(resolvedOptions, id: \.self) { type in
                 HStack(spacing: 10) {
                     Toggle("", isOn: binding(type))
