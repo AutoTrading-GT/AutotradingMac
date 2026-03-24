@@ -191,13 +191,16 @@
     - 눌림 정의: `pullback_retrace_min/max_pct`, `pullback_bars_min/max`
     - 재진입 조건: `reentry_volume_multiplier`, `use_vwap_filter`, `require_vwap_reclaim`
     - 시장제도 / 거래안전 필터: `exclude_recently_listed_enabled/days`, `exclude_short_term_overheated_enabled`, `exclude_market_warning_enabled`, `exclude_recent_vi_enabled`, `recent_vi_lookback_minutes`
+    - 체결 품질 필터: `use_spread_filter`, `max_spread_pct`, `use_orderbook_depth_filter`, `min_best_bid_size`, `min_best_ask_size`, `max_orderbook_imbalance_ratio`
     - 청산: `initial_stop_pct`, `first_take_profit_r_multiple`, `first_take_profit_partial_ratio`, `time_stop_soft_minutes`, `time_stop_hard_minutes`
   - 1차 구현 범위/제약:
-    - 현재 엔진 연결 범위는 1분봉 OHLCV, 거래대금/급등률 rank, VWAP, 시장제도/거래안전 필터, 부분익절, 시간청산까지다
+    - 현재 엔진 연결 범위는 1분봉 OHLCV, 거래대금/급등률 rank, VWAP, 시장제도/거래안전 필터, 1호가 기준 스프레드/잔량 필터, 부분익절, 시간청산까지다
     - 시장제도/거래안전 필터 데이터 소스:
       - 신규상장 초기 제외: 1일봉 개수 기반
       - 단기과열/시장경보/최근 VI: 저장된 `market.tick` 필드 기반
-    - 호가 잔량, 스프레드 필터는 아직 미구현이다
+    - 체결 품질 필터 데이터 소스:
+      - KIS `주식현재가 호가/예상체결` 응답의 `askp1/bidp1`, `askp_rsqn1/bidp_rsqn1`
+      - 현재 구현 범위는 1호가 기준이며 2~10호가 깊이 기반 필터는 TODO다
     - 포지션 사이징은 공통 `position_size_pct`를 그대로 사용하며 risk-per-trade sizing은 TODO다
   - 입력 컨트롤 규칙:
     - 정수 범위/단계값(`Top-N`, 보유시간, 최대 거래 횟수, 동시 보유 수)은 stepper형

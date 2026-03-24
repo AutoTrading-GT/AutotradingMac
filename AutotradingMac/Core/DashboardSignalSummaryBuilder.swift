@@ -306,6 +306,21 @@ enum DashboardSignalSummaryBuilder {
         if normalized.contains("recent_vi_excluded") {
             return "최근 VI 발동 종목이라 진입 제외"
         }
+        if normalized.contains("spread_too_wide") {
+            return "스프레드가 넓어 진입 제외"
+        }
+        if normalized.contains("orderbook_depth_insufficient") {
+            return "호가잔량 부족으로 진입 제외"
+        }
+        if normalized.contains("orderbook_imbalance_exceeded") {
+            return "호가 불균형이 커서 진입 제외"
+        }
+        if normalized.contains("spread_data_unavailable") {
+            return "스프레드 데이터 미확보"
+        }
+        if normalized.contains("orderbook_data_unavailable") {
+            return "호가 데이터 미확보"
+        }
         if normalized.contains("daily_loss_limit_account_value_unavailable") {
             return "계좌 기준값 미확보"
         }

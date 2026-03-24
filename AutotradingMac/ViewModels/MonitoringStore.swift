@@ -1457,6 +1457,12 @@ final class MonitoringStore: ObservableObject {
             "exclude_market_warning_enabled": .bool(true),
             "exclude_recent_vi_enabled": .bool(true),
             "recent_vi_lookback_minutes": .number(10),
+            "use_spread_filter": .bool(true),
+            "max_spread_pct": .number(0.35),
+            "use_orderbook_depth_filter": .bool(true),
+            "min_best_bid_size": .number(300),
+            "min_best_ask_size": .number(300),
+            "max_orderbook_imbalance_ratio": .number(4.0),
             "initial_stop_pct": .number(1.2),
             "first_take_profit_r_multiple": .number(1.5),
             "first_take_profit_partial_ratio": .number(0.5),
@@ -1729,6 +1735,26 @@ final class MonitoringStore: ObservableObject {
             let recentVILookbackMinutes = activeStrategyParams.intValue(for: "recent_vi_lookback_minutes") ?? 0
             if !(1...120).contains(recentVILookbackMinutes) {
                 errors.append("최근 VI 확인 시간은 1~120분 범위여야 합니다.")
+            }
+
+            let maxSpreadPct = activeStrategyParams.doubleValue(for: "max_spread_pct") ?? 0
+            if maxSpreadPct <= 0 || maxSpreadPct > 10 {
+                errors.append("최대 스프레드는 0 초과 10 이하 범위여야 합니다.")
+            }
+
+            let minBestBidSize = activeStrategyParams.intValue(for: "min_best_bid_size") ?? 0
+            if !(1...1_000_000).contains(minBestBidSize) {
+                errors.append("최소 매수호가 잔량은 1~1,000,000주 범위여야 합니다.")
+            }
+
+            let minBestAskSize = activeStrategyParams.intValue(for: "min_best_ask_size") ?? 0
+            if !(1...1_000_000).contains(minBestAskSize) {
+                errors.append("최소 매도호가 잔량은 1~1,000,000주 범위여야 합니다.")
+            }
+
+            let maxOrderbookImbalanceRatio = activeStrategyParams.doubleValue(for: "max_orderbook_imbalance_ratio") ?? 0
+            if maxOrderbookImbalanceRatio < 1 || maxOrderbookImbalanceRatio > 100 {
+                errors.append("최대 호가 불균형 비율은 1 이상 100 이하 범위여야 합니다.")
             }
 
             let initialStopPct = activeStrategyParams.doubleValue(for: "initial_stop_pct") ?? 0

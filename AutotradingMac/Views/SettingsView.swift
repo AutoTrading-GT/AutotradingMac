@@ -678,7 +678,7 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     strategyCompactNote(
                                         title: "현재 구현",
-                                        detail: "1분봉, 거래대금/급등률 rank, VWAP, 거래량 재증가, 부분익절, 시간청산까지 반영됩니다."
+                                        detail: "1분봉, 거래대금/급등률 rank, VWAP, 시장제도 필터, 1호가 스프레드/잔량 필터, 부분익절, 시간청산까지 반영됩니다."
                                     )
                                     strategyCompactNote(
                                         title: "시장제도 필터",
@@ -984,6 +984,111 @@ struct SettingsView: View {
                                                 range: 1...120
                                             )
                                         }
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+
+                strategyCategoryBlock(
+                    title: "체결 품질 필터",
+                    summary: "최우선 호가 스프레드와 1호가 잔량/불균형을 확인해 실제 체결 품질이 나쁜 종목을 제외합니다."
+                ) {
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(
+                                title: "스프레드",
+                                tooltip: "최우선 매도호가와 매수호가의 차이를 mid price 대비 비율로 계산합니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "스프레드 필터 사용",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "use_spread_filter") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("use_spread_filter", value: $0) }
+                                        )
+                                    )
+                                    strategyBandNumericField(
+                                        label: "최대 스프레드",
+                                        unit: "%",
+                                        text: openingDoubleText(params, key: "max_spread_pct"),
+                                        onChange: {
+                                            store.updateActiveStrategyParamDouble(
+                                                "max_spread_pct",
+                                                value: parseOptionalDouble($0) ?? 0.01,
+                                                range: 0.01...10
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        second: {
+                            strategyBandSegment(
+                                title: "최소 잔량",
+                                tooltip: "최우선 매수/매도호가 잔량이 너무 얇으면 실제 진입 주문 슬리피지가 커질 수 있습니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "호가잔량 필터 사용",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "use_orderbook_depth_filter") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("use_orderbook_depth_filter", value: $0) }
+                                        )
+                                    )
+                                    strategyBandStepperTile(
+                                        label: "최소 매수호가 잔량",
+                                        value: params.intValue(for: "min_best_bid_size") ?? 300,
+                                        range: 1...1_000_000,
+                                        step: 50,
+                                        unit: "주",
+                                        onChange: {
+                                            store.updateActiveStrategyParamInt(
+                                                "min_best_bid_size",
+                                                value: $0,
+                                                range: 1...1_000_000
+                                            )
+                                        }
+                                    )
+                                    strategyBandStepperTile(
+                                        label: "최소 매도호가 잔량",
+                                        value: params.intValue(for: "min_best_ask_size") ?? 300,
+                                        range: 1...1_000_000,
+                                        step: 50,
+                                        unit: "주",
+                                        onChange: {
+                                            store.updateActiveStrategyParamInt(
+                                                "min_best_ask_size",
+                                                value: $0,
+                                                range: 1...1_000_000
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        third: {
+                            strategyBandSegment(
+                                title: "호가 불균형",
+                                tooltip: "현재 엔진은 호가/예상체결 API의 최우선 1호가 잔량만 사용합니다. 2~10호가 깊이는 후속 TODO입니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandNumericField(
+                                        label: "최대 비율",
+                                        unit: "x",
+                                        text: openingDoubleText(params, key: "max_orderbook_imbalance_ratio"),
+                                        onChange: {
+                                            store.updateActiveStrategyParamDouble(
+                                                "max_orderbook_imbalance_ratio",
+                                                value: parseOptionalDouble($0) ?? 1.0,
+                                                range: 1...100
+                                            )
+                                        }
+                                    )
+                                    strategyCompactNote(
+                                        title: "현재 구현 범위",
+                                        detail: "KIS `주식현재가 호가/예상체결` 응답의 1호가(`askp1/bidp1`, `askp_rsqn1/bidp_rsqn1`) 기준으로만 차단합니다."
                                     )
                                 }
                             }

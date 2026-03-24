@@ -36,6 +36,20 @@ final class AutotradingMacTests: XCTestCase {
             snapshot.strategyParams["opening_pullback_reentry"]?["recent_vi_lookback_minutes"]?.intValue,
             10
         )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["max_spread_pct"]?.doubleValue,
+            0.35,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["min_best_bid_size"]?.intValue,
+            300
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["max_orderbook_imbalance_ratio"]?.doubleValue,
+            4.0,
+            accuracy: 0.0001
+        )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
     }
@@ -627,6 +641,45 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(rows.first?.status, .blocked)
         XCTAssertEqual(rows.first?.summary, "최근 VI 발동 종목이라 진입 제외")
         XCTAssertEqual(rows.first?.strategyLabel, "Opening Pullback Re-entry")
+    }
+
+    func test_dashboardSignalSummary_mapsSpreadBlockReason() {
+        let now = Date()
+        let rows = DashboardSignalSummaryBuilder.build(
+            signals: [],
+            strategyEvents: [
+                .init(
+                    eventId: 22,
+                    eventType: "strategy.signal_filtered",
+                    code: "005930",
+                    symbol: "삼성전자",
+                    strategyId: "opening_pullback_reentry",
+                    strategyDisplayName: "Opening Pullback Re-entry",
+                    signalType: "opening_pullback_reentry",
+                    stage: "signal",
+                    reason: "spread_too_wide",
+                    reasonCode: "spread_too_wide",
+                    summary: nil,
+                    selectionMode: "turnover",
+                    rankCurrent: 2,
+                    sourceSnapshotId: 10,
+                    candidateMetric: 1_500_000_000,
+                    details: nil,
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    createdAt: now
+                )
+            ],
+            riskDecisions: [],
+            orders: [],
+            fills: [],
+            closedPositions: [],
+            symbolByCode: ["005930": "삼성전자"]
+        )
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.status, .blocked)
+        XCTAssertEqual(rows.first?.summary, "스프레드가 넓어 진입 제외")
     }
 
     func test_connectionStatusResolver_reportsConnectedWhenRuntimeAndWebSocketAreHealthy() {

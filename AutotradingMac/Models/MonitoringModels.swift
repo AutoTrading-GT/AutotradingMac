@@ -671,7 +671,7 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                 status: activeStrategyId == "opening_pullback_reentry" ? "active" : "available",
                 wiredToEngine: true,
                 selectable: true,
-                implementationNote: "1차 버전은 rank 상위 후보 + 1분봉 + VWAP + 신규상장/단기과열/시장경보/최근 VI 필터 + 부분익절/시간청산까지 엔진에 연결되어 있습니다. 호가/스프레드/호가잔량 필터는 아직 미구현입니다.",
+                implementationNote: "1차 버전은 rank 상위 후보 + 1분봉 + VWAP + 신규상장/단기과열/시장경보/최근 VI 필터 + 1호가 기준 스프레드/호가잔량 필터 + 부분익절/시간청산까지 엔진에 연결되어 있습니다. 2~10호가 깊이 기반 필터는 후속 TODO입니다.",
                 configurableFields: [
                     StrategyConfigurableFieldSnapshot(
                         fieldId: "selection_mode",
@@ -831,6 +831,66 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                         description: "VI 회피를 위해 되돌아볼 시간창입니다.",
                         options: nil,
                         unit: "minutes",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "use_spread_filter",
+                        label: "스프레드 필터 사용",
+                        inputType: "bool",
+                        group: "execution_quality",
+                        description: "최우선 매도/매수호가 스프레드가 넓은 종목을 진입 직전 제외합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_spread_pct",
+                        label: "최대 스프레드",
+                        inputType: "float",
+                        group: "execution_quality",
+                        description: "mid price 대비 허용 가능한 최대 스프레드 비율입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "use_orderbook_depth_filter",
+                        label: "호가잔량 필터 사용",
+                        inputType: "bool",
+                        group: "execution_quality",
+                        description: "최우선 매수/매도호가 잔량과 불균형을 진입 필터에 사용합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "min_best_bid_size",
+                        label: "최소 매수호가 잔량",
+                        inputType: "int",
+                        group: "execution_quality",
+                        description: "최우선 매수호가 잔량이 이 수량보다 적으면 진입을 막습니다.",
+                        options: nil,
+                        unit: "shares",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "min_best_ask_size",
+                        label: "최소 매도호가 잔량",
+                        inputType: "int",
+                        group: "execution_quality",
+                        description: "최우선 매도호가 잔량이 이 수량보다 적으면 진입을 막습니다.",
+                        options: nil,
+                        unit: "shares",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_orderbook_imbalance_ratio",
+                        label: "최대 호가 불균형",
+                        inputType: "float",
+                        group: "execution_quality",
+                        description: "최우선 양방향 호가 잔량 비율이 이 값을 넘으면 진입을 막습니다.",
+                        options: nil,
+                        unit: "x",
                         wired: true
                     ),
                     StrategyConfigurableFieldSnapshot(
@@ -1116,6 +1176,12 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
                 "exclude_market_warning_enabled": .bool(true),
                 "exclude_recent_vi_enabled": .bool(true),
                 "recent_vi_lookback_minutes": .number(10),
+                "use_spread_filter": .bool(true),
+                "max_spread_pct": .number(0.35),
+                "use_orderbook_depth_filter": .bool(true),
+                "min_best_bid_size": .number(300),
+                "min_best_ask_size": .number(300),
+                "max_orderbook_imbalance_ratio": .number(4.0),
                 "initial_stop_pct": .number(1.2),
                 "first_take_profit_r_multiple": .number(1.5),
                 "first_take_profit_partial_ratio": .number(0.5),
