@@ -50,6 +50,21 @@ final class AutotradingMacTests: XCTestCase {
             4.0,
             accuracy: 0.0001
         )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["risk_per_trade_pct"]?.doubleValue,
+            0.35,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["max_position_size_pct_cap"]?.doubleValue,
+            10.0,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["sizing_slippage_buffer_pct"]?.doubleValue,
+            0.15,
+            accuracy: 0.0001
+        )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
     }
@@ -81,6 +96,11 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(
             store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["exclude_recently_listed_enabled"]?.boolValue,
             true
+        )
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["risk_per_trade_pct"]?.doubleValue,
+            0.35,
+            accuracy: 0.0001
         )
         XCTAssertTrue(
             store.strategyDraft?.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false

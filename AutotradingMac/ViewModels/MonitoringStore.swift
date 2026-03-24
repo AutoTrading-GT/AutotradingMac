@@ -1463,6 +1463,10 @@ final class MonitoringStore: ObservableObject {
             "min_best_bid_size": .number(300),
             "min_best_ask_size": .number(300),
             "max_orderbook_imbalance_ratio": .number(4.0),
+            "use_risk_per_trade_sizing": .bool(true),
+            "risk_per_trade_pct": .number(0.35),
+            "max_position_size_pct_cap": .number(10.0),
+            "sizing_slippage_buffer_pct": .number(0.15),
             "initial_stop_pct": .number(1.2),
             "first_take_profit_r_multiple": .number(1.5),
             "first_take_profit_partial_ratio": .number(0.5),
@@ -1755,6 +1759,21 @@ final class MonitoringStore: ObservableObject {
             let maxOrderbookImbalanceRatio = activeStrategyParams.doubleValue(for: "max_orderbook_imbalance_ratio") ?? 0
             if maxOrderbookImbalanceRatio < 1 || maxOrderbookImbalanceRatio > 100 {
                 errors.append("최대 호가 불균형 비율은 1 이상 100 이하 범위여야 합니다.")
+            }
+
+            let riskPerTradePct = activeStrategyParams.doubleValue(for: "risk_per_trade_pct") ?? 0
+            if riskPerTradePct <= 0 || riskPerTradePct > 10 {
+                errors.append("거래당 최대 손실 비율은 0 초과 10 이하 범위여야 합니다.")
+            }
+
+            let maxPositionSizePctCap = activeStrategyParams.doubleValue(for: "max_position_size_pct_cap") ?? 0
+            if maxPositionSizePctCap <= 0 || maxPositionSizePctCap > 100 {
+                errors.append("최대 포지션 상한은 0 초과 100 이하 범위여야 합니다.")
+            }
+
+            let sizingSlippageBufferPct = activeStrategyParams.doubleValue(for: "sizing_slippage_buffer_pct") ?? -1
+            if sizingSlippageBufferPct < 0 || sizingSlippageBufferPct > 5 {
+                errors.append("사이징 슬리피지 버퍼는 0 이상 5 이하 범위여야 합니다.")
             }
 
             let initialStopPct = activeStrategyParams.doubleValue(for: "initial_stop_pct") ?? 0

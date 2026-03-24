@@ -1097,6 +1097,92 @@ struct SettingsView: View {
                 }
 
                 strategyCategoryBlock(
+                    title: "포지션 사이징",
+                    summary: "이 전략은 진입 금액 비율이 아니라, 한 거래에서 허용할 손실과 손절 거리로 수량을 계산할 수 있습니다."
+                ) {
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(
+                                title: "리스크 기준",
+                                tooltip: "계좌의 몇 %를 살지가 아니라, 한 거래에서 계좌의 몇 %까지 손실을 허용할지를 먼저 정합니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "리스크 사이징 사용",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "use_risk_per_trade_sizing") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("use_risk_per_trade_sizing", value: $0) }
+                                        )
+                                    )
+                                    strategyBandNumericField(
+                                        label: "거래당 최대 손실",
+                                        unit: "%",
+                                        text: openingDoubleText(params, key: "risk_per_trade_pct"),
+                                        onChange: {
+                                            store.updateActiveStrategyParamDouble(
+                                                "risk_per_trade_pct",
+                                                value: parseOptionalDouble($0) ?? 0.01,
+                                                range: 0.01...10
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        second: {
+                            strategyBandSegment(
+                                title: "안전 상한",
+                                tooltip: "손절폭이 매우 좁을 때 risk-per-trade 결과가 과도하게 커지지 않도록 포지션 금액 상한을 둡니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandNumericField(
+                                        label: "최대 포지션 상한",
+                                        unit: "%",
+                                        text: openingDoubleText(params, key: "max_position_size_pct_cap"),
+                                        onChange: {
+                                            store.updateActiveStrategyParamDouble(
+                                                "max_position_size_pct_cap",
+                                                value: parseOptionalDouble($0) ?? 0.1,
+                                                range: 0.1...100
+                                            )
+                                        }
+                                    )
+                                    strategyCompactNote(
+                                        title: "공통 포지션 비율과의 관계",
+                                        detail: "다른 전략은 계속 공통 `position_size_pct`를 사용하고, Opening 전략은 리스크 사이징을 끄면 그 경로로 fallback합니다."
+                                    )
+                                }
+                            }
+                        },
+                        third: {
+                            strategyBandSegment(
+                                title: "보수 버퍼",
+                                tooltip: "체결가가 예상보다 조금 불리하게 나올 수 있다는 가정으로 주당 리스크를 더 크게 잡습니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandNumericField(
+                                        label: "슬리피지 버퍼",
+                                        unit: "%",
+                                        text: openingDoubleText(params, key: "sizing_slippage_buffer_pct"),
+                                        onChange: {
+                                            store.updateActiveStrategyParamDouble(
+                                                "sizing_slippage_buffer_pct",
+                                                value: parseOptionalDouble($0) ?? 0,
+                                                range: 0.0...5.0
+                                            )
+                                        }
+                                    )
+                                    strategyCompactNote(
+                                        title: "현재 계산식",
+                                        detail: "허용 손실 금액 / (주당 손절 리스크 + 버퍼)로 수량을 계산하고, 최종 수량은 1주 단위로 내림 처리합니다."
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+
+                strategyCategoryBlock(
                     title: "청산",
                     summary: "초기 손절, 1차 부분익절, soft/hard time stop으로 1차 버전 청산 규칙을 관리합니다."
                 ) {
@@ -1178,18 +1264,18 @@ struct SettingsView: View {
                 }
 
                 strategyPanel(
-                    title: "1차 구현 메모",
-                    subtitle: "현재 포지션 사이징은 공통 `position_size_pct`를 그대로 사용합니다.",
+                    title: "구현 메모",
+                    subtitle: "현재는 stop 기반 risk-per-trade sizing까지 연결되어 있고, 더 정교한 체결 모델은 아직 포함하지 않습니다.",
                     prominence: .secondary
                 ) {
                     VStack(alignment: .leading, spacing: 10) {
                         strategyCompactNote(
                             title: "현재 적용",
-                            detail: "신규 진입 수량은 손절거리 기반 risk-per-trade가 아니라 공통 포지션 비율로 계산됩니다."
+                            detail: "수량은 stop price 우선, 없으면 pullback low, 마지막으로 signal payload의 initial_stop_pct 기반으로 계산합니다."
                         )
                         strategyCompactNote(
-                            title: "향후 확장",
-                            detail: "손절 거리 기반 risk-per-trade sizing, 호가/스프레드/호가잔량 필터는 2차 작업으로 남겨둡니다."
+                            title: "현재 제약",
+                            detail: "고급 슬리피지 모델이나 예상 체결량 모델은 아직 없고, 보수 버퍼와 포지션 상한으로만 과도한 사이징을 막습니다."
                         )
                     }
                     .padding(.horizontal, 18)
