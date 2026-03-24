@@ -99,7 +99,7 @@ final class MonitoringStore: ObservableObject {
         return formatter
     }()
 
-    init() {
+    convenience init() {
         self.init(
             apiClient: MonitoringAPIClient(),
             webSocketClient: MonitoringWebSocketClient(),
