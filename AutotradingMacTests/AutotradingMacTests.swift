@@ -9,6 +9,46 @@ import XCTest
 @testable import AutotradingMac
 
 final class AutotradingMacTests: XCTestCase {
+    func test_strategySettingsSnapshot_buildsFallbackMultiStrategyCatalogFromLegacyInit() {
+        let snapshot = Self.makeStrategySettingsSnapshot()
+
+        XCTAssertEqual(snapshot.activeStrategyId, "turnover_surge_momentum")
+        XCTAssertEqual(snapshot.strategyTemplates.map(\.strategyId), ["turnover_surge_momentum", "intraday_breakout"])
+        XCTAssertEqual(snapshot.template(id: "turnover_surge_momentum")?.status, "active")
+        XCTAssertEqual(snapshot.template(id: "intraday_breakout")?.status, "preview_only")
+        XCTAssertEqual(
+            snapshot.strategyParams["turnover_surge_momentum"]?["selection_mode"]?.stringValue,
+            "turnover"
+        )
+        XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
+    }
+
+    @MainActor
+    func test_monitoringStore_rejectsPreviewOnlyStrategyActivation() async {
+        let snapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(strategyEnvelope: envelope),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadStrategySettings()
+        XCTAssertEqual(store.strategyDraft?.activeStrategyId, "turnover_surge_momentum")
+        XCTAssertEqual(store.strategyDraft?.template(id: "intraday_breakout")?.status, "preview_only")
+
+        store.updateStrategyActiveTemplate("intraday_breakout")
+
+        XCTAssertEqual(store.strategyDraft?.activeStrategyId, "turnover_surge_momentum")
+        XCTAssertEqual(store.strategyDraft?.template(id: "intraday_breakout")?.status, "preview_only")
+        XCTAssertTrue(store.lastStrategySettingsErrorMessage?.contains("프리뷰") ?? false)
+    }
+
     func test_resultFeedReducer_prefersCloseOverOrderAndFillInSameFlow() {
         let now = Date()
         let candidates: [ResultFeedEventCandidate] = [
@@ -458,5 +498,123 @@ final class AutotradingMacTests: XCTestCase {
 
         XCTAssertEqual(status.kind, .authenticationFailure)
         XCTAssertEqual(status.compactText, "인증 확인 필요")
+    }
+
+    private static func makeStrategySettingsSnapshot() -> StrategySettingsSnapshot {
+        StrategySettingsSnapshot(
+            scanner: ScannerSettingsSnapshot(
+                modes: ["turnover", "surge"],
+                defaultMode: "turnover",
+                topN: 10,
+                pageStep: 10,
+                maxLimit: 30,
+                candidateLimit: 30,
+                rankingSource: "rank_snapshots",
+                minTurnover: nil,
+                minChangePct: nil,
+                scoreDefinition: ScannerScoreDefinitionSnapshot(
+                    name: "후보 우선순위 점수(관찰용)",
+                    summary: "거래대금/등락률/상대순위를 조합한 스캐너 점수입니다.",
+                    formulaBasis: "mode별 가중합",
+                    weights: [
+                        "turnover": ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15),
+                        "surge": ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45),
+                    ],
+                    notes: []
+                )
+            ),
+            signal: SignalSettingsSnapshot(
+                topN: 10,
+                rankJumpThreshold: 3,
+                rankJumpWindowSeconds: 600,
+                rankHoldTolerance: 1,
+                enabledSignalTypes: ["new_entry", "rank_jump", "rank_maintained"]
+            ),
+            risk: RiskSettingsSnapshot(
+                allowedSignalTypes: ["new_entry", "rank_jump"],
+                maxConcurrentCandidates: 3,
+                cooldownMinutes: 10,
+                signalWindowMinutes: 10,
+                concurrencyWindowMinutes: 15,
+                blockWhenPositionExists: true
+            )
+        )
+    }
+}
+
+private struct MockLocalNotificationService: LocalNotificationServiceProtocol {
+    func authorizationStatus() async -> AppNotificationAuthorizationStatus {
+        .authorized
+    }
+
+    func requestAuthorizationIfNeeded() async -> AppNotificationAuthorizationStatus {
+        .authorized
+    }
+
+    func deliverNotification(
+        title: String,
+        subtitle: String?,
+        body: String,
+        identifier: String
+    ) async {}
+}
+
+private struct MockMonitoringAPIClient: MonitoringAPIClientProtocol {
+    let strategyEnvelope: StrategySettingsResponseEnvelope
+
+    func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
+        fatalError("unused in test")
+    }
+
+    func fetchRuntime() async throws -> RuntimeStatusSnapshot {
+        fatalError("unused in test")
+    }
+
+    func fetchStrategySettings() async throws -> StrategySettingsResponseEnvelope {
+        strategyEnvelope
+    }
+
+    func updateStrategySettings(_ payload: StrategySettingsUpdatePayload) async throws -> StrategySettingsResponseEnvelope {
+        strategyEnvelope
+    }
+
+    func fetchAppSettings() async throws -> AppSettingsResponseEnvelope {
+        fatalError("unused in test")
+    }
+
+    func updateAppSettings(_ payload: AppSettingsUpdatePayload) async throws -> AppSettingsUpdateResponseEnvelope {
+        fatalError("unused in test")
+    }
+
+    func fetchScannerRanks(mode: String, limit: Int) async throws -> ScannerRanksResponse {
+        fatalError("unused in test")
+    }
+
+    func fetchChartSeries(symbol: String, timeframe: ChartTimeframeOption, limit: Int) async throws -> ChartSeriesResponse {
+        fatalError("unused in test")
+    }
+
+    func startEngine() async throws -> EngineControlCommandResponse {
+        fatalError("unused in test")
+    }
+
+    func pauseEngine() async throws -> EngineControlCommandResponse {
+        fatalError("unused in test")
+    }
+
+    func emergencyStopEngine() async throws -> EngineControlCommandResponse {
+        fatalError("unused in test")
+    }
+
+    func clearEmergencyStop() async throws -> EngineControlCommandResponse {
+        fatalError("unused in test")
+    }
+
+    func setOrderMode(_ mode: String, confirmLive: Bool) async throws -> EngineModeCommandResponse {
+        fatalError("unused in test")
+    }
+
+    func setAccountMode(_ mode: String) async throws -> EngineModeCommandResponse {
+        fatalError("unused in test")
     }
 }

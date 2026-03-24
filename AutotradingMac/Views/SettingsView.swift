@@ -9,6 +9,7 @@ struct SettingsView: View {
     @EnvironmentObject private var store: MonitoringStore
     let mode: SettingsPageMode
     @State private var showAdvancedSettings = false
+    @State private var selectedStrategyTemplateID: String?
 
     var body: some View {
         ScrollView {
@@ -78,7 +79,7 @@ struct SettingsView: View {
         case .settings:
             return "Settings"
         case .stategy:
-            return "Stategy"
+            return "Strategy"
         }
     }
 
@@ -87,7 +88,7 @@ struct SettingsView: View {
         case .settings:
             return "애플리케이션 환경설정"
         case .stategy:
-            return "Basic Strategy에서 핵심 운용 기준을 조정하고, Advanced Settings에서 세부 튜닝을 관리합니다."
+            return "전략 템플릿 선택, 전략별 파라미터 조정, 공통 리스크/실행 가드를 분리해서 관리합니다."
         }
     }
 
@@ -106,7 +107,7 @@ struct SettingsView: View {
 
     private var strategyContent: some View {
         VStack(alignment: .leading, spacing: strategySectionSpacing) {
-            Text("먼저 Basic Strategy에서 진입/청산/리스크 핵심을 설정하고, 상세 튜닝은 Advanced Settings에서 조정하세요.")
+            Text("현재 활성 전략과 선택 가능한 전략 템플릿을 분리해서 보여주고, 공통 리스크/실행 설정은 전략 전환과 별개로 유지합니다.")
                 .font(.system(size: 13.5, weight: .regular))
                 .foregroundStyle(DesignTokens.Colors.textSecondary)
                 .padding(.horizontal, 2)
@@ -114,8 +115,17 @@ struct SettingsView: View {
 
             if let draft = store.strategyDraft {
                 strategyOverviewPanel(draft)
-                basicStrategyPanel(draft.basic)
-                advancedSettingsPanel(draft)
+                strategySelectionPanel(draft)
+
+                if let template = selectedStrategyTemplate(from: draft) {
+                    if template.strategyId == draft.activeStrategyId && template.selectable {
+                        strategySpecificSettingsPanel(draft, template: template)
+                    } else {
+                        strategyTemplatePreviewPanel(draft, template: template)
+                    }
+                }
+
+                commonRiskExecutionPanel(draft)
             } else {
                 settingsPanel(title: "전략 설정 로드 상태") {
                     if let error = store.lastStrategySettingsErrorMessage, !error.isEmpty {
@@ -173,9 +183,10 @@ struct SettingsView: View {
     }
 
     private func strategyOverviewPanel(_ draft: StrategySettingsSnapshot) -> some View {
+        let activeTemplate = draft.activeTemplate
         strategyPanel(
             title: "현재 전략 요약",
-            subtitle: "현재 운용 전략을 한눈에 보는 스냅샷입니다.",
+            subtitle: "현재 실제 운용 중인 전략 템플릿과 공통 가드를 한눈에 보는 스냅샷입니다.",
             trailing: {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .trailing, spacing: 2) {
@@ -196,21 +207,27 @@ struct SettingsView: View {
         ) {
             LazyVGrid(columns: strategyOverviewColumns, alignment: .leading, spacing: 12) {
                 strategySnapshotCard(
-                    title: "후보 선정",
+                    title: "활성 전략",
+                    value: activeTemplate?.displayName ?? "알 수 없음",
+                    detail: "\(activeTemplate?.category.uppercased() ?? "UNKNOWN") · \(activeTemplate?.shortDescription ?? "전략 메타 없음")",
+                    tone: .neutral
+                )
+                strategySnapshotCard(
+                    title: "전략형 진입",
                     value: localizedScannerMode(draft.basic.entry.selectionMode),
                     detail: "관찰 \(draft.basic.entry.topN)개 · 신호 \(draft.basic.entry.enabledSignalTypes.count)종",
                     tone: .neutral
                 )
                 strategySnapshotCard(
-                    title: "청산 기준",
+                    title: "전략형 청산",
                     value: "익절 \(DisplayFormatters.percent(draft.basic.exit.targetProfitPct)) / 손절 \(DisplayFormatters.percent(draft.basic.exit.stopLossPct))",
-                    detail: draft.basic.exit.forceCloseOnMarketClose ? "보유 \(draft.basic.exit.maxHoldingMinutes)분 · 장 마감 전 청산" : "보유 \(draft.basic.exit.maxHoldingMinutes)분",
+                    detail: "최대 보유 \(draft.basic.exit.maxHoldingMinutes)분",
                     tone: .neutral
                 )
                 strategySnapshotCard(
-                    title: "리스크 한도",
+                    title: "공통 리스크",
                     value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)) · 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct))",
-                    detail: "동시 보유 \(draft.basic.risk.maxConcurrentPositions)개",
+                    detail: "동시 보유 \(draft.basic.risk.maxConcurrentPositions)개 · 장마감 \(draft.basic.exit.forceCloseOnMarketClose ? "청산" : "유지")",
                     tone: .neutral
                 )
                 strategySnapshotCard(
@@ -231,10 +248,257 @@ struct SettingsView: View {
         }
     }
 
-    private func basicStrategyPanel(_ basic: BasicStrategySettingsSnapshot) -> some View {
+    private func strategySelectionPanel(_ draft: StrategySettingsSnapshot) -> some View {
+        let selectedStrategyId = resolvedSelectedStrategyTemplateID(for: draft)
+        return strategyPanel(
+            title: "전략 선택",
+            subtitle: "활성 전략 전환과 프리뷰용 후보 전략을 카드 단위로 구분합니다."
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(draft.strategyTemplates) { template in
+                    Button {
+                        selectedStrategyTemplateID = template.strategyId
+                    } label: {
+                        HStack(alignment: .top, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    Text(template.displayName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(DesignTokens.Colors.textPrimary)
+                                    strategyBadge(
+                                        text: templateStatusText(template),
+                                        tone: templateStatusTone(template),
+                                        size: .compact
+                                    )
+                                }
+                                Text(template.shortDescription)
+                                    .font(.system(size: 12.5, weight: .regular))
+                                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text("유형 \(template.category.uppercased()) · \(template.implementationNote)")
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                            }
+
+                            Spacer(minLength: 12)
+
+                            VStack(alignment: .trailing, spacing: 6) {
+                                if template.strategyId == draft.activeStrategyId {
+                                    Text("현재 활성")
+                                        .font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                                } else if template.selectable {
+                                    Text("선택 가능")
+                                        .font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                                } else {
+                                    Text("프리뷰 전용")
+                                        .font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                                }
+                                Text(template.strategyId)
+                                    .font(.system(size: 10.5, weight: .medium))
+                                    .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(templateCardFill(template, isSelected: template.strategyId == selectedStrategyId))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(templateCardStroke(template, isSelected: template.strategyId == selectedStrategyId), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let selectedTemplate = draft.template(id: selectedStrategyId) {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(selectionSummaryTitle(for: selectedTemplate, draft: draft))
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                            Text(selectionSummaryDetail(for: selectedTemplate, draft: draft))
+                                .font(.system(size: 11.5, weight: .regular))
+                                .foregroundStyle(DesignTokens.Colors.textTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        if selectedTemplate.selectable && selectedTemplate.strategyId != draft.activeStrategyId {
+                            Button("이 전략으로 전환") {
+                                selectedStrategyTemplateID = selectedTemplate.strategyId
+                                store.updateStrategyActiveTemplate(selectedTemplate.strategyId)
+                            }
+                            .buttonStyle(AppToolButtonStyle())
+                        } else {
+                            strategyBadge(
+                                text: templateStatusText(selectedTemplate),
+                                tone: templateStatusTone(selectedTemplate),
+                                size: .compact
+                            )
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
+        }
+    }
+
+    private func strategySpecificSettingsPanel(
+        _ draft: StrategySettingsSnapshot,
+        template: StrategyTemplateSnapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: strategySectionSpacing) {
+            basicStrategyPanel(draft.basic, template: template)
+            advancedSettingsPanel(draft)
+        }
+    }
+
+    private func strategyTemplatePreviewPanel(
+        _ draft: StrategySettingsSnapshot,
+        template: StrategyTemplateSnapshot
+    ) -> some View {
+        let params = draft.strategyParams[template.strategyId] ?? [:]
+        return strategyPanel(
+            title: "전략 프리뷰",
+            subtitle: "\(template.displayName)은 아직 엔진 미연결 상태입니다. 선택 카드는 미리 볼 수 있지만 활성화되지는 않습니다."
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                strategyBadge(
+                    text: "PREVIEW ONLY",
+                    tone: .warning,
+                    size: .compact
+                )
+                ForEach(template.configurableFields, id: \.fieldId) { field in
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(field.label)
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(DesignTokens.Colors.textSecondary)
+                            Text(field.description)
+                                .font(.system(size: 11.5, weight: .regular))
+                                .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                        }
+                        Spacer(minLength: 12)
+                        Text(strategyTemplateValueText(field: field, params: params))
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(field.wired ? DesignTokens.Colors.textSecondary : DesignTokens.Colors.textTertiary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
+        }
+    }
+
+    private func commonRiskExecutionPanel(_ draft: StrategySettingsSnapshot) -> some View {
         strategyPanel(
-            title: "Basic Strategy",
-            subtitle: "실제 엔진에 직접 연결되는 핵심 운용 기준입니다."
+            title: "공통 리스크 / 실행 설정",
+            subtitle: "전략 템플릿을 바꿔도 유지되는 손실 한도, 포지션 크기, 장마감 실행 가드를 관리합니다."
+        ) {
+            VStack(alignment: .leading, spacing: 22) {
+                strategyCategoryBlock(
+                    title: "공통 리스크 / 실행 가드",
+                    summary: "손실 한도와 포지션 크기, 거래 제한, 장마감 청산을 전략별 파라미터에서 분리합니다."
+                ) {
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(title: "최대 손실 한도") {
+                                strategyBandNumericField(
+                                    label: "손실 한도",
+                                    unit: "%",
+                                    text: basicMaxLossLimitText,
+                                    onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
+                                )
+                            }
+                        },
+                        second: {
+                            strategyBandSegment(
+                                title: "포지션 크기",
+                                tooltip: "활성 전략이 바뀌어도 유지할 1회 진입 비중입니다."
+                            ) {
+                                strategyBandNumericField(
+                                    label: "1회 진입 비중",
+                                    unit: "%",
+                                    text: basicPositionSizePctText,
+                                    onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
+                                )
+                            }
+                        },
+                        third: {
+                            let limitEnabled = store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? draft.basic.risk.dailyTradeLimitEnabled
+                            strategyBandSegment(
+                                title: "거래 제한 / 장마감 가드",
+                                tooltip: "일일 신규 진입 횟수, 동시 보유 수, 장마감 청산 정책을 함께 관리합니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "일일 거래 횟수 제한 사용",
+                                        isOn: Binding(
+                                            get: { store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? draft.basic.risk.dailyTradeLimitEnabled },
+                                            set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
+                                        )
+                                    )
+
+                                    HStack(alignment: .top, spacing: 12) {
+                                        strategyBandStepperTile(
+                                            label: "최대 거래 횟수",
+                                            value: draft.basic.risk.dailyTradeLimitCount,
+                                            range: 1...1_000,
+                                            step: 1,
+                                            unit: "회",
+                                            onChange: { store.updateStrategyBasicDailyTradeLimitCount($0) }
+                                        )
+                                        .disabled(!limitEnabled)
+                                        .opacity(limitEnabled ? 1.0 : 0.42)
+
+                                        strategyBandStepperTile(
+                                            label: "동시 보유 종목 수",
+                                            value: draft.basic.risk.maxConcurrentPositions,
+                                            range: 1...50,
+                                            step: 1,
+                                            unit: "개",
+                                            onChange: { store.updateStrategyBasicMaxConcurrentPositions($0) }
+                                        )
+                                    }
+
+                                    strategyBandToggleControl(
+                                        title: "장 마감 5분 전 전체 청산",
+                                        isOn: Binding(
+                                            get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? draft.basic.exit.forceCloseOnMarketClose },
+                                            set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+
+                riskSettingsPanel(draft.advanced.risk)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
+        }
+    }
+
+    private func basicStrategyPanel(
+        _ basic: BasicStrategySettingsSnapshot,
+        template: StrategyTemplateSnapshot
+    ) -> some View {
+        strategyPanel(
+            title: "선택한 전략 설정",
+            subtitle: "\(template.displayName)의 전략형 진입/청산 파라미터를 조정합니다."
         ) {
             VStack(alignment: .leading, spacing: 22) {
                 strategyCategoryBlock(
@@ -321,84 +585,11 @@ struct SettingsView: View {
                             }
                         },
                         third: {
-                            strategyBandSegment(title: "장마감 청산") {
-                                strategyBandToggleControl(
-                                    title: "장 마감 5분 전 전체 청산",
-                                    isOn: Binding(
-                                        get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? basic.exit.forceCloseOnMarketClose },
-                                        set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
-                                    )
-                                )
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "리스크 관리",
-                    summary: "손실 한도, 포지션 비중, 거래 제한을 한 패널에서 묶어 봅니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(title: "최대 손실 한도") {
-                                strategyBandNumericField(
-                                    label: "손실 한도",
-                                    unit: "%",
-                                    text: basicMaxLossLimitText,
-                                    onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
-                                )
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(
-                                title: "포지션 크기",
-                                tooltip: "신규 진입 한 번에 전체 자산 대비 얼마를 사용할지 정합니다."
-                            ) {
-                                strategyBandNumericField(
-                                    label: "1회 진입 비중",
-                                    unit: "%",
-                                    text: basicPositionSizePctText,
-                                    onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
-                                )
-                            }
-                        },
-                        third: {
-                            let limitEnabled = store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled
-                            strategyBandSegment(
-                                title: "거래 제한",
-                                tooltip: "일일 신규 진입 횟수와 동시에 보유할 종목 수를 함께 관리합니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "일일 거래 횟수 제한 사용",
-                                        isOn: Binding(
-                                            get: { store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? basic.risk.dailyTradeLimitEnabled },
-                                            set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
-                                        )
-                                    )
-
-                                    HStack(alignment: .top, spacing: 12) {
-                                        strategyBandStepperTile(
-                                            label: "최대 거래 횟수",
-                                            value: basic.risk.dailyTradeLimitCount,
-                                            range: 1...1_000,
-                                            step: 1,
-                                            unit: "회",
-                                            onChange: { store.updateStrategyBasicDailyTradeLimitCount($0) }
-                                        )
-                                        .disabled(!limitEnabled)
-                                        .opacity(limitEnabled ? 1.0 : 0.42)
-
-                                        strategyBandStepperTile(
-                                            label: "동시 보유 종목 수",
-                                            value: basic.risk.maxConcurrentPositions,
-                                            range: 1...50,
-                                            step: 1,
-                                            unit: "개",
-                                            onChange: { store.updateStrategyBasicMaxConcurrentPositions($0) }
-                                        )
-                                    }
-                                }
+                            strategyBandSegment(title: "공통 실행 가드") {
+                                Text("장 마감 강제 청산은 아래 공통 리스크 / 실행 설정에서 별도로 관리합니다.")
+                                    .font(.system(size: 12.5, weight: .medium))
+                                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     )
@@ -411,15 +602,14 @@ struct SettingsView: View {
 
     private func advancedSettingsPanel(_ draft: StrategySettingsSnapshot) -> some View {
         strategyPanel(
-            title: "Advanced Settings",
-            subtitle: "Basic Strategy를 보완하는 상세 튜닝 영역입니다.",
+            title: "전략별 고급 설정",
+            subtitle: "선택한 전략 템플릿에만 적용되는 세부 스캐너/신호 튜닝입니다.",
             prominence: .secondary
         ) {
             DisclosureGroup(isExpanded: $showAdvancedSettings) {
                 VStack(alignment: .leading, spacing: 14) {
                     scannerSettingsPanel(draft.advanced.scanner, basicEntry: draft.basic.entry)
                     signalSettingsPanel(draft.advanced.signal)
-                    riskSettingsPanel(draft.advanced.risk)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -431,7 +621,7 @@ struct SettingsView: View {
                         Text("상세 튜닝 펼치기")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(DesignTokens.Colors.textSecondary)
-                        Text("스캐너 가중치, 신호 임계값, 리스크 시간창을 조정합니다.")
+                        Text("스캐너 보조 필터, 점수 가중치, 신호 임계값을 조정합니다.")
                             .font(.caption2)
                             .foregroundStyle(DesignTokens.Colors.textTertiary)
                     }
@@ -578,8 +768,8 @@ struct SettingsView: View {
 
     private func riskSettingsPanel(_ risk: RiskSettingsSnapshot) -> some View {
         advancedSectionCard(
-            title: "Risk",
-            summary: "Basic 리스크 기준 위에 고급 게이트와 시간창만 더합니다."
+            title: "Shared Risk Runtime",
+            summary: "전략 템플릿과 분리된 공통 리스크 게이트와 시간창을 조정합니다."
         ) {
             advancedCardRow(minHeight: 258) {
                 advancedTuningCard(
@@ -2092,6 +2282,131 @@ struct SettingsView: View {
         }
     }
 
+    private func resolvedSelectedStrategyTemplateID(for draft: StrategySettingsSnapshot) -> String {
+        if let selectedStrategyTemplateID,
+           draft.strategyTemplates.contains(where: { $0.strategyId == selectedStrategyTemplateID }) {
+            return selectedStrategyTemplateID
+        }
+        return draft.activeStrategyId
+    }
+
+    private func selectedStrategyTemplate(from draft: StrategySettingsSnapshot) -> StrategyTemplateSnapshot? {
+        let selectedStrategyId = resolvedSelectedStrategyTemplateID(for: draft)
+        return draft.template(id: selectedStrategyId) ?? draft.activeTemplate
+    }
+
+    private func templateStatusText(_ template: StrategyTemplateSnapshot) -> String {
+        switch template.status.lowercased() {
+        case "active":
+            return "ACTIVE"
+        case "available":
+            return "AVAILABLE"
+        case "preview_only":
+            return "PREVIEW"
+        case "not_wired":
+            return "NOT WIRED"
+        default:
+            return template.status.uppercased()
+        }
+    }
+
+    private func templateStatusTone(_ template: StrategyTemplateSnapshot) -> StatusTone {
+        switch template.status.lowercased() {
+        case "active":
+            return .success
+        case "available":
+            return .neutral
+        case "preview_only", "not_wired":
+            return .warning
+        default:
+            return .neutral
+        }
+    }
+
+    private func templateCardFill(_ template: StrategyTemplateSnapshot, isSelected: Bool) -> Color {
+        if isSelected {
+            return template.selectable
+                ? DesignTokens.Colors.accentMuted.opacity(0.92)
+                : DesignTokens.Colors.warningBackground.opacity(0.68)
+        }
+        return DesignTokens.Colors.bgPanel.opacity(0.82)
+    }
+
+    private func templateCardStroke(_ template: StrategyTemplateSnapshot, isSelected: Bool) -> Color {
+        if isSelected {
+            return template.selectable
+                ? DesignTokens.Colors.accent.opacity(0.86)
+                : DesignTokens.Colors.warning.opacity(0.82)
+        }
+        return DesignTokens.Colors.borderSubtle.opacity(0.88)
+    }
+
+    private func selectionSummaryTitle(
+        for template: StrategyTemplateSnapshot,
+        draft: StrategySettingsSnapshot
+    ) -> String {
+        if template.strategyId == draft.activeStrategyId {
+            return "현재 운용 중인 전략"
+        }
+        if template.selectable {
+            return "선택 가능한 전략"
+        }
+        return "프리뷰 전용 전략"
+    }
+
+    private func selectionSummaryDetail(
+        for template: StrategyTemplateSnapshot,
+        draft: StrategySettingsSnapshot
+    ) -> String {
+        if template.strategyId == draft.activeStrategyId {
+            return "지금 엔진에 연결된 활성 전략입니다. 아래 패널에서 전략별 파라미터를 조정할 수 있습니다."
+        }
+        if template.selectable {
+            return "활성 전략으로 전환하면 전략별 파라미터는 해당 템플릿 값으로 바뀌고, 공통 리스크/실행 설정은 유지됩니다."
+        }
+        return "현재 단계에서는 메타와 파라미터 프리뷰만 제공하며, 엔진 활성화는 허용되지 않습니다."
+    }
+
+    private func strategyTemplateValueText(
+        field: StrategyConfigurableFieldSnapshot,
+        params: [String: JSONValue]
+    ) -> String {
+        guard let value = params[field.fieldId] else { return "미정" }
+
+        switch field.inputType {
+        case "multiselect":
+            return value.arrayStringValues?.joined(separator: ", ") ?? "미정"
+        case "weight_set":
+            guard let object = value.objectValue else { return "미정" }
+            let rank = object["rank"]?.doubleValue ?? 0
+            let turnover = object["turnover"]?.doubleValue ?? 0
+            let changePct = object["change_pct"]?.doubleValue ?? 0
+            return "순위 \(Int(rank)) · 거래대금 \(Int(turnover)) · 등락률 \(Int(changePct))"
+        case "bool":
+            if let boolValue = value.boolValue {
+                return boolValue ? "ON" : "OFF"
+            }
+            return "미정"
+        default:
+            if let stringValue = value.stringValue, !stringValue.isEmpty {
+                return stringValue
+            }
+            if let intValue = value.intValue {
+                return field.unit == nil ? "\(intValue)" : "\(intValue) \(field.unit!)"
+            }
+            if let doubleValue = value.doubleValue {
+                if let unit = field.unit {
+                    if unit == "%" || unit == "x" {
+                        return "\(DisplayFormatters.number(doubleValue))\(unit)"
+                    }
+                    return "\(DisplayFormatters.number(doubleValue)) \(unit)"
+                }
+                return DisplayFormatters.number(doubleValue)
+            }
+            return "미정"
+        }
+    }
+
     private func strategyGroupStatusText(_ group: String) -> String {
         guard let status = store.strategyGroupApplyStatus(group) else {
             return "상태 정보 없음"
@@ -2131,7 +2446,7 @@ struct SettingsView: View {
             return "저장 전 변경 있음"
         }
 
-        let statuses = ["entry", "exit", "risk"].compactMap { store.strategyGroupApplyStatus($0)?.appliedStatus.lowercased() }
+        let statuses = ["strategy", "execution", "risk"].compactMap { store.strategyGroupApplyStatus($0)?.appliedStatus.lowercased() }
         if statuses.contains("partial") {
             return "부분 반영"
         }
@@ -2149,7 +2464,7 @@ struct SettingsView: View {
             return .warning
         }
 
-        let statuses = ["entry", "exit", "risk"].compactMap { store.strategyGroupApplyStatus($0)?.appliedStatus.lowercased() }
+        let statuses = ["strategy", "execution", "risk"].compactMap { store.strategyGroupApplyStatus($0)?.appliedStatus.lowercased() }
         if statuses.contains("partial") || statuses.contains("pending_next_cycle") {
             return .warning
         }

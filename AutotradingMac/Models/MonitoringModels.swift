@@ -446,7 +446,298 @@ struct StrategyApplyGroupStatusSnapshot: Decodable {
     let note: String?
 }
 
+struct StrategyConfigurableFieldSnapshot: Decodable, Equatable {
+    let fieldId: String
+    let label: String
+    let inputType: String
+    let group: String
+    let description: String
+    let options: [String]?
+    let unit: String?
+    let wired: Bool
+}
+
+struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
+    var id: String { strategyId }
+
+    let strategyId: String
+    let displayName: String
+    let shortDescription: String
+    let category: String
+    let status: String
+    let wiredToEngine: Bool
+    let selectable: Bool
+    let implementationNote: String
+    let configurableFields: [StrategyConfigurableFieldSnapshot]
+
+    func resolvedStatus(activeStrategyId: String) -> String {
+        if strategyId == activeStrategyId, selectable {
+            return "active"
+        }
+        if selectable {
+            return "available"
+        }
+        if wiredToEngine {
+            return "not_wired"
+        }
+        return "preview_only"
+    }
+
+    static func normalizedCatalog(
+        _ templates: [StrategyTemplateSnapshot],
+        activeStrategyId: String
+    ) -> [StrategyTemplateSnapshot] {
+        let base = templates.isEmpty ? fallbackCatalog(activeStrategyId: activeStrategyId) : templates
+        return base.map { template in
+            StrategyTemplateSnapshot(
+                strategyId: template.strategyId,
+                displayName: template.displayName,
+                shortDescription: template.shortDescription,
+                category: template.category,
+                status: template.resolvedStatus(activeStrategyId: activeStrategyId),
+                wiredToEngine: template.wiredToEngine,
+                selectable: template.selectable,
+                implementationNote: template.implementationNote,
+                configurableFields: template.configurableFields
+            )
+        }
+    }
+
+    static func fallbackCatalog(activeStrategyId: String) -> [StrategyTemplateSnapshot] {
+        [
+            StrategyTemplateSnapshot(
+                strategyId: "turnover_surge_momentum",
+                displayName: "Turnover / Surge Momentum",
+                shortDescription: "거래대금/급등률 상위 후보에서 추세 지속과 순위 점프를 추종하는 현재 운용 전략입니다.",
+                category: "momentum",
+                status: activeStrategyId == "turnover_surge_momentum" ? "active" : "available",
+                wiredToEngine: true,
+                selectable: true,
+                implementationNote: "현재 strategy/risk/execution worker에 실제 연결된 기본 전략입니다.",
+                configurableFields: [
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "selection_mode",
+                        label: "후보 선정 방식",
+                        inputType: "enum",
+                        group: "entry",
+                        description: "거래대금 순위와 급등률 순위 중 어떤 후보군을 우선 감시할지 정합니다.",
+                        options: ["turnover", "surge"],
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "top_n",
+                        label: "관찰 후보 수",
+                        inputType: "int",
+                        group: "entry",
+                        description: "신호를 평가할 상위 후보 수입니다.",
+                        options: nil,
+                        unit: "symbols",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "enabled_signal_types",
+                        label: "진입 신호 유형",
+                        inputType: "multiselect",
+                        group: "entry",
+                        description: "활성 전략이 사용할 진입 신호 유형입니다.",
+                        options: ["new_entry", "rank_jump", "rank_maintained"],
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "target_profit_pct",
+                        label: "익절 기준",
+                        inputType: "float",
+                        group: "exit",
+                        description: "포지션 청산용 목표 수익률입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "stop_loss_pct",
+                        label: "손절 기준",
+                        inputType: "float",
+                        group: "exit",
+                        description: "포지션 청산용 손절 기준입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_holding_minutes",
+                        label: "최대 보유 시간",
+                        inputType: "int",
+                        group: "exit",
+                        description: "진입 후 강제 청산 전까지의 최대 보유 시간입니다.",
+                        options: nil,
+                        unit: "minutes",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "min_turnover",
+                        label: "최소 거래대금 필터",
+                        inputType: "float",
+                        group: "scanner",
+                        description: "스캐너 후보군을 좁히는 보조 필터입니다.",
+                        options: nil,
+                        unit: "KRW",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "min_change_pct",
+                        label: "최소 등락률 필터",
+                        inputType: "float",
+                        group: "scanner",
+                        description: "모멘텀 후보군의 최소 등락률 필터입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "turnover_weights",
+                        label: "거래대금 모드 가중치",
+                        inputType: "weight_set",
+                        group: "scanner",
+                        description: "거래대금 모드 점수 비중을 조정합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "surge_weights",
+                        label: "급등률 모드 가중치",
+                        inputType: "weight_set",
+                        group: "scanner",
+                        description: "급등률 모드 점수 비중을 조정합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "rank_jump_threshold",
+                        label: "순위 점프 임계값",
+                        inputType: "int",
+                        group: "signal",
+                        description: "순위 급변을 진입 신호로 판정하는 임계값입니다.",
+                        options: nil,
+                        unit: "rank",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "rank_jump_window_seconds",
+                        label: "순위 점프 시간창",
+                        inputType: "int",
+                        group: "signal",
+                        description: "순위 점프를 계산하는 시간창입니다.",
+                        options: nil,
+                        unit: "seconds",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "rank_hold_tolerance",
+                        label: "상위권 유지 허용 편차",
+                        inputType: "int",
+                        group: "signal",
+                        description: "상위권 유지 신호 판정에 허용하는 순위 편차입니다.",
+                        options: nil,
+                        unit: "rank",
+                        wired: true
+                    ),
+                ]
+            ),
+            StrategyTemplateSnapshot(
+                strategyId: "intraday_breakout",
+                displayName: "Intraday Breakout",
+                shortDescription: "장중 박스 상단 돌파와 거래량 확인 후 진입하는 돌파형 전략 초안입니다.",
+                category: "breakout",
+                status: "preview_only",
+                wiredToEngine: false,
+                selectable: false,
+                implementationNote: "현재는 템플릿 메타/설정 프리뷰만 제공하며 엔진에는 연결되어 있지 않습니다.",
+                configurableFields: [
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "breakout_window_minutes",
+                        label: "돌파 관찰 시간",
+                        inputType: "int",
+                        group: "entry",
+                        description: "고점 돌파 여부를 관찰할 기준 시간입니다.",
+                        options: nil,
+                        unit: "minutes",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "breakout_threshold_pct",
+                        label: "돌파 임계값",
+                        inputType: "float",
+                        group: "entry",
+                        description: "기준 고점 대비 필요한 돌파 폭입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "confirmation_volume_ratio",
+                        label: "거래량 확인 배수",
+                        inputType: "float",
+                        group: "entry",
+                        description: "돌파 확인에 필요한 거래량 배수입니다.",
+                        options: nil,
+                        unit: "x",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "pullback_tolerance_pct",
+                        label: "리테스트 허용폭",
+                        inputType: "float",
+                        group: "entry",
+                        description: "돌파 후 되돌림 허용 범위입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "target_profit_pct",
+                        label: "익절 기준",
+                        inputType: "float",
+                        group: "exit",
+                        description: "돌파 전략용 익절 기준 초안입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "stop_loss_pct",
+                        label: "손절 기준",
+                        inputType: "float",
+                        group: "exit",
+                        description: "돌파 전략용 손절 기준 초안입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: false
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_holding_minutes",
+                        label: "최대 보유 시간",
+                        inputType: "int",
+                        group: "exit",
+                        description: "장중 돌파 전략용 최대 보유 시간 초안입니다.",
+                        options: nil,
+                        unit: "minutes",
+                        wired: false
+                    ),
+                ]
+            ),
+        ]
+    }
+}
+
 struct StrategySettingsSnapshot: Decodable, Equatable {
+    var activeStrategyId: String
+    var strategyTemplates: [StrategyTemplateSnapshot]
+    var strategyParams: [String: [String: JSONValue]]
+    var commonRiskParams: [String: JSONValue]
     var basic: BasicStrategySettingsSnapshot
     var advanced: AdvancedStrategySettingsSnapshot
     var scanner: ScannerSettingsSnapshot
@@ -454,12 +745,23 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
     var risk: RiskSettingsSnapshot
 
     init(
+        activeStrategyId: String = "turnover_surge_momentum",
+        strategyTemplates: [StrategyTemplateSnapshot] = [],
+        strategyParams: [String: [String: JSONValue]] = [:],
+        commonRiskParams: [String: JSONValue] = [:],
         basic: BasicStrategySettingsSnapshot,
         advanced: AdvancedStrategySettingsSnapshot,
         scanner: ScannerSettingsSnapshot,
         signal: SignalSettingsSnapshot,
         risk: RiskSettingsSnapshot
     ) {
+        self.activeStrategyId = activeStrategyId
+        self.strategyTemplates = StrategyTemplateSnapshot.normalizedCatalog(
+            strategyTemplates,
+            activeStrategyId: activeStrategyId
+        )
+        self.strategyParams = strategyParams
+        self.commonRiskParams = commonRiskParams
         self.basic = basic
         self.advanced = advanced
         self.scanner = scanner
@@ -472,9 +774,22 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
         signal: SignalSettingsSnapshot,
         risk: RiskSettingsSnapshot
     ) {
+        let basic = BasicStrategySettingsSnapshot.derived(scanner: scanner, signal: signal, risk: risk)
+        let advanced = AdvancedStrategySettingsSnapshot(scanner: scanner, signal: signal, risk: risk)
         self.init(
-            basic: .derived(scanner: scanner, signal: signal, risk: risk),
-            advanced: AdvancedStrategySettingsSnapshot(scanner: scanner, signal: signal, risk: risk),
+            activeStrategyId: "turnover_surge_momentum",
+            strategyTemplates: StrategyTemplateSnapshot.fallbackCatalog(activeStrategyId: "turnover_surge_momentum"),
+            strategyParams: StrategySettingsSnapshot.derivedStrategyParams(
+                activeStrategyId: "turnover_surge_momentum",
+                basic: basic,
+                advanced: advanced
+            ),
+            commonRiskParams: StrategySettingsSnapshot.derivedCommonRiskParams(
+                basic: basic,
+                risk: risk
+            ),
+            basic: basic,
+            advanced: advanced,
             scanner: scanner,
             signal: signal,
             risk: risk
@@ -482,6 +797,10 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case activeStrategyId
+        case strategyTemplates
+        case strategyParams
+        case commonRiskParams
         case basic
         case advanced
         case scanner
@@ -498,6 +817,101 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
             ?? .derived(scanner: scanner, signal: signal, risk: risk)
         advanced = (try? container.decode(AdvancedStrategySettingsSnapshot.self, forKey: .advanced))
             ?? AdvancedStrategySettingsSnapshot(scanner: scanner, signal: signal, risk: risk)
+        activeStrategyId = container.decodeStringFlexible(forKey: .activeStrategyId)
+            ?? "turnover_surge_momentum"
+        strategyParams = (try? container.decode([String: [String: JSONValue]].self, forKey: .strategyParams))
+            ?? StrategySettingsSnapshot.derivedStrategyParams(
+                activeStrategyId: activeStrategyId,
+                basic: basic,
+                advanced: advanced
+            )
+        commonRiskParams = (try? container.decode([String: JSONValue].self, forKey: .commonRiskParams))
+            ?? StrategySettingsSnapshot.derivedCommonRiskParams(
+                basic: basic,
+                risk: risk
+            )
+        strategyTemplates = StrategyTemplateSnapshot.normalizedCatalog(
+            (try? container.decode([StrategyTemplateSnapshot].self, forKey: .strategyTemplates)) ?? [],
+            activeStrategyId: activeStrategyId
+        )
+    }
+
+    func template(id: String) -> StrategyTemplateSnapshot? {
+        strategyTemplates.first { $0.strategyId == id }
+    }
+
+    var activeTemplate: StrategyTemplateSnapshot? {
+        template(id: activeStrategyId)
+    }
+
+    private static func derivedStrategyParams(
+        activeStrategyId: String,
+        basic: BasicStrategySettingsSnapshot,
+        advanced: AdvancedStrategySettingsSnapshot
+    ) -> [String: [String: JSONValue]] {
+        [
+            "turnover_surge_momentum": [
+                "selection_mode": .string(basic.entry.selectionMode),
+                "top_n": .number(Double(basic.entry.topN)),
+                "enabled_signal_types": .array(basic.entry.enabledSignalTypes.map(JSONValue.string)),
+                "target_profit_pct": .number(basic.exit.targetProfitPct),
+                "stop_loss_pct": .number(basic.exit.stopLossPct),
+                "max_holding_minutes": .number(Double(basic.exit.maxHoldingMinutes)),
+                "min_turnover": advanced.scanner.minTurnover.map(JSONValue.number) ?? .null,
+                "min_change_pct": advanced.scanner.minChangePct.map(JSONValue.number) ?? .null,
+                "turnover_weights": .object(
+                    StrategySettingsSnapshot.weightObject(
+                        advanced.scanner.scoreDefinition.weights["turnover"]
+                            ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+                    )
+                ),
+                "surge_weights": .object(
+                    StrategySettingsSnapshot.weightObject(
+                        advanced.scanner.scoreDefinition.weights["surge"]
+                            ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
+                    )
+                ),
+                "rank_jump_threshold": .number(Double(advanced.signal.rankJumpThreshold)),
+                "rank_jump_window_seconds": .number(Double(advanced.signal.rankJumpWindowSeconds)),
+                "rank_hold_tolerance": .number(Double(advanced.signal.rankHoldTolerance)),
+            ],
+            "intraday_breakout": [
+                "breakout_window_minutes": .number(15),
+                "breakout_threshold_pct": .number(2.2),
+                "confirmation_volume_ratio": .number(1.8),
+                "pullback_tolerance_pct": .number(0.8),
+                "target_profit_pct": .number(2.7),
+                "stop_loss_pct": .number(1.4),
+                "max_holding_minutes": .number(45),
+            ],
+        ]
+    }
+
+    private static func derivedCommonRiskParams(
+        basic: BasicStrategySettingsSnapshot,
+        risk: RiskSettingsSnapshot
+    ) -> [String: JSONValue] {
+        [
+            "position_size_pct": .number(basic.risk.positionSizePct),
+            "max_loss_limit_pct": .number(basic.risk.maxLossLimitPct),
+            "daily_trade_limit_enabled": .bool(basic.risk.dailyTradeLimitEnabled),
+            "daily_trade_limit_count": .number(Double(basic.risk.dailyTradeLimitCount)),
+            "max_concurrent_positions": .number(Double(basic.risk.maxConcurrentPositions)),
+            "force_close_on_market_close": .bool(basic.exit.forceCloseOnMarketClose),
+            "allowed_signal_types": .array(risk.allowedSignalTypes.map(JSONValue.string)),
+            "cooldown_minutes": .number(Double(risk.cooldownMinutes)),
+            "signal_window_minutes": .number(Double(risk.signalWindowMinutes)),
+            "concurrency_window_minutes": .number(Double(risk.concurrencyWindowMinutes)),
+            "block_when_position_exists": .bool(risk.blockWhenPositionExists),
+        ]
+    }
+
+    private static func weightObject(_ snapshot: ScannerScoreWeightsSnapshot) -> [String: JSONValue] {
+        [
+            "rank": .number(snapshot.rank),
+            "turnover": .number(snapshot.turnover),
+            "change_pct": .number(snapshot.changePct),
+        ]
     }
 }
 
@@ -658,7 +1072,36 @@ struct RiskSettingsSnapshot: Decodable, Equatable {
     var blockWhenPositionExists: Bool
 }
 
+extension Dictionary where Key == String, Value == JSONValue {
+    func stringValue(for key: String) -> String? {
+        self[key]?.stringValue
+    }
+
+    func doubleValue(for key: String) -> Double? {
+        self[key]?.doubleValue
+    }
+
+    func intValue(for key: String) -> Int? {
+        self[key]?.intValue
+    }
+
+    func boolValue(for key: String) -> Bool? {
+        self[key]?.boolValue
+    }
+
+    func arrayStringValues(for key: String) -> [String]? {
+        self[key]?.arrayStringValues
+    }
+
+    func objectValue(for key: String) -> [String: JSONValue]? {
+        self[key]?.objectValue
+    }
+}
+
 struct StrategySettingsUpdatePayload: Encodable {
+    let activeStrategyId: String? = nil
+    let strategyParams: [String: [String: JSONValue]]? = nil
+    let commonRiskParams: [String: JSONValue]? = nil
     let basic: BasicStrategySettingsUpdatePayload?
     let advanced: AdvancedStrategySettingsUpdatePayload?
     let scanner: ScannerSettingsUpdatePayload?

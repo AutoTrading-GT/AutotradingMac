@@ -377,6 +377,28 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
+    func updateStrategyActiveTemplate(_ strategyId: String) {
+        guard var draft = strategyDraft ?? strategySettings else { return }
+        let normalizedStrategyId = strategyId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let template = draft.strategyTemplates.first(where: { $0.strategyId == normalizedStrategyId }) else { return }
+        guard template.selectable else {
+            lastStrategySettingsErrorMessage = "\(template.displayName)은 아직 엔진 미연결 상태라 프리뷰만 가능합니다."
+            return
+        }
+        guard normalizedStrategyId != draft.activeStrategyId else {
+            lastStrategySettingsErrorMessage = nil
+            return
+        }
+
+        persistLegacySections(into: &draft, strategyId: draft.activeStrategyId)
+        draft.activeStrategyId = normalizedStrategyId
+        normalizeStrategyDraftAfterTemplateChange(&draft)
+        strategyDraft = draft
+        strategyValidationMessages = validateStrategyDraft(draft)
+        recalculateStrategyDirty()
+        lastStrategySettingsErrorMessage = nil
+    }
+
     func updateStrategyScannerTopN(_ value: Int) {
         mutateStrategyDraft { draft in
             let normalized = min(max(value, 1), 30)
@@ -1162,15 +1184,169 @@ final class MonitoringStore: ObservableObject {
     }
 
     private func normalizeStrategyDraft(_ draft: inout StrategySettingsSnapshot) {
-        // Keep linked fields consistent across legacy(top-level), basic, and advanced sections.
-        draft.advanced.scanner = draft.scanner
-        draft.advanced.signal = draft.signal
-        draft.advanced.risk = draft.risk
+        let activeStrategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+        draft.activeStrategyId = activeStrategyId
+        draft.strategyTemplates = StrategyTemplateSnapshot.normalizedCatalog(
+            draft.strategyTemplates,
+            activeStrategyId: activeStrategyId
+        )
+
+        if draft.strategyParams["turnover_surge_momentum"] == nil {
+            draft.strategyParams["turnover_surge_momentum"] = fallbackMomentumStrategyParams(from: draft)
+        }
+        if draft.strategyParams["intraday_breakout"] == nil {
+            draft.strategyParams["intraday_breakout"] = defaultPreviewStrategyParams()
+        }
+
+        persistLegacySections(into: &draft, strategyId: activeStrategyId)
+        syncCommonRiskParamsFromLegacySections(&draft)
+        syncLegacySectionsFromActiveTemplate(&draft)
+    }
+
+    private func normalizeStrategyDraftAfterTemplateChange(_ draft: inout StrategySettingsSnapshot) {
+        let activeStrategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+        draft.activeStrategyId = activeStrategyId
+        draft.strategyTemplates = StrategyTemplateSnapshot.normalizedCatalog(
+            draft.strategyTemplates,
+            activeStrategyId: activeStrategyId
+        )
+
+        if draft.strategyParams["turnover_surge_momentum"] == nil {
+            draft.strategyParams["turnover_surge_momentum"] = fallbackMomentumStrategyParams(from: draft)
+        }
+        if draft.strategyParams["intraday_breakout"] == nil {
+            draft.strategyParams["intraday_breakout"] = defaultPreviewStrategyParams()
+        }
+
+        syncCommonRiskParamsFromLegacySections(&draft)
+        syncLegacySectionsFromActiveTemplate(&draft)
+    }
+
+    private func persistLegacySections(into draft: inout StrategySettingsSnapshot, strategyId: String) {
+        let normalizedStrategyId = strategyId.isEmpty ? "turnover_surge_momentum" : strategyId
+        guard normalizedStrategyId == "turnover_surge_momentum" else {
+            if draft.strategyParams[normalizedStrategyId] == nil {
+                draft.strategyParams[normalizedStrategyId] = defaultPreviewStrategyParams()
+            }
+            return
+        }
+        draft.strategyParams[normalizedStrategyId] = fallbackMomentumStrategyParams(from: draft)
+    }
+
+    private func syncCommonRiskParamsFromLegacySections(_ draft: inout StrategySettingsSnapshot) {
+        var commonRisk = draft.commonRiskParams
+        commonRisk["position_size_pct"] = .number(draft.basic.risk.positionSizePct)
+        commonRisk["max_loss_limit_pct"] = .number(draft.basic.risk.maxLossLimitPct)
+        commonRisk["daily_trade_limit_enabled"] = .bool(draft.basic.risk.dailyTradeLimitEnabled)
+        commonRisk["daily_trade_limit_count"] = .number(Double(draft.basic.risk.dailyTradeLimitCount))
+        commonRisk["max_concurrent_positions"] = .number(Double(draft.basic.risk.maxConcurrentPositions))
+        commonRisk["force_close_on_market_close"] = .bool(draft.basic.exit.forceCloseOnMarketClose)
+        commonRisk["allowed_signal_types"] = .array(draft.risk.allowedSignalTypes.map(JSONValue.string))
+        commonRisk["cooldown_minutes"] = .number(Double(draft.risk.cooldownMinutes))
+        commonRisk["signal_window_minutes"] = .number(Double(draft.risk.signalWindowMinutes))
+        commonRisk["concurrency_window_minutes"] = .number(Double(draft.risk.concurrencyWindowMinutes))
+        commonRisk["block_when_position_exists"] = .bool(draft.risk.blockWhenPositionExists)
+        draft.commonRiskParams = commonRisk
+    }
+
+    private func syncLegacySectionsFromActiveTemplate(_ draft: inout StrategySettingsSnapshot) {
+        let activeStrategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+        let normalizedActiveParams = draft.strategyParams[activeStrategyId] ?? [:]
+
+        draft.scanner.defaultMode = normalizedActiveParams.stringValue(for: "selection_mode") ?? draft.scanner.defaultMode
+        draft.scanner.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.scanner.topN
+        draft.scanner.minTurnover = normalizedActiveParams.doubleValue(for: "min_turnover")
+        draft.scanner.minChangePct = normalizedActiveParams.doubleValue(for: "min_change_pct")
+        draft.scanner.scoreDefinition.weights["turnover"] = weightSnapshot(
+            from: normalizedActiveParams.objectValue(for: "turnover_weights"),
+            fallback: draft.scanner.scoreDefinition.weights["turnover"]
+        )
+        draft.scanner.scoreDefinition.weights["surge"] = weightSnapshot(
+            from: normalizedActiveParams.objectValue(for: "surge_weights"),
+            fallback: draft.scanner.scoreDefinition.weights["surge"]
+        )
+
+        draft.signal.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.signal.topN
+        draft.signal.rankJumpThreshold = normalizedActiveParams.intValue(for: "rank_jump_threshold") ?? draft.signal.rankJumpThreshold
+        draft.signal.rankJumpWindowSeconds = normalizedActiveParams.intValue(for: "rank_jump_window_seconds") ?? draft.signal.rankJumpWindowSeconds
+        draft.signal.rankHoldTolerance = normalizedActiveParams.intValue(for: "rank_hold_tolerance") ?? draft.signal.rankHoldTolerance
+        draft.signal.enabledSignalTypes = normalizedActiveParams.arrayStringValues(for: "enabled_signal_types") ?? draft.signal.enabledSignalTypes
+
+        draft.risk.allowedSignalTypes = draft.commonRiskParams.arrayStringValues(for: "allowed_signal_types") ?? draft.risk.allowedSignalTypes
+        draft.risk.maxConcurrentCandidates = draft.commonRiskParams.intValue(for: "max_concurrent_positions") ?? draft.risk.maxConcurrentCandidates
+        draft.risk.cooldownMinutes = draft.commonRiskParams.intValue(for: "cooldown_minutes") ?? draft.risk.cooldownMinutes
+        draft.risk.signalWindowMinutes = draft.commonRiskParams.intValue(for: "signal_window_minutes") ?? draft.risk.signalWindowMinutes
+        draft.risk.concurrencyWindowMinutes = draft.commonRiskParams.intValue(for: "concurrency_window_minutes") ?? draft.risk.concurrencyWindowMinutes
+        draft.risk.blockWhenPositionExists = draft.commonRiskParams.boolValue(for: "block_when_position_exists") ?? draft.risk.blockWhenPositionExists
 
         draft.basic.entry.selectionMode = draft.scanner.defaultMode
         draft.basic.entry.topN = draft.signal.topN
         draft.basic.entry.enabledSignalTypes = draft.signal.enabledSignalTypes
-        draft.basic.risk.maxConcurrentPositions = draft.risk.maxConcurrentCandidates
+        draft.basic.exit.targetProfitPct = normalizedActiveParams.doubleValue(for: "target_profit_pct") ?? draft.basic.exit.targetProfitPct
+        draft.basic.exit.stopLossPct = normalizedActiveParams.doubleValue(for: "stop_loss_pct") ?? draft.basic.exit.stopLossPct
+        draft.basic.exit.maxHoldingMinutes = normalizedActiveParams.intValue(for: "max_holding_minutes") ?? draft.basic.exit.maxHoldingMinutes
+        draft.basic.exit.forceCloseOnMarketClose = draft.commonRiskParams.boolValue(for: "force_close_on_market_close") ?? draft.basic.exit.forceCloseOnMarketClose
+        draft.basic.risk.maxLossLimitPct = draft.commonRiskParams.doubleValue(for: "max_loss_limit_pct") ?? draft.basic.risk.maxLossLimitPct
+        draft.basic.risk.positionSizePct = draft.commonRiskParams.doubleValue(for: "position_size_pct") ?? draft.basic.risk.positionSizePct
+        draft.basic.risk.dailyTradeLimitEnabled = draft.commonRiskParams.boolValue(for: "daily_trade_limit_enabled") ?? draft.basic.risk.dailyTradeLimitEnabled
+        draft.basic.risk.dailyTradeLimitCount = draft.commonRiskParams.intValue(for: "daily_trade_limit_count") ?? draft.basic.risk.dailyTradeLimitCount
+        draft.basic.risk.maxConcurrentPositions = draft.commonRiskParams.intValue(for: "max_concurrent_positions") ?? draft.basic.risk.maxConcurrentPositions
+
+        draft.advanced.scanner = draft.scanner
+        draft.advanced.signal = draft.signal
+        draft.advanced.risk = draft.risk
+    }
+
+    private func fallbackMomentumStrategyParams(from draft: StrategySettingsSnapshot) -> [String: JSONValue] {
+        [
+            "selection_mode": .string(draft.basic.entry.selectionMode),
+            "top_n": .number(Double(draft.basic.entry.topN)),
+            "enabled_signal_types": .array(draft.basic.entry.enabledSignalTypes.map(JSONValue.string)),
+            "target_profit_pct": .number(draft.basic.exit.targetProfitPct),
+            "stop_loss_pct": .number(draft.basic.exit.stopLossPct),
+            "max_holding_minutes": .number(Double(draft.basic.exit.maxHoldingMinutes)),
+            "min_turnover": draft.scanner.minTurnover.map(JSONValue.number) ?? .null,
+            "min_change_pct": draft.scanner.minChangePct.map(JSONValue.number) ?? .null,
+            "turnover_weights": .object(weightObject(from: draft.scanner.scoreDefinition.weights["turnover"])),
+            "surge_weights": .object(weightObject(from: draft.scanner.scoreDefinition.weights["surge"])),
+            "rank_jump_threshold": .number(Double(draft.signal.rankJumpThreshold)),
+            "rank_jump_window_seconds": .number(Double(draft.signal.rankJumpWindowSeconds)),
+            "rank_hold_tolerance": .number(Double(draft.signal.rankHoldTolerance)),
+        ]
+    }
+
+    private func defaultPreviewStrategyParams() -> [String: JSONValue] {
+        [
+            "breakout_window_minutes": .number(15),
+            "breakout_threshold_pct": .number(2.2),
+            "confirmation_volume_ratio": .number(1.8),
+            "pullback_tolerance_pct": .number(0.8),
+            "target_profit_pct": .number(2.7),
+            "stop_loss_pct": .number(1.4),
+            "max_holding_minutes": .number(45),
+        ]
+    }
+
+    private func weightObject(from weights: ScannerScoreWeightsSnapshot?) -> [String: JSONValue] {
+        let resolved = weights ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+        return [
+            "rank": .number(resolved.rank),
+            "turnover": .number(resolved.turnover),
+            "change_pct": .number(resolved.changePct),
+        ]
+    }
+
+    private func weightSnapshot(
+        from object: [String: JSONValue]?,
+        fallback: ScannerScoreWeightsSnapshot?
+    ) -> ScannerScoreWeightsSnapshot {
+        let resolvedFallback = fallback ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+        guard let object else { return resolvedFallback }
+        return ScannerScoreWeightsSnapshot(
+            rank: object.doubleValue(for: "rank") ?? resolvedFallback.rank,
+            turnover: object.doubleValue(for: "turnover") ?? resolvedFallback.turnover,
+            changePct: object.doubleValue(for: "change_pct") ?? resolvedFallback.changePct
+        )
     }
 
     private func recalculateStrategyDirty() {
@@ -1307,6 +1483,10 @@ final class MonitoringStore: ObservableObject {
         base: StrategySettingsSnapshot,
         draft: StrategySettingsSnapshot
     ) -> StrategySettingsUpdatePayload {
+        let activeStrategyIdPatch: String? = draft.activeStrategyId != base.activeStrategyId ? draft.activeStrategyId : nil
+        let strategyParamsPatch = buildNestedJSONPatch(base: base.strategyParams, draft: draft.strategyParams)
+        let commonRiskPatch = buildJSONValuePatch(base: base.commonRiskParams, draft: draft.commonRiskParams)
+
         let basicPatch: BasicStrategySettingsUpdatePayload? = {
             var hasChange = false
             let entryPatch: BasicEntrySettingsUpdatePayload? = {
@@ -1560,12 +1740,52 @@ final class MonitoringStore: ObservableObject {
         )
 
         return StrategySettingsUpdatePayload(
+            activeStrategyId: activeStrategyIdPatch,
+            strategyParams: strategyParamsPatch,
+            commonRiskParams: commonRiskPatch,
             basic: basicPatch,
             advanced: (scannerPatch != nil || signalPatch != nil || riskPatch != nil) ? advancedPatch : nil,
             scanner: nil,
             signal: nil,
             risk: nil
         )
+    }
+
+    private func buildNestedJSONPatch(
+        base: [String: [String: JSONValue]],
+        draft: [String: [String: JSONValue]]
+    ) -> [String: [String: JSONValue]]? {
+        let strategyIds = Set(base.keys).union(draft.keys)
+        var patch: [String: [String: JSONValue]] = [:]
+
+        for strategyId in strategyIds {
+            let strategyPatch = buildJSONValuePatch(
+                base: base[strategyId] ?? [:],
+                draft: draft[strategyId] ?? [:]
+            )
+            if let strategyPatch, !strategyPatch.isEmpty {
+                patch[strategyId] = strategyPatch
+            }
+        }
+
+        return patch.isEmpty ? nil : patch
+    }
+
+    private func buildJSONValuePatch(
+        base: [String: JSONValue],
+        draft: [String: JSONValue]
+    ) -> [String: JSONValue]? {
+        let keys = Set(base.keys).union(draft.keys)
+        var patch: [String: JSONValue] = [:]
+
+        for key in keys {
+            let baseValue = base[key]
+            let draftValue = draft[key]
+            guard baseValue != draftValue else { continue }
+            patch[key] = draftValue ?? .null
+        }
+
+        return patch.isEmpty ? nil : patch
     }
 
     private func buildWeightPatch(
