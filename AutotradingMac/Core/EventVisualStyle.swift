@@ -76,16 +76,16 @@ enum EventVisualStyleResolver {
     static func close(reason: String?, realizedPnl: Double?) -> EventVisualStyle {
         let normalized = normalize(reason)
 
-        if containsAny(normalized, keywords: ["take_profit", "익절"]) {
+        if containsAny(normalized, keywords: ["first_take_profit_partial", "take_profit", "익절"]) {
             return EventVisualStyle(iconName: closeIcon, iconColor: DesignTokens.Colors.profit, tone: .danger)
         }
-        if containsAny(normalized, keywords: ["stop_loss", "손절"]) {
+        if containsAny(normalized, keywords: ["initial_stop", "stop_loss", "손절"]) {
             return EventVisualStyle(iconName: closeIcon, iconColor: DesignTokens.Colors.loss, tone: .info)
         }
-        if containsAny(normalized, keywords: ["market_close", "장마감"]) {
+        if containsAny(normalized, keywords: ["hard_time_stop", "soft_time_stop", "max_holding", "holding", "timeout", "time", "보유시간"]) {
             return EventVisualStyle(iconName: closeIcon, iconColor: DesignTokens.Colors.info, tone: .info)
         }
-        if containsAny(normalized, keywords: ["max_holding", "holding", "timeout", "time", "보유시간"]) {
+        if containsAny(normalized, keywords: ["market_close_exit", "market_close", "장마감"]) {
             return EventVisualStyle(iconName: closeIcon, iconColor: DesignTokens.Colors.info, tone: .info)
         }
 

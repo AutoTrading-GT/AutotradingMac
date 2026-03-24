@@ -206,7 +206,14 @@ final class AutotradingMacTests: XCTestCase {
                     code: "005930",
                     symbol: "삼성전자",
                     signalType: "new_entry",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
+                    summary: "상위 순위권 신규 진입 조건 충족",
                     confidence: 0.91,
+                    selectionMode: "turnover",
+                    rankCurrent: nil,
+                    rankPrevious: nil,
+                    payload: nil,
                     orderMode: "paper",
                     executionMode: "paper",
                     sourceSnapshotId: nil,
@@ -214,6 +221,7 @@ final class AutotradingMacTests: XCTestCase {
                     createdAt: now.addingTimeInterval(-30)
                 )
             ],
+            strategyEvents: [],
             riskDecisions: [
                 .init(
                     riskEventId: 11,
@@ -222,6 +230,11 @@ final class AutotradingMacTests: XCTestCase {
                     decision: "approved",
                     blocked: false,
                     reason: "ok",
+                    reasonCode: "risk_checks_passed",
+                    summary: "리스크 검사를 통과해 주문 대기",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
+                    context: nil,
                     orderMode: "paper",
                     executionMode: "paper",
                     signalId: 1,
@@ -239,6 +252,10 @@ final class AutotradingMacTests: XCTestCase {
                     orderQty: 10,
                     orderPrice: 71200,
                     status: "submitted",
+                    executionReason: "new_entry",
+                    signalType: "new_entry",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
                     orderMode: "paper",
                     executionMode: "paper",
                     sourceSignalReference: "strategy_signal:1",
@@ -270,6 +287,7 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(rows.first?.action, .buy)
         XCTAssertEqual(rows.first?.status, .executed)
         XCTAssertEqual(rows.first?.summary, "매수 주문 체결 완료")
+        XCTAssertEqual(rows.first?.strategyLabel, "Turnover / Surge Momentum")
     }
 
     func test_dashboardSignalSummary_excludesWatchAndGenericHoldBlocked() {
@@ -281,7 +299,14 @@ final class AutotradingMacTests: XCTestCase {
                     code: "000660",
                     symbol: "SK하이닉스",
                     signalType: "rank_maintained",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
+                    summary: nil,
                     confidence: 0.7,
+                    selectionMode: nil,
+                    rankCurrent: nil,
+                    rankPrevious: nil,
+                    payload: nil,
                     orderMode: "paper",
                     executionMode: "paper",
                     sourceSnapshotId: nil,
@@ -289,6 +314,7 @@ final class AutotradingMacTests: XCTestCase {
                     createdAt: now.addingTimeInterval(-20)
                 )
             ],
+            strategyEvents: [],
             riskDecisions: [
                 .init(
                     riskEventId: 12,
@@ -297,6 +323,11 @@ final class AutotradingMacTests: XCTestCase {
                     decision: "blocked",
                     blocked: true,
                     reason: "already_holding_position",
+                    reasonCode: "block_when_position_exists",
+                    summary: "보유 중 종목이라 추가 진입 차단",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
+                    context: nil,
                     orderMode: "paper",
                     executionMode: "paper",
                     signalId: 1,
@@ -318,6 +349,7 @@ final class AutotradingMacTests: XCTestCase {
         let now = Date()
         let rows = DashboardSignalSummaryBuilder.build(
             signals: [],
+            strategyEvents: [],
             riskDecisions: [
                 .init(
                     riskEventId: 13,
@@ -326,6 +358,11 @@ final class AutotradingMacTests: XCTestCase {
                     decision: "blocked",
                     blocked: true,
                     reason: "daily_trade_limit_reached:3",
+                    reasonCode: "daily_trade_limit_reached",
+                    summary: "일일 거래 한도 도달로 진입 차단",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
+                    context: nil,
                     orderMode: "paper",
                     executionMode: "paper",
                     signalId: 2,
@@ -350,6 +387,7 @@ final class AutotradingMacTests: XCTestCase {
         let now = Date()
         let rows = DashboardSignalSummaryBuilder.build(
             signals: [],
+            strategyEvents: [],
             riskDecisions: [
                 .init(
                     riskEventId: 14,
@@ -358,6 +396,11 @@ final class AutotradingMacTests: XCTestCase {
                     decision: "approved",
                     blocked: false,
                     reason: "ok",
+                    reasonCode: "risk_checks_passed",
+                    summary: "리스크 검사를 통과해 주문 대기",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
+                    context: nil,
                     orderMode: "paper",
                     executionMode: "paper",
                     signalId: 3,
@@ -375,6 +418,10 @@ final class AutotradingMacTests: XCTestCase {
                     orderQty: 5,
                     orderPrice: 52300,
                     status: "submitted",
+                    executionReason: "new_entry",
+                    signalType: "new_entry",
+                    strategyId: "turnover_surge_momentum",
+                    strategyDisplayName: "Turnover / Surge Momentum",
                     orderMode: "paper",
                     executionMode: "paper",
                     sourceSignalReference: "strategy_signal:3",
@@ -404,6 +451,46 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows.first?.status, .executed)
         XCTAssertEqual(rows.first?.summary, "매수 주문 체결 완료")
+    }
+
+    func test_dashboardSignalSummary_includesOpeningStrategyFilteredEvent() {
+        let now = Date()
+        let rows = DashboardSignalSummaryBuilder.build(
+            signals: [],
+            strategyEvents: [
+                .init(
+                    eventId: 21,
+                    eventType: "strategy.signal_filtered",
+                    code: "005930",
+                    symbol: "삼성전자",
+                    strategyId: "opening_pullback_reentry",
+                    strategyDisplayName: "Opening Pullback Re-entry",
+                    signalType: "opening_pullback_reentry",
+                    stage: "signal",
+                    reason: "recent_vi_excluded",
+                    reasonCode: "recent_vi_excluded",
+                    summary: "최근 VI 발동 종목이라 진입 제외",
+                    selectionMode: "turnover",
+                    rankCurrent: 2,
+                    sourceSnapshotId: 10,
+                    candidateMetric: 1_500_000_000,
+                    details: nil,
+                    orderMode: "paper",
+                    executionMode: "paper",
+                    createdAt: now
+                )
+            ],
+            riskDecisions: [],
+            orders: [],
+            fills: [],
+            closedPositions: [],
+            symbolByCode: ["005930": "삼성전자"]
+        )
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.status, .blocked)
+        XCTAssertEqual(rows.first?.summary, "최근 VI 발동 종목이라 진입 제외")
+        XCTAssertEqual(rows.first?.strategyLabel, "Opening Pullback Re-entry")
     }
 
     func test_connectionStatusResolver_reportsConnectedWhenRuntimeAndWebSocketAreHealthy() {

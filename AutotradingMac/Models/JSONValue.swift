@@ -122,4 +122,27 @@ enum JSONValue: Codable, Equatable {
         guard let arrayValue else { return nil }
         return arrayValue.compactMap(\.stringValue)
     }
+
+    var displayText: String {
+        switch self {
+        case .string(let value):
+            return value
+        case .number(let value):
+            if abs(value.rounded() - value) < 0.000001 {
+                return String(Int(value.rounded()))
+            }
+            return String(format: "%.4f", value)
+        case .bool(let value):
+            return value ? "true" : "false"
+        case .object(let value):
+            return value
+                .sorted(by: { $0.key < $1.key })
+                .map { key, nestedValue in "\(key)=\(nestedValue.displayText)" }
+                .joined(separator: ", ")
+        case .array(let value):
+            return value.map(\.displayText).joined(separator: ", ")
+        case .null:
+            return "null"
+        }
+    }
 }

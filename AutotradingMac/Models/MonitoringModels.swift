@@ -9,6 +9,7 @@ struct MonitoringSnapshotResponse: Decodable {
     let runtime: RuntimeStatusSnapshot
     let marketTopRanks: [MarketRankSnapshotItem]
     let recentSignals: [SignalSnapshotItem]
+    let recentStrategyEvents: [StrategyEventSnapshotItem]
     let recentRiskDecisions: [RiskDecisionSnapshotItem]
     let recentOrders: [OrderSnapshotItem]
     let recentFills: [FillSnapshotItem]
@@ -21,6 +22,7 @@ struct MonitoringSnapshotResponse: Decodable {
         case runtime
         case marketTopRanks
         case recentSignals
+        case recentStrategyEvents
         case recentRiskDecisions
         case recentOrders
         case recentFills
@@ -36,6 +38,7 @@ struct MonitoringSnapshotResponse: Decodable {
             ?? RuntimeStatusSnapshot.fallback
         marketTopRanks = Self.decodeLossyArray(MarketRankSnapshotItem.self, from: container, forKey: .marketTopRanks)
         recentSignals = Self.decodeLossyArray(SignalSnapshotItem.self, from: container, forKey: .recentSignals)
+        recentStrategyEvents = Self.decodeLossyArray(StrategyEventSnapshotItem.self, from: container, forKey: .recentStrategyEvents)
         recentRiskDecisions = Self.decodeLossyArray(RiskDecisionSnapshotItem.self, from: container, forKey: .recentRiskDecisions)
         recentOrders = Self.decodeLossyArray(OrderSnapshotItem.self, from: container, forKey: .recentOrders)
         recentFills = Self.decodeLossyArray(FillSnapshotItem.self, from: container, forKey: .recentFills)
@@ -1481,11 +1484,44 @@ struct SignalSnapshotItem: Decodable, Identifiable {
     let code: String
     let symbol: String?
     let signalType: String
+    let strategyId: String?
+    let strategyDisplayName: String?
+    let summary: String?
     let confidence: Double?
+    let selectionMode: String?
+    let rankCurrent: Int?
+    let rankPrevious: Int?
+    let payload: [String: JSONValue]?
     let orderMode: String?
     let executionMode: String?
     let sourceSnapshotId: Int?
     let previousSnapshotId: Int?
+    let createdAt: Date
+}
+
+struct StrategyEventSnapshotItem: Decodable, Identifiable {
+    var id: String {
+        "strategy-event-\(eventId)-\(code ?? "unknown")-\(createdAt.timeIntervalSince1970)"
+    }
+
+    let eventId: Int
+    let eventType: String
+    let code: String?
+    let symbol: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
+    let signalType: String?
+    let stage: String?
+    let reason: String?
+    let reasonCode: String?
+    let summary: String?
+    let selectionMode: String?
+    let rankCurrent: Int?
+    let sourceSnapshotId: Int?
+    let candidateMetric: Double?
+    let details: [String: JSONValue]?
+    let orderMode: String?
+    let executionMode: String?
     let createdAt: Date
 }
 
@@ -1500,6 +1536,11 @@ struct RiskDecisionSnapshotItem: Decodable, Identifiable {
     let decision: String
     let blocked: Bool?
     let reason: String
+    let reasonCode: String?
+    let summary: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
+    let context: [String: JSONValue]?
     let orderMode: String?
     let executionMode: String?
     let signalId: Int?
@@ -1517,6 +1558,10 @@ struct OrderSnapshotItem: Decodable, Identifiable {
     let orderQty: Double
     let orderPrice: Double?
     let status: String
+    let executionReason: String?
+    let signalType: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
     let orderMode: String?
     let executionMode: String?
     let sourceSignalReference: String?
@@ -1569,6 +1614,11 @@ struct ClosedPositionSnapshotItem: Decodable, Identifiable {
     let realizedPnl: Double?
     let realizedPnlPct: Double?
     let reason: String?
+    let reasonCode: String?
+    let summary: String?
+    let signalType: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
     let sourceOrderId: Int?
     let sourceSignalReference: String?
     let holdingSeconds: Double?

@@ -42,6 +42,7 @@ enum DashboardSignalStatus: String {
 struct DashboardSignalSummaryRow: Identifiable {
     let code: String
     let name: String
+    let strategyLabel: String?
     let summary: String
     let action: DashboardSignalAction
     let status: DashboardSignalStatus
@@ -55,6 +56,7 @@ enum DashboardSignalSummaryBuilder {
 
     static func build(
         signals: [SignalSnapshotItem],
+        strategyEvents: [StrategyEventSnapshotItem],
         riskDecisions: [RiskDecisionSnapshotItem],
         orders: [OrderSnapshotItem],
         fills: [FillSnapshotItem],
@@ -63,6 +65,7 @@ enum DashboardSignalSummaryBuilder {
         limit: Int = 6
     ) -> [DashboardSignalSummaryRow] {
         var candidatesByCode: [String: [Candidate]] = [:]
+        let orderByID = Dictionary(uniqueKeysWithValues: orders.map { ($0.orderId, $0) })
 
         func append(_ candidate: Candidate?) {
             guard let candidate else { return }
@@ -75,11 +78,29 @@ enum DashboardSignalSummaryBuilder {
                 Candidate(
                     code: row.code,
                     name: instrumentName(symbol: row.symbol, code: row.code, symbolByCode: symbolByCode),
-                    summary: signalSummary(signalType: row.signalType),
+                    strategyLabel: row.strategyDisplayName,
+                    summary: row.summary ?? signalSummary(signalType: row.signalType),
                     action: action(forSignalType: row.signalType),
                     status: .monitoring,
                     timestamp: row.createdAt,
                     priority: 10
+                )
+            )
+        }
+
+        strategyEvents.forEach { row in
+            guard let code = normalizedCode(row.code) else { return }
+            let signalType = row.signalType ?? row.strategyId ?? ""
+            append(
+                Candidate(
+                    code: code,
+                    name: instrumentName(symbol: row.symbol, code: code, symbolByCode: symbolByCode),
+                    strategyLabel: row.strategyDisplayName,
+                    summary: row.summary ?? blockedSummary(reason: row.reasonCode ?? row.reason),
+                    action: action(forSignalType: signalType),
+                    status: .blocked,
+                    timestamp: row.createdAt,
+                    priority: 25
                 )
             )
         }
@@ -95,7 +116,8 @@ enum DashboardSignalSummaryBuilder {
                     Candidate(
                         code: code,
                         name: instrumentName(symbol: row.symbol, code: code, symbolByCode: symbolByCode),
-                        summary: approvedSummary(signalType: signalType),
+                        strategyLabel: row.strategyDisplayName,
+                        summary: row.summary ?? approvedSummary(signalType: signalType),
                         action: action(forSignalType: signalType),
                         status: .pending,
                         timestamp: row.createdAt,
@@ -105,12 +127,14 @@ enum DashboardSignalSummaryBuilder {
                 return
             }
 
-            guard decision == "blocked", shouldIncludeBlocked(reason: row.reason, signalType: signalType) else { return }
+            let blockedReason = row.reasonCode ?? row.reason
+            guard decision == "blocked", shouldIncludeBlocked(reason: blockedReason, signalType: signalType) else { return }
             append(
                 Candidate(
                     code: code,
                     name: instrumentName(symbol: row.symbol, code: code, symbolByCode: symbolByCode),
-                    summary: blockedSummary(reason: row.reason),
+                    strategyLabel: row.strategyDisplayName,
+                    summary: row.summary ?? blockedSummary(reason: blockedReason),
                     action: action(forSignalType: signalType),
                     status: .blocked,
                     timestamp: row.createdAt,
@@ -127,7 +151,12 @@ enum DashboardSignalSummaryBuilder {
                     Candidate(
                         code: row.code,
                         name: name,
-                        summary: orderSummary(status: status),
+                        strategyLabel: row.strategyDisplayName,
+                        summary: orderSummary(
+                            status: status,
+                            side: row.side,
+                            executionReason: row.executionReason
+                        ),
                         action: action(forSide: row.side),
                         status: .pending,
                         timestamp: row.updatedAt,
@@ -139,7 +168,8 @@ enum DashboardSignalSummaryBuilder {
                     Candidate(
                         code: row.code,
                         name: name,
-                        summary: "주문 거부",
+                        strategyLabel: row.strategyDisplayName,
+                        summary: row.executionReason.map { blockedSummary(reason: $0) } ?? "주문 거부",
                         action: action(forSide: row.side),
                         status: .blocked,
                         timestamp: row.updatedAt,
@@ -150,11 +180,13 @@ enum DashboardSignalSummaryBuilder {
         }
 
         fills.forEach { row in
+            let relatedOrder = orderByID[row.orderId]
             append(
                 Candidate(
                     code: row.code,
                     name: instrumentName(symbol: row.symbol, code: row.code, symbolByCode: symbolByCode),
-                    summary: fillSummary(side: row.side),
+                    strategyLabel: relatedOrder?.strategyDisplayName,
+                    summary: fillSummary(side: row.side, executionReason: relatedOrder?.executionReason),
                     action: action(forSide: row.side),
                     status: .executed,
                     timestamp: row.filledAt,
@@ -169,7 +201,8 @@ enum DashboardSignalSummaryBuilder {
                 Candidate(
                     code: code,
                     name: instrumentName(symbol: row.symbol, code: code, symbolByCode: symbolByCode),
-                    summary: closeSummary(reason: row.reason),
+                    strategyLabel: row.strategyDisplayName,
+                    summary: row.summary ?? closeSummary(reason: row.reasonCode ?? row.reason),
                     action: .sell,
                     status: .executed,
                     timestamp: row.createdAt,
@@ -188,6 +221,7 @@ enum DashboardSignalSummaryBuilder {
                 DashboardSignalSummaryRow(
                     code: $0.code,
                     name: $0.name,
+                    strategyLabel: $0.strategyLabel,
                     summary: $0.summary,
                     action: $0.action,
                     status: $0.status,
@@ -203,7 +237,7 @@ enum DashboardSignalSummaryBuilder {
         if normalizedReason.contains("already_holding") || normalizedReason.contains("position_exists") || normalizedReason.contains("block_when_position_exists") {
             return false
         }
-        if normalizedReason.contains("cooldown") || normalizedReason.contains("recent") {
+        if normalizedReason.contains("cooldown") {
             return false
         }
         if normalizedReason.contains("signal_type_not_allowed") {
@@ -237,13 +271,40 @@ enum DashboardSignalSummaryBuilder {
         return "진입 조건 확인, 주문 대기"
     }
 
-    private static func blockedSummary(reason: String) -> String {
+    private static func blockedSummary(reason: String?) -> String {
         let normalized = normalize(reason)
         if normalized.contains("daily_trade_limit_reached") {
             return "일일 거래 한도 도달"
         }
         if normalized.contains("daily_loss_limit_reached") {
             return "일일 손실 한도 도달"
+        }
+        if normalized.contains("time_window_outside") {
+            return "진입 가능 시간대 밖이라 신호 제외"
+        }
+        if normalized.contains("open_impulse_not_qualified") {
+            return "개장 초 상승 탄력이 기준에 못 미쳐 신호 제외"
+        }
+        if normalized.contains("pullback_invalid") {
+            return "눌림 구조가 기준에 맞지 않아 신호 제외"
+        }
+        if normalized.contains("reentry_volume_insufficient") {
+            return "재진입 거래량 부족으로 신호 제외"
+        }
+        if normalized.contains("vwap_condition_failed") {
+            return "VWAP 조건 미충족으로 신호 제외"
+        }
+        if normalized.contains("recently_listed_excluded") {
+            return "신규상장 초기 종목이라 진입 제외"
+        }
+        if normalized.contains("short_term_overheated_excluded") {
+            return "단기과열 종목이라 진입 제외"
+        }
+        if normalized.contains("market_warning_excluded") {
+            return "시장경보 종목이라 진입 제외"
+        }
+        if normalized.contains("recent_vi_excluded") {
+            return "최근 VI 발동 종목이라 진입 제외"
         }
         if normalized.contains("daily_loss_limit_account_value_unavailable") {
             return "계좌 기준값 미확보"
@@ -269,19 +330,48 @@ enum DashboardSignalSummaryBuilder {
         return "리스크 제한으로 차단"
     }
 
-    private static func orderSummary(status: String) -> String {
+    private static func orderSummary(status: String, side: String, executionReason: String?) -> String {
+        let sideAction = action(forSide: side)
+        if sideAction == .sell, let executionReason, !executionReason.isEmpty {
+            let executionSummary = closeSummary(reason: executionReason)
+            if status == "partially_filled" {
+                return "\(executionSummary) 진행 중"
+            }
+            if status == "submitted" || status == "created" {
+                return "\(executionSummary) 주문 대기"
+            }
+            return executionSummary
+        }
         if status == "partially_filled" {
             return "부분 체결 진행 중"
         }
         return "주문 접수 후 대기"
     }
 
-    private static func fillSummary(side: String) -> String {
-        action(forSide: side) == .sell ? "매도 주문 체결 완료" : "매수 주문 체결 완료"
+    private static func fillSummary(side: String, executionReason: String?) -> String {
+        if action(forSide: side) == .sell, let executionReason, !executionReason.isEmpty {
+            return closeSummary(reason: executionReason)
+        }
+        return action(forSide: side) == .sell ? "매도 주문 체결 완료" : "매수 주문 체결 완료"
     }
 
     private static func closeSummary(reason: String?) -> String {
         let normalized = normalize(reason)
+        if normalized.contains("first_take_profit_partial") {
+            return "1차 익절 분할청산"
+        }
+        if normalized.contains("initial_stop") {
+            return "초기 손절 청산"
+        }
+        if normalized.contains("hard_time_stop") {
+            return "하드 시간청산"
+        }
+        if normalized.contains("soft_time_stop") {
+            return "소프트 시간청산"
+        }
+        if normalized.contains("market_close_exit") {
+            return "장마감 강제청산"
+        }
         if normalized.contains("take_profit") || normalized.contains("익절") {
             return "목표 수익 도달"
         }
@@ -346,6 +436,7 @@ enum DashboardSignalSummaryBuilder {
     private struct Candidate {
         let code: String
         let name: String
+        let strategyLabel: String?
         let summary: String
         let action: DashboardSignalAction
         let status: DashboardSignalStatus

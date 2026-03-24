@@ -65,6 +65,9 @@ struct SignalGeneratedPayload: Decodable {
     let rankPrevious: Int?
     let sourceSnapshotId: Int
     let previousSnapshotId: Int?
+    let orderMode: String?
+    let executionMode: String?
+    let payload: [String: JSONValue]?
 }
 
 struct RiskDecisionPayload: Decodable {
@@ -76,6 +79,29 @@ struct RiskDecisionPayload: Decodable {
     let signalType: String?
     let relatedSignalReference: String?
     let reason: String
+    let orderMode: String?
+    let executionMode: String?
+    let context: [String: JSONValue]?
+}
+
+struct StrategySignalFilteredPayload: Decodable {
+    let timestamp: Date
+    let code: String
+    let symbol: String?
+    let strategyId: String
+    let strategyDisplayName: String?
+    let signalType: String
+    let stage: String
+    let reason: String
+    let reasonCode: String?
+    let summary: String?
+    let selectionMode: String?
+    let sourceSnapshotId: Int?
+    let rankCurrent: Int?
+    let candidateMetric: Double?
+    let orderMode: String?
+    let executionMode: String?
+    let details: [String: JSONValue]?
 }
 
 struct OrderCreatedPayload: Decodable {
@@ -155,6 +181,11 @@ struct PositionClosedPayload: Decodable {
     let sourceOrderId: Int?
     let sourceSignalReference: String?
     let reason: String
+    let reasonCode: String?
+    let summary: String?
+    let signalType: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
     let orderMode: String?
     let executionMode: String?
 }

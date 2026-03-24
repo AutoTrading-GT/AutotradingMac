@@ -236,7 +236,7 @@ struct DashboardView: View {
                                     Text(item.name)
                                         .font(.subheadline.weight(.medium))
                                         .lineLimit(1)
-                                    Text(item.summary)
+                                    Text(signalRowSecondaryText(item))
                                         .font(.caption2)
                                         .foregroundStyle(DesignTokens.Colors.textQuaternary)
                                         .lineLimit(1)
@@ -472,6 +472,7 @@ struct DashboardView: View {
     private var signalItems: [DashboardSignalSummaryRow] {
         DashboardSignalSummaryBuilder.build(
             signals: store.recentSignals,
+            strategyEvents: store.recentStrategyEvents,
             riskDecisions: store.recentRiskDecisions,
             orders: store.recentOrders,
             fills: store.recentFills,
@@ -533,7 +534,12 @@ struct DashboardView: View {
                     timestamp: row.updatedAt,
                     iconName: style.iconName,
                     iconColor: style.iconColor,
-                    message: "\(displayName) \(row.sideText) 주문 \(row.status)",
+                    message: orderLogMessage(
+                        instrumentName: displayName,
+                        side: row.side,
+                        status: row.status,
+                        executionReason: row.executionReason
+                    ),
                     kind: .order,
                     code: row.code,
                     orderId: row.orderId,
@@ -544,10 +550,38 @@ struct DashboardView: View {
             }
         )
         items.append(
+            contentsOf: store.recentStrategyEvents.map { row in
+                let style = EventVisualStyleResolver.risk(
+                    decision: "blocked",
+                    reason: row.reasonCode ?? row.reason ?? "",
+                    signalType: row.signalType
+                )
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code ?? "종목")
+                return DashboardLogItem(
+                    id: "strategy-event-\(row.id)",
+                    timestamp: row.createdAt,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    message: strategyEventLogMessage(
+                        instrumentName: displayName,
+                        summary: row.summary,
+                        reason: row.reasonCode ?? row.reason,
+                        strategyLabel: row.strategyDisplayName
+                    ),
+                    kind: .risk,
+                    code: row.code,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: row.signalType.map(signalSide),
+                    status: row.reasonCode ?? row.reason
+                )
+            }
+        )
+        items.append(
             contentsOf: store.recentRiskDecisions.map { row in
                 let style = EventVisualStyleResolver.risk(
                     decision: row.decision,
-                    reason: row.reason,
+                    reason: row.reasonCode ?? row.reason,
                     signalType: row.signalType
                 )
                 let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code ?? "종목")
@@ -559,8 +593,10 @@ struct DashboardView: View {
                     message: riskLogMessage(
                         instrumentName: displayName,
                         decision: row.decision,
-                        reason: row.reason,
-                        signalType: row.signalType
+                        reason: row.reasonCode ?? row.reason,
+                        signalType: row.signalType,
+                        summary: row.summary,
+                        strategyLabel: row.strategyDisplayName
                     ),
                     kind: .risk,
                     code: row.code,
@@ -582,7 +618,9 @@ struct DashboardView: View {
                     iconColor: style.iconColor,
                     message: signalLogMessage(
                         instrumentName: displayName,
-                        signalType: row.signalType
+                        signalType: row.signalType,
+                        summary: row.summary,
+                        strategyLabel: row.strategyDisplayName
                     ),
                     kind: .signal,
                     code: row.code,
@@ -595,8 +633,8 @@ struct DashboardView: View {
         )
         items.append(
             contentsOf: store.recentClosedPositions.map { row in
-                let style = EventVisualStyleResolver.close(reason: row.reason, realizedPnl: row.realizedPnl)
-                let reasonText = closeReasonText(row.reason)
+                let style = EventVisualStyleResolver.close(reason: row.reasonCode ?? row.reason, realizedPnl: row.realizedPnl)
+                let reasonText = closeReasonText(row.reasonCode ?? row.reason, summary: row.summary)
                 let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code ?? "종목")
                 return DashboardLogItem(
                     id: "closed-\(row.id)",
@@ -609,7 +647,7 @@ struct DashboardView: View {
                     orderId: nil,
                     sourceOrderId: row.sourceOrderId,
                     side: "sell",
-                    status: row.reason,
+                    status: row.reasonCode ?? row.reason,
                     trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
                     trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl)
                 )
@@ -776,8 +814,23 @@ struct DashboardView: View {
         return fallback
     }
 
-    private func closeReasonText(_ reason: String?) -> String {
+    private func signalRowSecondaryText(_ item: DashboardSignalSummaryRow) -> String {
+        guard let strategyLabel = item.strategyLabel, !strategyLabel.isEmpty else {
+            return item.summary
+        }
+        return "\(strategyLabel) · \(item.summary)"
+    }
+
+    private func closeReasonText(_ reason: String?, summary: String?) -> String {
+        if let summary, !summary.isEmpty {
+            return summary
+        }
         let normalized = (reason ?? "").lowercased()
+        if normalized.contains("first_take_profit_partial") { return "1차 익절 분할청산" }
+        if normalized.contains("initial_stop") { return "초기 손절 청산" }
+        if normalized.contains("hard_time_stop") { return "하드 시간청산" }
+        if normalized.contains("soft_time_stop") { return "소프트 시간청산" }
+        if normalized.contains("market_close_exit") { return "장마감 강제청산" }
         if normalized.contains("take_profit") || normalized.contains("익절") { return "익절 청산" }
         if normalized.contains("stop_loss") || normalized.contains("손절") { return "손절 청산" }
         if normalized.contains("market_close") || normalized.contains("장마감") { return "장마감 청산" }
@@ -793,7 +846,18 @@ struct DashboardView: View {
         return "buy"
     }
 
-    private func signalLogMessage(instrumentName: String, signalType: String) -> String {
+    private func signalLogMessage(
+        instrumentName: String,
+        signalType: String,
+        summary: String?,
+        strategyLabel: String?
+    ) -> String {
+        if let summary, !summary.isEmpty {
+            if let strategyLabel, !strategyLabel.isEmpty {
+                return "\(instrumentName) \(strategyLabel) · \(summary)"
+            }
+            return "\(instrumentName) \(summary)"
+        }
         let normalized = signalType.lowercased()
         if normalized.contains("watch") || normalized.contains("maintained") || normalized.contains("wait") || normalized.contains("hold") || normalized.contains("관망") {
             return "\(instrumentName) 관망 신호"
@@ -804,7 +868,45 @@ struct DashboardView: View {
         return "\(instrumentName) 매수 신호 생성"
     }
 
-    private func riskLogMessage(instrumentName: String, decision: String, reason: String, signalType: String?) -> String {
+    private func orderLogMessage(
+        instrumentName: String,
+        side: String,
+        status: String,
+        executionReason: String?
+    ) -> String {
+        if side.lowercased() == "sell", let executionReason, !executionReason.isEmpty {
+            return "\(instrumentName) \(closeReasonText(executionReason, summary: nil))"
+        }
+        return "\(instrumentName) \(side.lowercased() == "buy" ? "매수" : "매도") 주문 \(status)"
+    }
+
+    private func strategyEventLogMessage(
+        instrumentName: String,
+        summary: String?,
+        reason: String?,
+        strategyLabel: String?
+    ) -> String {
+        let base = summary ?? closeReasonText(reason, summary: nil)
+        if let strategyLabel, !strategyLabel.isEmpty {
+            return "\(instrumentName) \(strategyLabel) · \(base)"
+        }
+        return "\(instrumentName) \(base)"
+    }
+
+    private func riskLogMessage(
+        instrumentName: String,
+        decision: String,
+        reason: String,
+        signalType: String?,
+        summary: String?,
+        strategyLabel: String?
+    ) -> String {
+        if let summary, !summary.isEmpty {
+            if let strategyLabel, !strategyLabel.isEmpty {
+                return "\(instrumentName) \(strategyLabel) · \(summary)"
+            }
+            return "\(instrumentName) \(summary)"
+        }
         let normalizedDecision = decision.lowercased()
         let normalizedReason = reason.lowercased()
         let normalizedSignalType = signalType?.lowercased() ?? ""

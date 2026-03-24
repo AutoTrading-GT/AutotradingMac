@@ -20,6 +20,7 @@
   - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
+- snapshot에는 `recent_strategy_events`가 포함되며, websocket `strategy.signal_filtered` 이벤트도 별도로 반영
 - 페이지별 SwiftUI `#Preview` 지원
   - Dashboard / Scanner / Chart / Stategy / Logs / Settings / Dev
   - Dev 하위(`Signals / Risk`, `Orders / Fills`, `Positions / PnL`, `Runtime / Workers`) 및 `GlobalTopBarView` 포함
@@ -73,11 +74,16 @@
     - 손실(-): 파랑
     - 보합(0): 회색
   - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
+  - opening 전략 관찰성:
+    - `strategy.signal_filtered`를 별도 로그 항목으로 표시해 "후보는 있었지만 차단됨"을 구분
+    - signal/risk/order/close row는 `strategyDisplayName`, `summary`, `reasonCode`, `executionReason`를 우선 사용
+    - `opening_pullback_reentry`는 `눌림 후 재상승 진입`, `재진입 거래량 부족으로 신호 제외`, `하드 타임스탑 청산` 같은 사용자 문구로 치환
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
   - 우측 상세는 내부 단계 추적을 유지:
     - `source_order_id`, `source_signal_reference`
     - 연계 주문 상태/수량/가격
     - 연계 체결 수량/가격/시각
+    - `strategy_id`, `strategy_display_name`, `reason_code`, `summary`, `execution_reason`
   - 즉, 목록은 “최종 결과”, 상세는 “내부 실행 단계” 역할로 분리
   - 우측 상세에 `execution_mode`를 명시해 mode 혼선을 줄임
   - 로그 미선택 시 우측 empty state 표시
@@ -301,6 +307,7 @@
     - 각 행: 종목명, 짧은 근거 요약, 액션 배지(`매수`/`매도`), 상태 배지(`실행됨`/`대기중`/`모니터링`/`차단됨`)
     - 포함: 실제 매수/매도/진입/청산 신호, 실행/대기 상태, 중요한 리스크 차단 상태
     - 제외: 관망(`watch`/`rank_maintained`) 및 일반 보류(`already_holding`/`cooldown`) 계열
+    - `opening_pullback_reentry`는 전략 라벨과 backend summary를 우선 사용해 `Opening Pullback Re-entry`, `눌림 후 재상승 진입 조건 충족`, `최근 VI로 진입 제외`처럼 보이게 한다
   - `최근 로그`는 Logs 페이지 최신 feed 축약본 역할을 유지
     - 관망 신호를 다시 포함하며, 시간순 사건 기록을 담당
 - 스캔 종목 리스트는 고정 컬럼 정렬을 사용

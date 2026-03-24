@@ -31,6 +31,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var strategyValidationMessages: [String] = []
     @Published private(set) var marketTopRanks: [MarketRankSnapshotItem] = []
     @Published private(set) var recentSignals: [SignalSnapshotItem] = []
+    @Published private(set) var recentStrategyEvents: [StrategyEventSnapshotItem] = []
     @Published private(set) var recentRiskDecisions: [RiskDecisionSnapshotItem] = []
     @Published private(set) var recentOrders: [OrderSnapshotItem] = []
     @Published private(set) var recentFills: [FillSnapshotItem] = []
@@ -1206,6 +1207,7 @@ final class MonitoringStore: ObservableObject {
         strategyValidationMessages = []
         marketTopRanks = []
         recentSignals = []
+        recentStrategyEvents = []
         recentRiskDecisions = []
         recentOrders = []
         recentFills = []
@@ -2131,6 +2133,7 @@ final class MonitoringStore: ObservableObject {
         scannerLoadedLimitByMode["turnover"] = min(scannerStep, snapshot.marketTopRanks.count)
         scannerHasMoreByMode["turnover"] = snapshot.marketTopRanks.count >= scannerStep
         recentSignals = snapshot.recentSignals
+        recentStrategyEvents = snapshot.recentStrategyEvents
         recentRiskDecisions = snapshot.recentRiskDecisions
         recentOrders = snapshot.recentOrders
         recentFills = snapshot.recentFills
@@ -2236,6 +2239,10 @@ final class MonitoringStore: ObservableObject {
                 Task {
                     await notifyTradeSignalIfNeeded(payload: payload)
                 }
+            }
+        case "strategy.signal_filtered":
+            if let payload = decodePayload(StrategySignalFilteredPayload.self, from: event.data) {
+                appendStrategyEvent(payload: payload)
             }
         case "risk.blocked", "risk.approved":
             if let payload = decodePayload(RiskDecisionPayload.self, from: event.data) {
@@ -2402,14 +2409,28 @@ final class MonitoringStore: ObservableObject {
     }
 
     private func appendSignal(payload: SignalGeneratedPayload) {
+        let strategyId = strategyID(
+            signalType: payload.signalType,
+            payload: payload.payload
+        )
         let row = SignalSnapshotItem(
             signalId: nil,
             code: payload.code,
             symbol: payload.symbol,
             signalType: payload.signalType,
+            strategyId: strategyId,
+            strategyDisplayName: resolveStrategyDisplayName(
+                strategyId: strategyId,
+                preferred: payload.payload?["strategy_display_name"]?.stringValue
+            ),
+            summary: signalSummaryText(payload.payload, fallbackSignalType: payload.signalType),
             confidence: payload.confidence,
-            orderMode: runtime?.orderMode,
-            executionMode: runtime?.executionMode ?? runtime?.orderMode,
+            selectionMode: payload.payload?["selection_mode"]?.stringValue,
+            rankCurrent: payload.rankCurrent,
+            rankPrevious: payload.rankPrevious,
+            payload: payload.payload,
+            orderMode: payload.orderMode ?? runtime?.orderMode,
+            executionMode: payload.executionMode ?? payload.orderMode ?? runtime?.executionMode ?? runtime?.orderMode,
             sourceSnapshotId: payload.sourceSnapshotId,
             previousSnapshotId: payload.previousSnapshotId,
             createdAt: payload.timestamp
@@ -2418,7 +2439,39 @@ final class MonitoringStore: ObservableObject {
         recentSignals = Array(recentSignals.prefix(maxRecentItems))
     }
 
+    private func appendStrategyEvent(payload: StrategySignalFilteredPayload) {
+        let row = StrategyEventSnapshotItem(
+            eventId: 0,
+            eventType: "strategy.signal_filtered",
+            code: payload.code,
+            symbol: payload.symbol,
+            strategyId: payload.strategyId,
+            strategyDisplayName: resolveStrategyDisplayName(
+                strategyId: payload.strategyId,
+                preferred: payload.strategyDisplayName
+            ),
+            signalType: payload.signalType,
+            stage: payload.stage,
+            reason: payload.reason,
+            reasonCode: payload.reasonCode,
+            summary: payload.summary,
+            selectionMode: payload.selectionMode,
+            rankCurrent: payload.rankCurrent,
+            sourceSnapshotId: payload.sourceSnapshotId,
+            candidateMetric: payload.candidateMetric,
+            details: payload.details,
+            orderMode: payload.orderMode ?? runtime?.orderMode,
+            executionMode: payload.executionMode ?? payload.orderMode ?? runtime?.executionMode ?? runtime?.orderMode,
+            createdAt: payload.timestamp
+        )
+        recentStrategyEvents.insert(row, at: 0)
+        recentStrategyEvents = Array(recentStrategyEvents.prefix(maxRecentItems))
+    }
+
     private func appendRiskDecision(payload: RiskDecisionPayload) {
+        let signalPayload = payload.context?["signal_payload"]?.objectValue
+        let strategyId = payload.context?["strategy_id"]?.stringValue
+            ?? strategyID(signalType: payload.signalType, payload: signalPayload)
         let row = RiskDecisionSnapshotItem(
             riskEventId: nil,
             code: payload.code,
@@ -2426,8 +2479,16 @@ final class MonitoringStore: ObservableObject {
             decision: payload.decision,
             blocked: payload.decision.lowercased() == "blocked",
             reason: payload.reason,
-            orderMode: runtime?.orderMode,
-            executionMode: runtime?.executionMode ?? runtime?.orderMode,
+            reasonCode: payload.context?["reason_code"]?.stringValue,
+            summary: payload.context?["summary"]?.stringValue,
+            strategyId: strategyId,
+            strategyDisplayName: resolveStrategyDisplayName(
+                strategyId: strategyId,
+                preferred: payload.context?["strategy_display_name"]?.stringValue
+            ),
+            context: payload.context,
+            orderMode: payload.orderMode ?? runtime?.orderMode,
+            executionMode: payload.executionMode ?? payload.orderMode ?? runtime?.executionMode ?? runtime?.orderMode,
             signalId: payload.signalId,
             signalType: payload.signalType,
             relatedSignalReference: payload.relatedSignalReference,
@@ -2446,6 +2507,10 @@ final class MonitoringStore: ObservableObject {
             orderQty: payload.qty,
             orderPrice: payload.orderPrice,
             status: payload.status,
+            executionReason: nil,
+            signalType: nil,
+            strategyId: nil,
+            strategyDisplayName: nil,
             orderMode: runtime?.orderMode,
             executionMode: runtime?.executionMode ?? runtime?.orderMode,
             sourceSignalReference: payload.sourceSignalReference,
@@ -2467,6 +2532,10 @@ final class MonitoringStore: ObservableObject {
                 orderQty: payload.qty,
                 orderPrice: payload.orderPrice,
                 status: payload.status,
+                executionReason: payload.executionReason ?? previous.executionReason,
+                signalType: previous.signalType,
+                strategyId: previous.strategyId,
+                strategyDisplayName: previous.strategyDisplayName,
                 orderMode: previous.orderMode ?? runtime?.orderMode,
                 executionMode: previous.executionMode ?? runtime?.executionMode ?? runtime?.orderMode,
                 sourceSignalReference: payload.sourceSignalReference,
@@ -2483,6 +2552,10 @@ final class MonitoringStore: ObservableObject {
                 orderQty: payload.qty,
                 orderPrice: payload.orderPrice,
                 status: payload.status,
+                executionReason: payload.executionReason,
+                signalType: nil,
+                strategyId: nil,
+                strategyDisplayName: nil,
                 orderMode: runtime?.orderMode,
                 executionMode: runtime?.executionMode ?? runtime?.orderMode,
                 sourceSignalReference: payload.sourceSignalReference,
@@ -2591,6 +2664,14 @@ final class MonitoringStore: ObservableObject {
                 realizedPnl: payload.realizedPnl,
                 realizedPnlPct: payload.realizedPnlPct,
                 reason: payload.reason,
+                reasonCode: payload.reasonCode,
+                summary: payload.summary,
+                signalType: payload.signalType,
+                strategyId: payload.strategyId,
+                strategyDisplayName: resolveStrategyDisplayName(
+                    strategyId: payload.strategyId,
+                    preferred: payload.strategyDisplayName
+                ),
                 sourceOrderId: payload.sourceOrderId,
                 sourceSignalReference: payload.sourceSignalReference,
                 holdingSeconds: payload.holdingSeconds,
@@ -2733,6 +2814,8 @@ final class MonitoringStore: ObservableObject {
             return "순위 급상승"
         case "rank_maintained":
             return "상위권 유지"
+        case "opening_pullback_reentry":
+            return "눌림 후 재상승 진입"
         case "exit_signal":
             return "청산"
         default:
@@ -2748,6 +2831,67 @@ final class MonitoringStore: ObservableObject {
             return "매도"
         default:
             return "주문"
+        }
+    }
+
+    private func strategyID(signalType: String?, payload: [String: JSONValue]?) -> String? {
+        if let direct = payload?["strategy_id"]?.stringValue, !direct.isEmpty {
+            return direct
+        }
+        if let nested = payload?["rule_payload"]?.objectValue?["strategy_id"]?.stringValue, !nested.isEmpty {
+            return nested
+        }
+        switch signalType?.lowercased() {
+        case "opening_pullback_reentry":
+            return "opening_pullback_reentry"
+        case "new_entry", "rank_jump", "rank_maintained":
+            return "turnover_surge_momentum"
+        default:
+            return nil
+        }
+    }
+
+    private func resolveStrategyDisplayName(strategyId: String?, preferred: String?) -> String? {
+        if let preferred, !preferred.isEmpty {
+            return preferred
+        }
+        guard let strategyId, !strategyId.isEmpty else { return nil }
+        if let name = strategySettings?.template(id: strategyId)?.displayName {
+            return name
+        }
+        switch strategyId {
+        case "turnover_surge_momentum":
+            return "Turnover / Surge Momentum"
+        case "opening_pullback_reentry":
+            return "Opening Pullback Re-entry"
+        case "intraday_breakout":
+            return "Intraday Breakout"
+        default:
+            return strategyId
+        }
+    }
+
+    private func signalSummaryText(_ payload: [String: JSONValue]?, fallbackSignalType: String) -> String? {
+        if let summary = payload?["signal_summary"]?.stringValue, !summary.isEmpty {
+            return summary
+        }
+        if let summary = payload?["summary"]?.stringValue, !summary.isEmpty {
+            return summary
+        }
+        if let nested = payload?["rule_payload"]?.objectValue?["signal_summary"]?.stringValue, !nested.isEmpty {
+            return nested
+        }
+        switch fallbackSignalType.lowercased() {
+        case "opening_pullback_reentry":
+            return "개장 초 눌림 후 재상승 진입 조건 충족"
+        case "rank_jump":
+            return "순위 급상승으로 모멘텀 진입 조건 충족"
+        case "new_entry":
+            return "상위 순위권 신규 진입 조건 충족"
+        case "rank_maintained":
+            return "상위권 유지 모니터링"
+        default:
+            return "매매 신호 생성"
         }
     }
 
