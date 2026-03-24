@@ -1447,6 +1447,12 @@ final class MonitoringStore: ObservableObject {
             "reentry_volume_multiplier": .number(1.4),
             "use_vwap_filter": .bool(true),
             "require_vwap_reclaim": .bool(false),
+            "exclude_recently_listed_enabled": .bool(true),
+            "exclude_recently_listed_days": .number(5),
+            "exclude_short_term_overheated_enabled": .bool(true),
+            "exclude_market_warning_enabled": .bool(true),
+            "exclude_recent_vi_enabled": .bool(true),
+            "recent_vi_lookback_minutes": .number(10),
             "initial_stop_pct": .number(1.2),
             "first_take_profit_r_multiple": .number(1.5),
             "first_take_profit_partial_ratio": .number(0.5),
@@ -1709,6 +1715,16 @@ final class MonitoringStore: ObservableObject {
             let reentryVolumeMultiplier = activeStrategyParams.doubleValue(for: "reentry_volume_multiplier") ?? 0
             if reentryVolumeMultiplier <= 0 || reentryVolumeMultiplier > 20 {
                 errors.append("재상승 거래량 배수는 0 초과 20 이하 범위여야 합니다.")
+            }
+
+            let recentlyListedDays = activeStrategyParams.intValue(for: "exclude_recently_listed_days") ?? 0
+            if !(1...60).contains(recentlyListedDays) {
+                errors.append("신규상장 제외 일수는 1~60거래일 범위여야 합니다.")
+            }
+
+            let recentVILookbackMinutes = activeStrategyParams.intValue(for: "recent_vi_lookback_minutes") ?? 0
+            if !(1...120).contains(recentVILookbackMinutes) {
+                errors.append("최근 VI 확인 시간은 1~120분 범위여야 합니다.")
             }
 
             let initialStopPct = activeStrategyParams.doubleValue(for: "initial_stop_pct") ?? 0

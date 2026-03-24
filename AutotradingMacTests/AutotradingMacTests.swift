@@ -28,6 +28,14 @@ final class AutotradingMacTests: XCTestCase {
             snapshot.strategyParams["opening_pullback_reentry"]?["candidate_end_time"]?.stringValue,
             "09:20"
         )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["exclude_recently_listed_days"]?.intValue,
+            5
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["recent_vi_lookback_minutes"]?.intValue,
+            10
+        )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
     }
@@ -55,6 +63,10 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(
             store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["time_stop_hard_minutes"]?.intValue,
             45
+        )
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["exclude_recently_listed_enabled"]?.boolValue,
+            true
         )
         XCTAssertTrue(
             store.strategyDraft?.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false

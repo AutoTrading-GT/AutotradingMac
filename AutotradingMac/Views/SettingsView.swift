@@ -681,8 +681,8 @@ struct SettingsView: View {
                                         detail: "1분봉, 거래대금/급등률 rank, VWAP, 거래량 재증가, 부분익절, 시간청산까지 반영됩니다."
                                     )
                                     strategyCompactNote(
-                                        title: "미구현",
-                                        detail: "호가 잔량, 스프레드, VI/시장경보/신규상장 필터는 아직 연결되지 않았습니다."
+                                        title: "시장제도 필터",
+                                        detail: "신규상장, 단기과열, 시장경보, 최근 VI 회피 필터를 후보/신호 단계에 함께 적용합니다."
                                     )
                                 }
                             }
@@ -901,6 +901,97 @@ struct SettingsView: View {
                 }
 
                 strategyCategoryBlock(
+                    title: "시장제도 / 거래안전 필터",
+                    summary: "실전에서 피해야 할 신규상장, 단기과열, 시장경보, 최근 VI 종목을 opening 전략 전용으로 제외합니다."
+                ) {
+                    strategyBandPanel(
+                        first: {
+                            strategyBandSegment(
+                                title: "신규상장 제외",
+                                tooltip: "전용 상장일 마스터 대신 KIS 일봉 이력 개수로 최근 상장 여부를 판단합니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "신규상장 제외 사용",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "exclude_recently_listed_enabled") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("exclude_recently_listed_enabled", value: $0) }
+                                        )
+                                    )
+                                    strategyBandStepperTile(
+                                        label: "제외 기준",
+                                        value: params.intValue(for: "exclude_recently_listed_days") ?? 5,
+                                        range: 1...60,
+                                        step: 1,
+                                        unit: "거래일",
+                                        onChange: {
+                                            store.updateActiveStrategyParamInt(
+                                                "exclude_recently_listed_days",
+                                                value: $0,
+                                                range: 1...60
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        },
+                        second: {
+                            strategyBandSegment(
+                                title: "단기과열 / 시장경보",
+                                tooltip: "KIS 현재가 payload의 단기과열 플래그와 투자주의/경고/위험 코드를 사용합니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "단기과열 종목 제외",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "exclude_short_term_overheated_enabled") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("exclude_short_term_overheated_enabled", value: $0) }
+                                        )
+                                    )
+                                    strategyBandToggleControl(
+                                        title: "시장경보 종목 제외",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "exclude_market_warning_enabled") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("exclude_market_warning_enabled", value: $0) }
+                                        )
+                                    )
+                                }
+                            }
+                        },
+                        third: {
+                            strategyBandSegment(
+                                title: "최근 VI 회피",
+                                tooltip: "최근 market.tick 이력에서 VI 관련 플래그가 보인 종목은 지정 시간 동안 진입을 막습니다."
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    strategyBandToggleControl(
+                                        title: "최근 VI 종목 제외",
+                                        isOn: Binding(
+                                            get: { params.boolValue(for: "exclude_recent_vi_enabled") ?? true },
+                                            set: { store.updateActiveStrategyParamBool("exclude_recent_vi_enabled", value: $0) }
+                                        )
+                                    )
+                                    strategyBandStepperTile(
+                                        label: "확인 시간",
+                                        value: params.intValue(for: "recent_vi_lookback_minutes") ?? 10,
+                                        range: 1...120,
+                                        step: 1,
+                                        unit: "분",
+                                        onChange: {
+                                            store.updateActiveStrategyParamInt(
+                                                "recent_vi_lookback_minutes",
+                                                value: $0,
+                                                range: 1...120
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+
+                strategyCategoryBlock(
                     title: "청산",
                     summary: "초기 손절, 1차 부분익절, soft/hard time stop으로 1차 버전 청산 규칙을 관리합니다."
                 ) {
@@ -993,7 +1084,7 @@ struct SettingsView: View {
                         )
                         strategyCompactNote(
                             title: "향후 확장",
-                            detail: "손절 거리 기반 risk-per-trade sizing, 호가/스프레드/VI/시장경보 필터는 2차 작업으로 남겨둡니다."
+                            detail: "손절 거리 기반 risk-per-trade sizing, 호가/스프레드/호가잔량 필터는 2차 작업으로 남겨둡니다."
                         )
                     }
                     .padding(.horizontal, 18)

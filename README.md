@@ -148,7 +148,7 @@
     - `전략 선택`은 segmented control 대신 카드형 목록으로 유지해 향후 전략 추가에 대비한다
     - 활성 전략 편집 패널과 공통 리스크/실행 패널은 시각적으로 분리한다
     - `turnover_surge_momentum`는 기존 Basic Strategy + Advanced Settings 편집 UI를 유지한다
-    - `opening_pullback_reentry`는 `시간대 / 후보 선정 / 눌림 정의 / 재진입 조건 / 청산` 전용 폼을 사용한다
+    - `opening_pullback_reentry`는 `시간대 / 후보 선정 / 눌림 정의 / 재진입 조건 / 시장제도·거래안전 필터 / 청산` 전용 폼을 사용한다
     - `intraday_breakout` 같은 preview 템플릿은 값 미리보기만 제공한다
     - 공통 설정은 전략을 바꿔도 유지되며, 전략 전환과 별도의 패널에서 조정한다
     - `Basic Strategy`는 현재 활성 전략의 편집 패널로서 작은 카드 여러 개 대신 하나의 긴 가로 패널로 정리한다
@@ -182,10 +182,14 @@
     - 후보 선정: `selection_mode`, `top_n`, `open_impulse_min/max_return_pct`
     - 눌림 정의: `pullback_retrace_min/max_pct`, `pullback_bars_min/max`
     - 재진입 조건: `reentry_volume_multiplier`, `use_vwap_filter`, `require_vwap_reclaim`
+    - 시장제도 / 거래안전 필터: `exclude_recently_listed_enabled/days`, `exclude_short_term_overheated_enabled`, `exclude_market_warning_enabled`, `exclude_recent_vi_enabled`, `recent_vi_lookback_minutes`
     - 청산: `initial_stop_pct`, `first_take_profit_r_multiple`, `first_take_profit_partial_ratio`, `time_stop_soft_minutes`, `time_stop_hard_minutes`
   - 1차 구현 범위/제약:
-    - 현재 엔진 연결 범위는 1분봉 OHLCV, 거래대금/급등률 rank, VWAP, 부분익절, 시간청산까지다
-    - 호가 잔량, 스프레드, VI/시장경보/신규상장 필터는 아직 UI에도 별도 노출하지 않는다
+    - 현재 엔진 연결 범위는 1분봉 OHLCV, 거래대금/급등률 rank, VWAP, 시장제도/거래안전 필터, 부분익절, 시간청산까지다
+    - 시장제도/거래안전 필터 데이터 소스:
+      - 신규상장 초기 제외: 1일봉 개수 기반
+      - 단기과열/시장경보/최근 VI: 저장된 `market.tick` 필드 기반
+    - 호가 잔량, 스프레드 필터는 아직 미구현이다
     - 포지션 사이징은 공통 `position_size_pct`를 그대로 사용하며 risk-per-trade sizing은 TODO다
   - 입력 컨트롤 규칙:
     - 정수 범위/단계값(`Top-N`, 보유시간, 최대 거래 횟수, 동시 보유 수)은 stepper형

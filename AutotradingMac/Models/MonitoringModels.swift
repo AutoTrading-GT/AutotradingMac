@@ -665,7 +665,7 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                 status: activeStrategyId == "opening_pullback_reentry" ? "active" : "available",
                 wiredToEngine: true,
                 selectable: true,
-                implementationNote: "1차 버전은 rank 상위 후보 + 1분봉 + VWAP + 부분익절/시간청산까지 엔진에 연결되어 있습니다. 호가/VI/시장경보 필터는 아직 미구현입니다.",
+                implementationNote: "1차 버전은 rank 상위 후보 + 1분봉 + VWAP + 신규상장/단기과열/시장경보/최근 VI 필터 + 부분익절/시간청산까지 엔진에 연결되어 있습니다. 호가/스프레드/호가잔량 필터는 아직 미구현입니다.",
                 configurableFields: [
                     StrategyConfigurableFieldSnapshot(
                         fieldId: "selection_mode",
@@ -765,6 +765,66 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                         description: "VWAP 위 유지/회복 여부를 진입 필터로 사용할지 정합니다.",
                         options: nil,
                         unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "exclude_recently_listed_enabled",
+                        label: "신규상장 제외",
+                        inputType: "bool",
+                        group: "market_safety",
+                        description: "일봉 이력 기준 상장 초기 종목을 후보에서 제외합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "exclude_recently_listed_days",
+                        label: "신규상장 제외 일수",
+                        inputType: "int",
+                        group: "market_safety",
+                        description: "최근 N거래일 이내 종목을 제외하는 기준입니다.",
+                        options: nil,
+                        unit: "days",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "exclude_short_term_overheated_enabled",
+                        label: "단기과열 제외",
+                        inputType: "bool",
+                        group: "market_safety",
+                        description: "KIS 현재가 payload의 단기과열 플래그가 켜진 종목을 제외합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "exclude_market_warning_enabled",
+                        label: "시장경보 제외",
+                        inputType: "bool",
+                        group: "market_safety",
+                        description: "투자주의/경고/위험 등 시장경보 종목을 제외합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "exclude_recent_vi_enabled",
+                        label: "최근 VI 제외",
+                        inputType: "bool",
+                        group: "market_safety",
+                        description: "최근 N분 내 VI 관련 플래그가 있던 종목을 제외합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "recent_vi_lookback_minutes",
+                        label: "최근 VI 확인 시간",
+                        inputType: "int",
+                        group: "market_safety",
+                        description: "VI 회피를 위해 되돌아볼 시간창입니다.",
+                        options: nil,
+                        unit: "minutes",
                         wired: true
                     ),
                     StrategyConfigurableFieldSnapshot(
@@ -1044,6 +1104,12 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
                 "reentry_volume_multiplier": .number(1.4),
                 "use_vwap_filter": .bool(true),
                 "require_vwap_reclaim": .bool(false),
+                "exclude_recently_listed_enabled": .bool(true),
+                "exclude_recently_listed_days": .number(5),
+                "exclude_short_term_overheated_enabled": .bool(true),
+                "exclude_market_warning_enabled": .bool(true),
+                "exclude_recent_vi_enabled": .bool(true),
+                "recent_vi_lookback_minutes": .number(10),
                 "initial_stop_pct": .number(1.2),
                 "first_take_profit_r_multiple": .number(1.5),
                 "first_take_profit_partial_ratio": .number(0.5),
