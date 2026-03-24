@@ -1,0 +1,48 @@
+{
+  "configurations" : [
+    {
+      "id" : "F554EDA3-2C85-4E1E-AD0B-9F73093C4271",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "AUTOTRADING_BACKEND_BASE_URL",
+        "value" : "http:\/\/100.82.44.83:8008"
+      },
+      {
+        "key" : "AUTOTRADING_BACKEND_WS_URL",
+        "value" : "ws:\/\/100.82.44.83:8008\/ws\/events"
+      }
+    ],
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:AutotradingMac.xcodeproj",
+      "identifier" : "B56EB76A2F6BC71600898235",
+      "name" : "AutotradingMac"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:AutotradingMac.xcodeproj",
+        "identifier" : "B56EB7772F6BC71800898235",
+        "name" : "AutotradingMacTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:AutotradingMac.xcodeproj",
+        "identifier" : "B56EB7812F6BC71800898235",
+        "name" : "AutotradingMacUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
