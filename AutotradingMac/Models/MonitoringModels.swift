@@ -1073,18 +1073,31 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
             }
             return values
         }()
-        [
-            "position_size_pct": .number(basic.risk.positionSizePct),
-            "max_loss_limit_pct": .number(basic.risk.maxLossLimitPct),
-            "daily_trade_limit_enabled": .bool(basic.risk.dailyTradeLimitEnabled),
-            "daily_trade_limit_count": .number(Double(basic.risk.dailyTradeLimitCount)),
-            "max_concurrent_positions": .number(Double(basic.risk.maxConcurrentPositions)),
-            "force_close_on_market_close": .bool(basic.exit.forceCloseOnMarketClose),
-            "allowed_signal_types": .array(allowedSignalTypes.map(JSONValue.string)),
-            "cooldown_minutes": .number(Double(risk.cooldownMinutes)),
-            "signal_window_minutes": .number(Double(risk.signalWindowMinutes)),
-            "concurrency_window_minutes": .number(Double(risk.concurrencyWindowMinutes)),
-            "block_when_position_exists": .bool(risk.blockWhenPositionExists),
+        let allowedSignalTypeValues: [JSONValue] = allowedSignalTypes.map { .string($0) }
+        let positionSizePct = JSONValue.number(basic.risk.positionSizePct)
+        let maxLossLimitPct = JSONValue.number(basic.risk.maxLossLimitPct)
+        let dailyTradeLimitEnabled = JSONValue.bool(basic.risk.dailyTradeLimitEnabled)
+        let dailyTradeLimitCount = JSONValue.number(Double(basic.risk.dailyTradeLimitCount))
+        let maxConcurrentPositions = JSONValue.number(Double(basic.risk.maxConcurrentPositions))
+        let forceCloseOnMarketClose = JSONValue.bool(basic.exit.forceCloseOnMarketClose)
+        let allowedSignalTypesValue = JSONValue.array(allowedSignalTypeValues)
+        let cooldownMinutes = JSONValue.number(Double(risk.cooldownMinutes))
+        let signalWindowMinutes = JSONValue.number(Double(risk.signalWindowMinutes))
+        let concurrencyWindowMinutes = JSONValue.number(Double(risk.concurrencyWindowMinutes))
+        let blockWhenPositionExists = JSONValue.bool(risk.blockWhenPositionExists)
+
+        return [
+            "position_size_pct": positionSizePct,
+            "max_loss_limit_pct": maxLossLimitPct,
+            "daily_trade_limit_enabled": dailyTradeLimitEnabled,
+            "daily_trade_limit_count": dailyTradeLimitCount,
+            "max_concurrent_positions": maxConcurrentPositions,
+            "force_close_on_market_close": forceCloseOnMarketClose,
+            "allowed_signal_types": allowedSignalTypesValue,
+            "cooldown_minutes": cooldownMinutes,
+            "signal_window_minutes": signalWindowMinutes,
+            "concurrency_window_minutes": concurrencyWindowMinutes,
+            "block_when_position_exists": blockWhenPositionExists,
         ]
     }
 
