@@ -32,6 +32,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var marketTopRanks: [MarketRankSnapshotItem] = []
     @Published private(set) var recentSignals: [SignalSnapshotItem] = []
     @Published private(set) var recentStrategyEvents: [StrategyEventSnapshotItem] = []
+    @Published private(set) var recentExitEvents: [ExitEventSnapshotItem] = []
     @Published private(set) var recentRiskDecisions: [RiskDecisionSnapshotItem] = []
     @Published private(set) var recentOrders: [OrderSnapshotItem] = []
     @Published private(set) var recentFills: [FillSnapshotItem] = []
@@ -1208,6 +1209,7 @@ final class MonitoringStore: ObservableObject {
         marketTopRanks = []
         recentSignals = []
         recentStrategyEvents = []
+        recentExitEvents = []
         recentRiskDecisions = []
         recentOrders = []
         recentFills = []
@@ -2134,6 +2136,7 @@ final class MonitoringStore: ObservableObject {
         scannerHasMoreByMode["turnover"] = snapshot.marketTopRanks.count >= scannerStep
         recentSignals = snapshot.recentSignals
         recentStrategyEvents = snapshot.recentStrategyEvents
+        recentExitEvents = snapshot.recentExitEvents
         recentRiskDecisions = snapshot.recentRiskDecisions
         recentOrders = snapshot.recentOrders
         recentFills = snapshot.recentFills
@@ -2243,6 +2246,10 @@ final class MonitoringStore: ObservableObject {
         case "strategy.signal_filtered":
             if let payload = decodePayload(StrategySignalFilteredPayload.self, from: event.data) {
                 appendStrategyEvent(payload: payload)
+            }
+        case "signal.exit_generated":
+            if let payload = decodePayload(SignalExitGeneratedPayload.self, from: event.data) {
+                appendExitEvent(payload: payload)
             }
         case "risk.blocked", "risk.approved":
             if let payload = decodePayload(RiskDecisionPayload.self, from: event.data) {
@@ -2466,6 +2473,49 @@ final class MonitoringStore: ObservableObject {
         )
         recentStrategyEvents.insert(row, at: 0)
         recentStrategyEvents = Array(recentStrategyEvents.prefix(maxRecentItems))
+    }
+
+    private func appendExitEvent(payload: SignalExitGeneratedPayload) {
+        let row = ExitEventSnapshotItem(
+            eventId: nil,
+            eventType: "signal.exit_generated",
+            positionId: payload.positionId,
+            code: payload.code,
+            symbol: payload.symbol,
+            signalType: payload.signalType,
+            sourceSignalType: payload.sourceSignalType,
+            reason: payload.reason,
+            reasonCode: payload.reasonCode,
+            summary: payload.summary,
+            strategyId: payload.strategyId,
+            strategyDisplayName: resolveStrategyDisplayName(
+                strategyId: payload.strategyId,
+                preferred: payload.strategyDisplayName
+            ),
+            partial: payload.partial,
+            partialRatio: payload.partialRatio,
+            qty: payload.qty,
+            currentPositionQty: payload.currentPositionQty,
+            expectedRemainingQty: payload.expectedRemainingQty,
+            markPrice: payload.markPrice,
+            unrealizedPnl: payload.unrealizedPnl,
+            unrealizedPnlPct: payload.unrealizedPnlPct,
+            holdingSeconds: payload.holdingSeconds,
+            sourcePositionReference: payload.sourcePositionReference,
+            sourceSignalReference: payload.sourceSignalReference,
+            triggeredAt: payload.triggeredAt,
+            orderMode: payload.orderMode ?? runtime?.orderMode,
+            executionMode: payload.executionMode ?? payload.orderMode ?? runtime?.executionMode ?? runtime?.orderMode,
+            createdAt: payload.timestamp
+        )
+        recentExitEvents.removeAll { existing in
+            existing.positionId == row.positionId &&
+            existing.reasonCode == row.reasonCode &&
+            existing.sourceSignalReference == row.sourceSignalReference &&
+            existing.createdAt == row.createdAt
+        }
+        recentExitEvents.insert(row, at: 0)
+        recentExitEvents = Array(recentExitEvents.prefix(maxRecentItems))
     }
 
     private func appendRiskDecision(payload: RiskDecisionPayload) {

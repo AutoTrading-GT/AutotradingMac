@@ -10,6 +10,7 @@ struct MonitoringSnapshotResponse: Decodable {
     let marketTopRanks: [MarketRankSnapshotItem]
     let recentSignals: [SignalSnapshotItem]
     let recentStrategyEvents: [StrategyEventSnapshotItem]
+    let recentExitEvents: [ExitEventSnapshotItem]
     let recentRiskDecisions: [RiskDecisionSnapshotItem]
     let recentOrders: [OrderSnapshotItem]
     let recentFills: [FillSnapshotItem]
@@ -23,6 +24,7 @@ struct MonitoringSnapshotResponse: Decodable {
         case marketTopRanks
         case recentSignals
         case recentStrategyEvents
+        case recentExitEvents
         case recentRiskDecisions
         case recentOrders
         case recentFills
@@ -39,6 +41,7 @@ struct MonitoringSnapshotResponse: Decodable {
         marketTopRanks = Self.decodeLossyArray(MarketRankSnapshotItem.self, from: container, forKey: .marketTopRanks)
         recentSignals = Self.decodeLossyArray(SignalSnapshotItem.self, from: container, forKey: .recentSignals)
         recentStrategyEvents = Self.decodeLossyArray(StrategyEventSnapshotItem.self, from: container, forKey: .recentStrategyEvents)
+        recentExitEvents = Self.decodeLossyArray(ExitEventSnapshotItem.self, from: container, forKey: .recentExitEvents)
         recentRiskDecisions = Self.decodeLossyArray(RiskDecisionSnapshotItem.self, from: container, forKey: .recentRiskDecisions)
         recentOrders = Self.decodeLossyArray(OrderSnapshotItem.self, from: container, forKey: .recentOrders)
         recentFills = Self.decodeLossyArray(FillSnapshotItem.self, from: container, forKey: .recentFills)
@@ -1520,6 +1523,43 @@ struct StrategyEventSnapshotItem: Decodable, Identifiable {
     let sourceSnapshotId: Int?
     let candidateMetric: Double?
     let details: [String: JSONValue]?
+    let orderMode: String?
+    let executionMode: String?
+    let createdAt: Date
+}
+
+struct ExitEventSnapshotItem: Decodable, Identifiable {
+    var id: String {
+        let eventToken = eventId?.description ?? "none"
+        let positionToken = positionId?.description ?? "none"
+        let reasonToken = reasonCode ?? reason ?? "unknown"
+        return "exit-\(eventToken)-\(positionToken)-\(reasonToken)-\(createdAt.timeIntervalSince1970)"
+    }
+
+    let eventId: Int?
+    let eventType: String?
+    let positionId: Int?
+    let code: String?
+    let symbol: String?
+    let signalType: String?
+    let sourceSignalType: String?
+    let reason: String?
+    let reasonCode: String?
+    let summary: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
+    let partial: Bool?
+    let partialRatio: Double?
+    let qty: Double?
+    let currentPositionQty: Double?
+    let expectedRemainingQty: Double?
+    let markPrice: Double?
+    let unrealizedPnl: Double?
+    let unrealizedPnlPct: Double?
+    let holdingSeconds: Double?
+    let sourcePositionReference: String?
+    let sourceSignalReference: String?
+    let triggeredAt: Date?
     let orderMode: String?
     let executionMode: String?
     let createdAt: Date

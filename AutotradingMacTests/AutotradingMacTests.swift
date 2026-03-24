@@ -112,7 +112,8 @@ final class AutotradingMacTests: XCTestCase {
                 side: "sell",
                 status: "filled",
                 orderId: 101,
-                sourceOrderId: nil
+                sourceOrderId: nil,
+                sourceSignalReference: "exit_signal:position:1:first_take_profit"
             ),
             .init(
                 id: "fill-101",
@@ -122,7 +123,8 @@ final class AutotradingMacTests: XCTestCase {
                 side: "sell",
                 status: nil,
                 orderId: 101,
-                sourceOrderId: nil
+                sourceOrderId: nil,
+                sourceSignalReference: nil
             ),
             .init(
                 id: "close-101",
@@ -132,7 +134,8 @@ final class AutotradingMacTests: XCTestCase {
                 side: "sell",
                 status: "take_profit",
                 orderId: nil,
-                sourceOrderId: 101
+                sourceOrderId: 101,
+                sourceSignalReference: "exit_signal:position:1:first_take_profit"
             ),
         ]
 
@@ -153,7 +156,8 @@ final class AutotradingMacTests: XCTestCase {
                 side: "buy",
                 status: "filled",
                 orderId: 202,
-                sourceOrderId: nil
+                sourceOrderId: nil,
+                sourceSignalReference: "strategy_signal:entry-202"
             ),
             .init(
                 id: "fill-202",
@@ -163,7 +167,8 @@ final class AutotradingMacTests: XCTestCase {
                 side: "buy",
                 status: nil,
                 orderId: 202,
-                sourceOrderId: nil
+                sourceOrderId: nil,
+                sourceSignalReference: nil
             ),
         ]
 
@@ -181,7 +186,8 @@ final class AutotradingMacTests: XCTestCase {
             side: "buy",
             status: "submitted",
             orderId: 303,
-            sourceOrderId: nil
+            sourceOrderId: nil,
+            sourceSignalReference: "strategy_signal:entry-303"
         )
 
         let visible = ResultFeedReducer.visibleEventIDs(for: [candidate])
@@ -195,6 +201,136 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertFalse(ResultFeedReducer.isActionableSignalType("rank_maintained"))
         XCTAssertFalse(ResultFeedReducer.isActionableSignalType("watch"))
         XCTAssertFalse(ResultFeedReducer.isActionableSignalType("관망"))
+    }
+
+    func test_resultFeedReducer_keepsExitDecisionAndHidesRelatedSellOrderAndFill() {
+        let now = Date()
+        let candidates: [ResultFeedEventCandidate] = [
+            .init(
+                id: "exit-501",
+                timestamp: now,
+                kind: .exit,
+                code: "005930",
+                side: "sell",
+                status: "first_take_profit_partial",
+                orderId: nil,
+                sourceOrderId: nil,
+                sourceSignalReference: "exit_signal:position:5:first_take_profit"
+            ),
+            .init(
+                id: "order-501",
+                timestamp: now.addingTimeInterval(5),
+                kind: .order,
+                code: "005930",
+                side: "sell",
+                status: "filled",
+                orderId: 501,
+                sourceOrderId: nil,
+                sourceSignalReference: "exit_signal:position:5:first_take_profit"
+            ),
+            .init(
+                id: "fill-501",
+                timestamp: now.addingTimeInterval(8),
+                kind: .fill,
+                code: "005930",
+                side: "sell",
+                status: nil,
+                orderId: 501,
+                sourceOrderId: nil,
+                sourceSignalReference: nil
+            ),
+        ]
+
+        let visible = ResultFeedReducer.visibleEventIDs(for: candidates)
+        XCTAssertTrue(visible.contains("exit-501"))
+        XCTAssertFalse(visible.contains("order-501"))
+        XCTAssertFalse(visible.contains("fill-501"))
+    }
+
+    func test_monitoringSnapshotResponse_decodesRecentExitEvents() throws {
+        let json = """
+        {
+          "runtime": {
+            "timestamp": "2026-03-24T10:00:00Z",
+            "app_name": "autotrading-core",
+            "app_version": "0.1.0",
+            "env": "dev",
+            "app_status": "ready",
+            "order_mode": "paper",
+            "account_mode": "paper",
+            "database_status": "connected",
+            "database_connected": true,
+            "readiness_status": "ready",
+            "startup_ok": true,
+            "startup_status": "ok",
+            "active_ws_clients": 1,
+            "workers": {
+              "summary": {
+                "count": 4,
+                "running": 4,
+                "error": 0,
+                "stopping": 0,
+                "starting": 0,
+                "stopped": 0
+              },
+              "workers": {}
+            }
+          },
+          "market_top_ranks": [],
+          "recent_signals": [],
+          "recent_strategy_events": [],
+          "recent_exit_events": [
+            {
+              "event_id": 901,
+              "event_type": "signal.exit_generated",
+              "position_id": 17,
+              "code": "005930",
+              "symbol": "삼성전자",
+              "signal_type": "exit",
+              "source_signal_type": "opening_pullback_reentry",
+              "reason": "first_take_profit",
+              "reason_code": "first_take_profit_partial",
+              "summary": "1차 부분익절 조건 충족",
+              "strategy_id": "opening_pullback_reentry",
+              "strategy_display_name": "Opening Pullback Re-entry",
+              "partial": true,
+              "partial_ratio": 0.4,
+              "qty": 4.0,
+              "current_position_qty": 10.0,
+              "expected_remaining_qty": 6.0,
+              "source_signal_reference": "exit_signal:position:17:first_take_profit",
+              "triggered_at": "2026-03-24T10:00:00Z",
+              "order_mode": "paper",
+              "execution_mode": "paper",
+              "created_at": "2026-03-24T10:00:01Z"
+            }
+          ],
+          "recent_risk_decisions": [],
+          "recent_orders": [],
+          "recent_fills": [],
+          "current_positions": [],
+          "recent_closed_positions": [],
+          "pnl_summary": {
+            "open_positions": 0,
+            "unrealized_pnl_total": null,
+            "realized_pnl_recent_total": null,
+            "recent_closed_count": 0
+          },
+          "limits": {
+            "recent_exit_events": 20
+          }
+        }
+        """
+
+        let snapshot = try MonitoringCoding.decoder().decode(
+            MonitoringSnapshotResponse.self,
+            from: Data(json.utf8)
+        )
+
+        XCTAssertEqual(snapshot.recentExitEvents.count, 1)
+        XCTAssertEqual(snapshot.recentExitEvents.first?.reasonCode, "first_take_profit_partial")
+        XCTAssertEqual(snapshot.recentExitEvents.first?.strategyId, "opening_pullback_reentry")
+        XCTAssertEqual(snapshot.recentExitEvents.first?.partialRatio, 0.4, accuracy: 0.0001)
     }
 
     func test_dashboardSignalSummary_usesLatestMeaningfulStatePerSymbol() {

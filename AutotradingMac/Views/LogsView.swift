@@ -109,6 +109,7 @@ struct LogsView: View {
 
         store.recentSignals.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentStrategyEvents.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentExitEvents.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentRiskDecisions.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentOrders.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentFills.forEach { merge(code: $0.code, symbol: $0.symbol) }
@@ -140,6 +141,71 @@ struct LogsView: View {
         ).compactMapValues { group in
             group.max(by: { $0.filledAt < $1.filledAt })
         }
+        let latestOrderBySourceSignalReference = Dictionary(
+            grouping: store.recentOrders.compactMap { order -> (String, OrderSnapshotItem)? in
+                guard let reference = order.sourceSignalReference, !reference.isEmpty else { return nil }
+                return (reference, order)
+            },
+            by: { $0.0 }
+        ).compactMapValues { group in
+            group.map(\.1).max(by: { $0.updatedAt < $1.updatedAt })
+        }
+        let latestClosedBySourceSignalReference = Dictionary(
+            grouping: store.recentClosedPositions.compactMap { closed -> (String, ClosedPositionSnapshotItem)? in
+                guard let reference = closed.sourceSignalReference, !reference.isEmpty else { return nil }
+                return (reference, closed)
+            },
+            by: { $0.0 }
+        ).compactMapValues { group in
+            group.map(\.1).max(by: { $0.createdAt < $1.createdAt })
+        }
+
+        rows.append(
+            contentsOf: store.recentExitEvents.map { exit in
+                let title = instrumentTitle(symbol: exit.symbol, code: exit.code)
+                let displayName = instrumentDisplayName(symbol: exit.symbol, code: exit.code)
+                let style = EventVisualStyleResolver.exit(
+                    reason: exit.reasonCode ?? exit.reason,
+                    partial: exit.partial ?? false
+                )
+                let relatedOrder = exit.sourceSignalReference.flatMap { latestOrderBySourceSignalReference[$0] }
+                let relatedFill = relatedOrder.flatMap { latestFillByOrderID[$0.orderId] }
+                let relatedClosed = exit.sourceSignalReference.flatMap { latestClosedBySourceSignalReference[$0] }
+                return LogEntry(
+                    id: "exit-\(exit.id)",
+                    timestamp: exit.createdAt,
+                    eventType: exit.eventType ?? "signal.exit_generated",
+                    code: exit.code ?? "-",
+                    symbol: exit.symbol,
+                    title: title,
+                    summary: exit.summary ?? localizedExitReason(exit.reasonCode ?? exit.reason ?? ""),
+                    feedMessage: exitEventFeedMessage(
+                        instrumentName: displayName,
+                        summary: exit.summary,
+                        reason: exit.reasonCode ?? exit.reason,
+                        strategyLabel: exit.strategyDisplayName,
+                        partial: exit.partial ?? false
+                    ),
+                    status: exit.reasonCode ?? exit.reason,
+                    executionMode: normalizeExecutionMode(exit.executionMode ?? exit.orderMode),
+                    source: exit.orderMode ?? exit.executionMode ?? "execution",
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    iconTone: style.tone,
+                    metaPairs: exitMetaPairs(
+                        exit,
+                        relatedOrder: relatedOrder,
+                        relatedFill: relatedFill,
+                        relatedClosed: relatedClosed
+                    ),
+                    eventKind: .exit,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: "sell",
+                    sourceSignalReference: exit.sourceSignalReference
+                )
+            }
+        )
 
         rows.append(
             contentsOf: store.recentSignals.map { signal in
@@ -171,7 +237,8 @@ struct LogsView: View {
                     eventKind: .signal,
                     orderId: nil,
                     sourceOrderId: nil,
-                    side: nil
+                    side: nil,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -209,7 +276,8 @@ struct LogsView: View {
                     eventKind: .risk,
                     orderId: nil,
                     sourceOrderId: nil,
-                    side: event.signalType
+                    side: event.signalType,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -249,7 +317,8 @@ struct LogsView: View {
                     eventKind: .risk,
                     orderId: nil,
                     sourceOrderId: nil,
-                    side: nil
+                    side: nil,
+                    sourceSignalReference: risk.relatedSignalReference
                 )
             }
         )
@@ -285,7 +354,8 @@ struct LogsView: View {
                     eventKind: .order,
                     orderId: order.orderId,
                     sourceOrderId: nil,
-                    side: order.side
+                    side: order.side,
+                    sourceSignalReference: order.sourceSignalReference
                 )
             }
         )
@@ -326,7 +396,8 @@ struct LogsView: View {
                     eventKind: .fill,
                     orderId: fill.orderId,
                     sourceOrderId: nil,
-                    side: fill.side
+                    side: fill.side,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -366,7 +437,8 @@ struct LogsView: View {
                     eventKind: .position,
                     orderId: nil,
                     sourceOrderId: nil,
-                    side: position.side
+                    side: position.side,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -425,7 +497,8 @@ struct LogsView: View {
                     eventKind: .close,
                     orderId: nil,
                     sourceOrderId: closed.sourceOrderId,
-                    side: "sell"
+                    side: "sell",
+                    sourceSignalReference: closed.sourceSignalReference
                 )
             }
         )
@@ -440,7 +513,8 @@ struct LogsView: View {
                 side: entry.side,
                 status: entry.status,
                 orderId: entry.orderId,
-                sourceOrderId: entry.sourceOrderId
+                sourceOrderId: entry.sourceOrderId,
+                sourceSignalReference: entry.sourceSignalReference
             )
         }
         let visibleIDs = ResultFeedReducer.visibleEventIDs(for: candidates)
@@ -602,6 +676,51 @@ struct LogsView: View {
         return pairs
     }
 
+    private func exitMetaPairs(
+        _ exit: ExitEventSnapshotItem,
+        relatedOrder: OrderSnapshotItem?,
+        relatedFill: FillSnapshotItem?,
+        relatedClosed: ClosedPositionSnapshotItem?
+    ) -> [LogMetaPair] {
+        var pairs: [LogMetaPair] = [
+            .init(key: "position_id", value: optionalInt(exit.positionId)),
+            .init(key: "signal_type", value: exit.signalType ?? "-"),
+            .init(key: "source_signal_type", value: exit.sourceSignalType ?? "-"),
+            .init(key: "reason", value: exit.reason ?? "-"),
+            .init(key: "reason_code", value: exit.reasonCode ?? "-"),
+            .init(key: "summary", value: exit.summary ?? "-"),
+            .init(key: "strategy_id", value: exit.strategyId ?? "-"),
+            .init(key: "strategy_display_name", value: exit.strategyDisplayName ?? "-"),
+            .init(key: "partial", value: optionalBool(exit.partial)),
+            .init(key: "partial_ratio", value: DisplayFormatters.percent(exit.partialRatio.map { $0 * 100.0 })),
+            .init(key: "exit_qty", value: DisplayFormatters.number(exit.qty)),
+            .init(key: "current_position_qty", value: DisplayFormatters.number(exit.currentPositionQty)),
+            .init(key: "expected_remaining_qty", value: DisplayFormatters.number(exit.expectedRemainingQty)),
+            .init(key: "mark_price", value: DisplayFormatters.number(exit.markPrice)),
+            .init(key: "unrealized_pnl", value: DisplayFormatters.pnl(exit.unrealizedPnl)),
+            .init(key: "unrealized_pnl_pct", value: DisplayFormatters.percent(exit.unrealizedPnlPct)),
+            .init(key: "holding_seconds", value: DisplayFormatters.number(exit.holdingSeconds)),
+            .init(key: "triggered_at", value: exit.triggeredAt.map(DisplayFormatters.dateTime) ?? "-"),
+            .init(key: "order_mode", value: exit.orderMode ?? exit.executionMode ?? "-")
+        ]
+        pairs.append(
+            contentsOf: closeFlowMetaPairs(
+                sourceOrderId: relatedOrder?.orderId,
+                sourceSignalReference: exit.sourceSignalReference,
+                order: relatedOrder,
+                fill: relatedFill
+            )
+        )
+        if let relatedClosed {
+            pairs.append(.init(key: "related_closed_summary", value: relatedClosed.summary ?? "-"))
+            pairs.append(.init(key: "related_closed_realized_pnl", value: DisplayFormatters.pnl(relatedClosed.realizedPnl)))
+            pairs.append(.init(key: "related_closed_at", value: DisplayFormatters.dateTime(relatedClosed.createdAt)))
+        } else {
+            pairs.append(.init(key: "related_closed_summary", value: "-"))
+        }
+        return pairs
+    }
+
     private func orderMetaPairs(_ order: OrderSnapshotItem) -> [LogMetaPair] {
         [
             .init(key: "order_id", value: "\(order.orderId)"),
@@ -693,6 +812,21 @@ struct LogsView: View {
             return "\(instrumentName) \(message) (\(reason))"
         }
         return "\(instrumentName) \(message)"
+    }
+
+    private func exitEventFeedMessage(
+        instrumentName: String,
+        summary: String?,
+        reason: String?,
+        strategyLabel: String?,
+        partial: Bool
+    ) -> String {
+        let base = summary ?? localizedExitReason(reason ?? "")
+        let normalizedBase = partial && !base.contains("부분") ? "부분청산 신호 · \(base)" : base
+        if let strategyLabel, !strategyLabel.isEmpty {
+            return "\(instrumentName) \(strategyLabel) · \(normalizedBase)"
+        }
+        return "\(instrumentName) \(normalizedBase)"
     }
 
     private func riskFeedMessage(
@@ -894,6 +1028,7 @@ private struct LogEntry: Identifiable {
     let orderId: Int?
     let sourceOrderId: Int?
     let side: String?
+    let sourceSignalReference: String?
 }
 
 private struct LogFeedRow: View {

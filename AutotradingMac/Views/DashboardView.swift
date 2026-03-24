@@ -430,6 +430,7 @@ struct DashboardView: View {
 
         store.marketRows.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentSignals.forEach { merge(code: $0.code, symbol: $0.symbol) }
+        store.recentExitEvents.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentRiskDecisions.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentOrders.forEach { merge(code: $0.code, symbol: $0.symbol) }
         store.recentFills.forEach { merge(code: $0.code, symbol: $0.symbol) }
@@ -507,6 +508,35 @@ struct DashboardView: View {
     private var logItems: [DashboardLogItem] {
         var items: [DashboardLogItem] = []
         items.append(
+            contentsOf: store.recentExitEvents.map { row in
+                let style = EventVisualStyleResolver.exit(
+                    reason: row.reasonCode ?? row.reason,
+                    partial: row.partial ?? false
+                )
+                let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code ?? "종목")
+                return DashboardLogItem(
+                    id: "exit-\(row.id)",
+                    timestamp: row.createdAt,
+                    iconName: style.iconName,
+                    iconColor: style.iconColor,
+                    message: exitEventLogMessage(
+                        instrumentName: displayName,
+                        summary: row.summary,
+                        reason: row.reasonCode ?? row.reason,
+                        strategyLabel: row.strategyDisplayName,
+                        partial: row.partial ?? false
+                    ),
+                    kind: .exit,
+                    code: row.code,
+                    orderId: nil,
+                    sourceOrderId: nil,
+                    side: "sell",
+                    status: row.reasonCode ?? row.reason,
+                    sourceSignalReference: row.sourceSignalReference
+                )
+            }
+        )
+        items.append(
             contentsOf: store.recentFills.map { row in
                 let style = EventVisualStyleResolver.fill(side: row.side)
                 let displayName = instrumentName(symbol: row.symbol, code: row.code, fallback: row.code)
@@ -521,7 +551,8 @@ struct DashboardView: View {
                     orderId: row.orderId,
                     sourceOrderId: nil,
                     side: row.side,
-                    status: nil
+                    status: nil,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -545,7 +576,8 @@ struct DashboardView: View {
                     orderId: row.orderId,
                     sourceOrderId: nil,
                     side: row.side,
-                    status: row.status
+                    status: row.status,
+                    sourceSignalReference: row.sourceSignalReference
                 )
             }
         )
@@ -573,7 +605,8 @@ struct DashboardView: View {
                     orderId: nil,
                     sourceOrderId: nil,
                     side: row.signalType.map(signalSide),
-                    status: row.reasonCode ?? row.reason
+                    status: row.reasonCode ?? row.reason,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -603,7 +636,8 @@ struct DashboardView: View {
                     orderId: nil,
                     sourceOrderId: nil,
                     side: row.signalType.map(signalSide),
-                    status: row.decision
+                    status: row.decision,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -627,7 +661,8 @@ struct DashboardView: View {
                     orderId: nil,
                     sourceOrderId: nil,
                     side: nil,
-                    status: row.signalType
+                    status: row.signalType,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -648,6 +683,7 @@ struct DashboardView: View {
                     sourceOrderId: row.sourceOrderId,
                     side: "sell",
                     status: row.reasonCode ?? row.reason,
+                    sourceSignalReference: row.sourceSignalReference,
                     trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
                     trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl)
                 )
@@ -667,7 +703,8 @@ struct DashboardView: View {
                     orderId: nil,
                     sourceOrderId: nil,
                     side: nil,
-                    status: nil
+                    status: nil,
+                    sourceSignalReference: nil
                 )
             }
         )
@@ -681,7 +718,8 @@ struct DashboardView: View {
                 side: item.side,
                 status: item.status,
                 orderId: item.orderId,
-                sourceOrderId: item.sourceOrderId
+                sourceOrderId: item.sourceOrderId,
+                sourceSignalReference: item.sourceSignalReference
             )
         }
         let visibleIDs = ResultFeedReducer.visibleEventIDs(for: candidates)
@@ -893,6 +931,21 @@ struct DashboardView: View {
         return "\(instrumentName) \(base)"
     }
 
+    private func exitEventLogMessage(
+        instrumentName: String,
+        summary: String?,
+        reason: String?,
+        strategyLabel: String?,
+        partial: Bool
+    ) -> String {
+        let base = summary ?? closeReasonText(reason, summary: nil)
+        let normalizedBase = partial && !base.contains("부분") ? "부분청산 · \(base)" : base
+        if let strategyLabel, !strategyLabel.isEmpty {
+            return "\(instrumentName) \(strategyLabel) · \(normalizedBase)"
+        }
+        return "\(instrumentName) \(normalizedBase)"
+    }
+
     private func riskLogMessage(
         instrumentName: String,
         decision: String,
@@ -995,6 +1048,7 @@ private struct DashboardLogItem: Identifiable {
     let sourceOrderId: Int?
     let side: String?
     let status: String?
+    let sourceSignalReference: String?
     let trailingAmount: String?
     let trailingAmountColor: Color?
 
@@ -1010,6 +1064,7 @@ private struct DashboardLogItem: Identifiable {
         sourceOrderId: Int?,
         side: String?,
         status: String?,
+        sourceSignalReference: String?,
         trailingAmount: String? = nil,
         trailingAmountColor: Color? = nil
     ) {
@@ -1024,6 +1079,7 @@ private struct DashboardLogItem: Identifiable {
         self.sourceOrderId = sourceOrderId
         self.side = side
         self.status = status
+        self.sourceSignalReference = sourceSignalReference
         self.trailingAmount = trailingAmount
         self.trailingAmountColor = trailingAmountColor
     }

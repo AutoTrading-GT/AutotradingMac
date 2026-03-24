@@ -13,6 +13,8 @@ struct EventVisualStyle {
 
 enum EventVisualStyleResolver {
     private static let closeIcon = "flag.checkered.circle.fill"
+    private static let exitIcon = "arrowshape.right.circle.fill"
+    private static let partialExitIcon = "arrow.down.right.circle.fill"
 
     static func signal(signalType: String) -> EventVisualStyle {
         let normalized = normalize(signalType)
@@ -92,6 +94,25 @@ enum EventVisualStyleResolver {
         let pnlColor = amountColor(forPnL: realizedPnl)
         let pnlTone: StatusTone = (realizedPnl ?? 0) > 0 ? .danger : ((realizedPnl ?? 0) < 0 ? .info : .neutral)
         return EventVisualStyle(iconName: closeIcon, iconColor: pnlColor, tone: pnlTone)
+    }
+
+    static func exit(reason: String?, partial: Bool) -> EventVisualStyle {
+        let normalized = normalize(reason)
+        let iconName = partial ? partialExitIcon : exitIcon
+
+        if containsAny(normalized, keywords: ["first_take_profit_partial", "take_profit", "익절"]) {
+            return EventVisualStyle(iconName: iconName, iconColor: DesignTokens.Colors.profit, tone: .warning)
+        }
+        if containsAny(normalized, keywords: ["initial_stop", "stop_loss", "손절"]) {
+            return EventVisualStyle(iconName: iconName, iconColor: DesignTokens.Colors.loss, tone: .info)
+        }
+        if containsAny(normalized, keywords: ["hard_time_stop", "soft_time_stop", "max_holding", "holding", "timeout", "time", "보유시간"]) {
+            return EventVisualStyle(iconName: iconName, iconColor: DesignTokens.Colors.info, tone: .warning)
+        }
+        if containsAny(normalized, keywords: ["market_close_exit", "market_close", "장마감"]) {
+            return EventVisualStyle(iconName: iconName, iconColor: DesignTokens.Colors.info, tone: .warning)
+        }
+        return EventVisualStyle(iconName: iconName, iconColor: DesignTokens.Colors.textSecondary, tone: .neutral)
     }
 
     static func position(pnl: Double?) -> EventVisualStyle {

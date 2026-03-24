@@ -132,6 +132,34 @@ struct OrderUpdatedPayload: Decodable {
     let executionReason: String?
 }
 
+struct SignalExitGeneratedPayload: Decodable {
+    let timestamp: Date
+    let code: String
+    let symbol: String?
+    let positionId: Int
+    let reason: String
+    let reasonCode: String?
+    let summary: String?
+    let partial: Bool?
+    let partialRatio: Double?
+    let qty: Double?
+    let currentPositionQty: Double?
+    let expectedRemainingQty: Double?
+    let markPrice: Double?
+    let unrealizedPnl: Double?
+    let unrealizedPnlPct: Double?
+    let holdingSeconds: Double?
+    let sourcePositionReference: String?
+    let sourceSignalReference: String?
+    let signalType: String?
+    let sourceSignalType: String?
+    let strategyId: String?
+    let strategyDisplayName: String?
+    let orderMode: String?
+    let executionMode: String?
+    let triggeredAt: Date?
+}
+
 struct FillReceivedPayload: Decodable {
     let timestamp: Date
     let fillId: Int?

@@ -58,7 +58,8 @@
 - Logs 페이지(운영형 2-pane)
   - 좌측: 결과 중심 로그 피드(`시간 + 아이콘 + 한 줄 핵심 메시지`)
   - 대표 이벤트 선택 규칙:
-    - `position.closed`가 있으면 같은 흐름의 주문/체결을 기본 목록에서 숨기고 청산 결과를 대표로 노출
+    - `signal.exit_generated`가 있으면 같은 흐름의 sell 주문/체결을 기본 목록에서 숨기고 청산 결정 이벤트를 대표로 노출
+    - `position.closed`는 exit decision과 별도 유지해 최종 청산 결과를 보여준다
     - 청산이 없고 fill이 있으면 fill을 대표로 노출(주문은 숨김)
     - fill도 없으면 주문 이벤트를 유지
   - 좌측 각 행에 mode 배지(`PAPER`/`LIVE`/`UNKNOWN`) 표시
@@ -76,6 +77,7 @@
   - 핵심 메시지: 운영자 친화적 한국어 템플릿(예: `삼성전자 150주 매수 체결 @ 71,200원`, `NAVER 매수 신호 생성 (점수: 94)`)
   - opening 전략 관찰성:
     - `strategy.signal_filtered`를 별도 로그 항목으로 표시해 "후보는 있었지만 차단됨"을 구분
+    - `signal.exit_generated`를 별도 로그 항목으로 표시해 partial take profit / hard time stop / market close exit 같은 청산 결정 시점을 결과와 분리해 추적
     - signal/risk/order/close row는 `strategyDisplayName`, `summary`, `reasonCode`, `executionReason`를 우선 사용
     - `opening_pullback_reentry`는 `눌림 후 재상승 진입`, `재진입 거래량 부족으로 신호 제외`, `하드 타임스탑 청산` 같은 사용자 문구로 치환
   - 우측: 선택 이벤트 상세(event type/timestamp/symbol/code/source + payload/meta)
