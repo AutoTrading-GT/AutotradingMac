@@ -184,7 +184,7 @@ struct SettingsView: View {
 
     private func strategyOverviewPanel(_ draft: StrategySettingsSnapshot) -> some View {
         let activeTemplate = draft.activeTemplate
-        strategyPanel(
+        return strategyPanel(
             title: "현재 전략 요약",
             subtitle: "현재 실제 운용 중인 전략 템플릿과 공통 가드를 한눈에 보는 스냅샷입니다.",
             trailing: {
