@@ -1099,14 +1099,34 @@ extension Dictionary where Key == String, Value == JSONValue {
 }
 
 struct StrategySettingsUpdatePayload: Encodable {
-    let activeStrategyId: String? = nil
-    let strategyParams: [String: [String: JSONValue]]? = nil
-    let commonRiskParams: [String: JSONValue]? = nil
+    let activeStrategyId: String?
+    let strategyParams: [String: [String: JSONValue]]?
+    let commonRiskParams: [String: JSONValue]?
     let basic: BasicStrategySettingsUpdatePayload?
     let advanced: AdvancedStrategySettingsUpdatePayload?
     let scanner: ScannerSettingsUpdatePayload?
     let signal: SignalSettingsUpdatePayload?
     let risk: RiskSettingsUpdatePayload?
+
+    init(
+        activeStrategyId: String? = nil,
+        strategyParams: [String: [String: JSONValue]]? = nil,
+        commonRiskParams: [String: JSONValue]? = nil,
+        basic: BasicStrategySettingsUpdatePayload?,
+        advanced: AdvancedStrategySettingsUpdatePayload?,
+        scanner: ScannerSettingsUpdatePayload?,
+        signal: SignalSettingsUpdatePayload?,
+        risk: RiskSettingsUpdatePayload?
+    ) {
+        self.activeStrategyId = activeStrategyId
+        self.strategyParams = strategyParams
+        self.commonRiskParams = commonRiskParams
+        self.basic = basic
+        self.advanced = advanced
+        self.scanner = scanner
+        self.signal = signal
+        self.risk = risk
+    }
 }
 
 struct AppSettingsUpdatePayload: Encodable {

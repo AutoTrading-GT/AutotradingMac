@@ -99,10 +99,18 @@ final class MonitoringStore: ObservableObject {
         return formatter
     }()
 
+    init() {
+        self.init(
+            apiClient: MonitoringAPIClient(),
+            webSocketClient: MonitoringWebSocketClient(),
+            localNotificationService: LocalNotificationService()
+        )
+    }
+
     init(
-        apiClient: MonitoringAPIClientProtocol = MonitoringAPIClient(),
-        webSocketClient: MonitoringWebSocketClient = MonitoringWebSocketClient(),
-        localNotificationService: LocalNotificationServiceProtocol = LocalNotificationService()
+        apiClient: MonitoringAPIClientProtocol,
+        webSocketClient: MonitoringWebSocketClient,
+        localNotificationService: LocalNotificationServiceProtocol
     ) {
         self.apiClient = apiClient
         self.webSocketClient = webSocketClient
