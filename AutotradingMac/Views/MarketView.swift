@@ -760,7 +760,9 @@ private enum TrendDirection {
 #if DEBUG
 private struct MarketViewPreviewContainer: View {
     @StateObject private var store = MonitoringStore(
-        apiClient: MarketViewPreviewAPIClient()
+        apiClient: MarketViewPreviewAPIClient(),
+        webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+        localNotificationService: LocalNotificationService()
     )
 
     var body: some View {
