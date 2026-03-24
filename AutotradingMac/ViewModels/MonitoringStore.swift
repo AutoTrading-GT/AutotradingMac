@@ -80,7 +80,7 @@ final class MonitoringStore: ObservableObject {
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private let scannerStep = 10
     private let scannerMaxLimit = 30
-    private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained"]
+    private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained", "opening_pullback_reentry"]
     private let strategySelectionModes = ["turnover", "surge"]
     private var apiConnectionStatusClearTask: Task<Void, Never>?
     private var notificationStatusClearTask: Task<Void, Never>?
@@ -600,6 +600,70 @@ final class MonitoringStore: ObservableObject {
     func updateStrategyBlockWhenPositionExists(_ value: Bool) {
         mutateStrategyDraft { draft in
             draft.risk.blockWhenPositionExists = value
+        }
+    }
+
+    func updateActiveStrategyParamString(_ key: String, value: String) {
+        mutateStrategyDraft { draft in
+            let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+            var params = draft.strategyParams[strategyId] ?? defaultStrategyParams(for: strategyId)
+            params[key] = .string(value.trimmingCharacters(in: .whitespacesAndNewlines))
+            draft.strategyParams[strategyId] = params
+        }
+    }
+
+    func updateActiveStrategyParamInt(
+        _ key: String,
+        value: Int,
+        range: ClosedRange<Int>
+    ) {
+        mutateStrategyDraft { draft in
+            let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+            var params = draft.strategyParams[strategyId] ?? defaultStrategyParams(for: strategyId)
+            let normalized = min(max(value, range.lowerBound), range.upperBound)
+            params[key] = .number(Double(normalized))
+            draft.strategyParams[strategyId] = params
+        }
+    }
+
+    func updateActiveStrategyParamOptionalInt(
+        _ key: String,
+        value: Int?,
+        range: ClosedRange<Int>
+    ) {
+        mutateStrategyDraft { draft in
+            let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+            var params = draft.strategyParams[strategyId] ?? defaultStrategyParams(for: strategyId)
+            if let value {
+                let normalized = min(max(value, range.lowerBound), range.upperBound)
+                params[key] = .number(Double(normalized))
+            } else {
+                params[key] = .null
+            }
+            draft.strategyParams[strategyId] = params
+        }
+    }
+
+    func updateActiveStrategyParamDouble(
+        _ key: String,
+        value: Double,
+        range: ClosedRange<Double>
+    ) {
+        mutateStrategyDraft { draft in
+            let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+            var params = draft.strategyParams[strategyId] ?? defaultStrategyParams(for: strategyId)
+            let normalized = min(max(value, range.lowerBound), range.upperBound)
+            params[key] = .number(normalized)
+            draft.strategyParams[strategyId] = params
+        }
+    }
+
+    func updateActiveStrategyParamBool(_ key: String, value: Bool) {
+        mutateStrategyDraft { draft in
+            let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+            var params = draft.strategyParams[strategyId] ?? defaultStrategyParams(for: strategyId)
+            params[key] = .bool(value)
+            draft.strategyParams[strategyId] = params
         }
     }
 
@@ -1202,6 +1266,9 @@ final class MonitoringStore: ObservableObject {
         if draft.strategyParams["turnover_surge_momentum"] == nil {
             draft.strategyParams["turnover_surge_momentum"] = fallbackMomentumStrategyParams(from: draft)
         }
+        if draft.strategyParams["opening_pullback_reentry"] == nil {
+            draft.strategyParams["opening_pullback_reentry"] = defaultOpeningPullbackStrategyParams()
+        }
         if draft.strategyParams["intraday_breakout"] == nil {
             draft.strategyParams["intraday_breakout"] = defaultPreviewStrategyParams()
         }
@@ -1222,6 +1289,9 @@ final class MonitoringStore: ObservableObject {
         if draft.strategyParams["turnover_surge_momentum"] == nil {
             draft.strategyParams["turnover_surge_momentum"] = fallbackMomentumStrategyParams(from: draft)
         }
+        if draft.strategyParams["opening_pullback_reentry"] == nil {
+            draft.strategyParams["opening_pullback_reentry"] = defaultOpeningPullbackStrategyParams()
+        }
         if draft.strategyParams["intraday_breakout"] == nil {
             draft.strategyParams["intraday_breakout"] = defaultPreviewStrategyParams()
         }
@@ -1232,13 +1302,21 @@ final class MonitoringStore: ObservableObject {
 
     private func persistLegacySections(into draft: inout StrategySettingsSnapshot, strategyId: String) {
         let normalizedStrategyId = strategyId.isEmpty ? "turnover_surge_momentum" : strategyId
-        guard normalizedStrategyId == "turnover_surge_momentum" else {
+        if normalizedStrategyId == "turnover_surge_momentum" {
+            draft.strategyParams[normalizedStrategyId] = fallbackMomentumStrategyParams(from: draft)
+            return
+        }
+
+        if normalizedStrategyId == "opening_pullback_reentry" {
             if draft.strategyParams[normalizedStrategyId] == nil {
-                draft.strategyParams[normalizedStrategyId] = defaultPreviewStrategyParams()
+                draft.strategyParams[normalizedStrategyId] = defaultOpeningPullbackStrategyParams()
             }
             return
         }
-        draft.strategyParams[normalizedStrategyId] = fallbackMomentumStrategyParams(from: draft)
+
+        if draft.strategyParams[normalizedStrategyId] == nil {
+            draft.strategyParams[normalizedStrategyId] = defaultPreviewStrategyParams()
+        }
     }
 
     private func syncCommonRiskParamsFromLegacySections(_ draft: inout StrategySettingsSnapshot) {
@@ -1249,7 +1327,11 @@ final class MonitoringStore: ObservableObject {
         commonRisk["daily_trade_limit_count"] = .number(Double(draft.basic.risk.dailyTradeLimitCount))
         commonRisk["max_concurrent_positions"] = .number(Double(draft.basic.risk.maxConcurrentPositions))
         commonRisk["force_close_on_market_close"] = .bool(draft.basic.exit.forceCloseOnMarketClose)
-        commonRisk["allowed_signal_types"] = .array(draft.risk.allowedSignalTypes.map(JSONValue.string))
+        var normalizedAllowedSignalTypes = strategySupportedSignalTypes.filter(Set(draft.risk.allowedSignalTypes).contains)
+        if !normalizedAllowedSignalTypes.contains("opening_pullback_reentry") {
+            normalizedAllowedSignalTypes.append("opening_pullback_reentry")
+        }
+        commonRisk["allowed_signal_types"] = .array(normalizedAllowedSignalTypes.map(JSONValue.string))
         commonRisk["cooldown_minutes"] = .number(Double(draft.risk.cooldownMinutes))
         commonRisk["signal_window_minutes"] = .number(Double(draft.risk.signalWindowMinutes))
         commonRisk["concurrency_window_minutes"] = .number(Double(draft.risk.concurrencyWindowMinutes))
@@ -1263,21 +1345,25 @@ final class MonitoringStore: ObservableObject {
 
         draft.scanner.defaultMode = normalizedActiveParams.stringValue(for: "selection_mode") ?? draft.scanner.defaultMode
         draft.scanner.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.scanner.topN
-        draft.scanner.minTurnover = normalizedActiveParams.doubleValue(for: "min_turnover")
-        draft.scanner.minChangePct = normalizedActiveParams.doubleValue(for: "min_change_pct")
-        draft.scanner.scoreDefinition.weights["turnover"] = weightSnapshot(
-            from: normalizedActiveParams.objectValue(for: "turnover_weights"),
-            fallback: draft.scanner.scoreDefinition.weights["turnover"]
-        )
-        draft.scanner.scoreDefinition.weights["surge"] = weightSnapshot(
-            from: normalizedActiveParams.objectValue(for: "surge_weights"),
-            fallback: draft.scanner.scoreDefinition.weights["surge"]
-        )
+        if activeStrategyId == "turnover_surge_momentum" {
+            draft.scanner.minTurnover = normalizedActiveParams.doubleValue(for: "min_turnover")
+            draft.scanner.minChangePct = normalizedActiveParams.doubleValue(for: "min_change_pct")
+            draft.scanner.scoreDefinition.weights["turnover"] = weightSnapshot(
+                from: normalizedActiveParams.objectValue(for: "turnover_weights"),
+                fallback: draft.scanner.scoreDefinition.weights["turnover"]
+            )
+            draft.scanner.scoreDefinition.weights["surge"] = weightSnapshot(
+                from: normalizedActiveParams.objectValue(for: "surge_weights"),
+                fallback: draft.scanner.scoreDefinition.weights["surge"]
+            )
+        }
 
         draft.signal.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.signal.topN
-        draft.signal.rankJumpThreshold = normalizedActiveParams.intValue(for: "rank_jump_threshold") ?? draft.signal.rankJumpThreshold
-        draft.signal.rankJumpWindowSeconds = normalizedActiveParams.intValue(for: "rank_jump_window_seconds") ?? draft.signal.rankJumpWindowSeconds
-        draft.signal.rankHoldTolerance = normalizedActiveParams.intValue(for: "rank_hold_tolerance") ?? draft.signal.rankHoldTolerance
+        if activeStrategyId == "turnover_surge_momentum" {
+            draft.signal.rankJumpThreshold = normalizedActiveParams.intValue(for: "rank_jump_threshold") ?? draft.signal.rankJumpThreshold
+            draft.signal.rankJumpWindowSeconds = normalizedActiveParams.intValue(for: "rank_jump_window_seconds") ?? draft.signal.rankJumpWindowSeconds
+            draft.signal.rankHoldTolerance = normalizedActiveParams.intValue(for: "rank_hold_tolerance") ?? draft.signal.rankHoldTolerance
+        }
         draft.signal.enabledSignalTypes = normalizedActiveParams.arrayStringValues(for: "enabled_signal_types") ?? draft.signal.enabledSignalTypes
 
         draft.risk.allowedSignalTypes = draft.commonRiskParams.arrayStringValues(for: "allowed_signal_types") ?? draft.risk.allowedSignalTypes
@@ -1290,9 +1376,17 @@ final class MonitoringStore: ObservableObject {
         draft.basic.entry.selectionMode = draft.scanner.defaultMode
         draft.basic.entry.topN = draft.signal.topN
         draft.basic.entry.enabledSignalTypes = draft.signal.enabledSignalTypes
-        draft.basic.exit.targetProfitPct = normalizedActiveParams.doubleValue(for: "target_profit_pct") ?? draft.basic.exit.targetProfitPct
-        draft.basic.exit.stopLossPct = normalizedActiveParams.doubleValue(for: "stop_loss_pct") ?? draft.basic.exit.stopLossPct
-        draft.basic.exit.maxHoldingMinutes = normalizedActiveParams.intValue(for: "max_holding_minutes") ?? draft.basic.exit.maxHoldingMinutes
+        if activeStrategyId == "opening_pullback_reentry" {
+            let initialStopPct = normalizedActiveParams.doubleValue(for: "initial_stop_pct") ?? draft.basic.exit.stopLossPct
+            let firstTakeProfitR = normalizedActiveParams.doubleValue(for: "first_take_profit_r_multiple") ?? 1.0
+            draft.basic.exit.targetProfitPct = max(0, initialStopPct * firstTakeProfitR)
+            draft.basic.exit.stopLossPct = initialStopPct
+            draft.basic.exit.maxHoldingMinutes = normalizedActiveParams.intValue(for: "time_stop_hard_minutes") ?? draft.basic.exit.maxHoldingMinutes
+        } else {
+            draft.basic.exit.targetProfitPct = normalizedActiveParams.doubleValue(for: "target_profit_pct") ?? draft.basic.exit.targetProfitPct
+            draft.basic.exit.stopLossPct = normalizedActiveParams.doubleValue(for: "stop_loss_pct") ?? draft.basic.exit.stopLossPct
+            draft.basic.exit.maxHoldingMinutes = normalizedActiveParams.intValue(for: "max_holding_minutes") ?? draft.basic.exit.maxHoldingMinutes
+        }
         draft.basic.exit.forceCloseOnMarketClose = draft.commonRiskParams.boolValue(for: "force_close_on_market_close") ?? draft.basic.exit.forceCloseOnMarketClose
         draft.basic.risk.maxLossLimitPct = draft.commonRiskParams.doubleValue(for: "max_loss_limit_pct") ?? draft.basic.risk.maxLossLimitPct
         draft.basic.risk.positionSizePct = draft.commonRiskParams.doubleValue(for: "position_size_pct") ?? draft.basic.risk.positionSizePct
@@ -1335,6 +1429,77 @@ final class MonitoringStore: ObservableObject {
         ]
     }
 
+    private func defaultOpeningPullbackStrategyParams() -> [String: JSONValue] {
+        [
+            "selection_mode": .string("turnover"),
+            "top_n": .number(8),
+            "enabled_signal_types": .array([.string("opening_pullback_reentry")]),
+            "observe_start_time": .string("09:00"),
+            "candidate_start_time": .string("09:02"),
+            "candidate_end_time": .string("09:20"),
+            "entry_end_time": .string("10:00"),
+            "open_impulse_min_return_pct": .number(2.0),
+            "open_impulse_max_return_pct": .number(8.0),
+            "pullback_retrace_min_pct": .number(25.0),
+            "pullback_retrace_max_pct": .number(55.0),
+            "pullback_bars_min": .number(2),
+            "pullback_bars_max": .number(6),
+            "reentry_volume_multiplier": .number(1.4),
+            "use_vwap_filter": .bool(true),
+            "require_vwap_reclaim": .bool(false),
+            "initial_stop_pct": .number(1.2),
+            "first_take_profit_r_multiple": .number(1.5),
+            "first_take_profit_partial_ratio": .number(0.5),
+            "time_stop_soft_minutes": .number(15),
+            "time_stop_hard_minutes": .number(45),
+        ]
+    }
+
+    private func defaultMomentumStrategyParams() -> [String: JSONValue] {
+        [
+            "selection_mode": .string("turnover"),
+            "top_n": .number(10),
+            "enabled_signal_types": .array([
+                .string("new_entry"),
+                .string("rank_jump"),
+                .string("rank_maintained"),
+            ]),
+            "target_profit_pct": .number(3.0),
+            "stop_loss_pct": .number(2.0),
+            "max_holding_minutes": .number(60),
+            "min_turnover": .null,
+            "min_change_pct": .null,
+            "turnover_weights": .object([
+                "rank": .number(40),
+                "turnover": .number(45),
+                "change_pct": .number(15),
+            ]),
+            "surge_weights": .object([
+                "rank": .number(40),
+                "turnover": .number(15),
+                "change_pct": .number(45),
+            ]),
+            "rank_jump_threshold": .number(3),
+            "rank_jump_window_seconds": .number(600),
+            "rank_hold_tolerance": .number(1),
+        ]
+    }
+
+    private func defaultStrategyParams(for strategyId: String) -> [String: JSONValue] {
+        switch strategyId {
+        case "turnover_surge_momentum":
+            return strategyDraft?.strategyParams[strategyId]
+                ?? strategySettings?.strategyParams[strategyId]
+                ?? defaultMomentumStrategyParams()
+        case "opening_pullback_reentry":
+            return defaultOpeningPullbackStrategyParams()
+        case "intraday_breakout":
+            return defaultPreviewStrategyParams()
+        default:
+            return [:]
+        }
+    }
+
     private func weightObject(from weights: ScannerScoreWeightsSnapshot?) -> [String: JSONValue] {
         let resolved = weights ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
         return [
@@ -1371,6 +1536,8 @@ final class MonitoringStore: ObservableObject {
         let signal = draft.signal
         let risk = draft.risk
         let basic = draft.basic
+        let activeStrategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+        let activeStrategyParams = draft.strategyParams[activeStrategyId] ?? [:]
 
         if !strategySelectionModes.contains(scanner.defaultMode) {
             errors.append("기본 스캔 기준은 거래대금 순위/급등률 순위 중 하나여야 합니다.")
@@ -1484,7 +1651,109 @@ final class MonitoringStore: ObservableObject {
             errors.append("리스크 동시 보유 제한과 고급 Risk 동시 후보 수가 일치해야 합니다.")
         }
 
+        if activeStrategyId == "opening_pullback_reentry" {
+            let enabledSignalTypes = activeStrategyParams.arrayStringValues(for: "enabled_signal_types") ?? []
+            let observeStartTime = activeStrategyParams.stringValue(for: "observe_start_time") ?? ""
+            let candidateStartTime = activeStrategyParams.stringValue(for: "candidate_start_time") ?? ""
+            let candidateEndTime = activeStrategyParams.stringValue(for: "candidate_end_time") ?? ""
+            let entryEndTime = activeStrategyParams.stringValue(for: "entry_end_time") ?? ""
+            let observeMinutes = parseHHMMMinutes(observeStartTime)
+            let candidateStartMinutes = parseHHMMMinutes(candidateStartTime)
+            let candidateEndMinutes = parseHHMMMinutes(candidateEndTime)
+            let entryEndMinutes = parseHHMMMinutes(entryEndTime)
+
+            if !strategySelectionModes.contains(activeStrategyParams.stringValue(for: "selection_mode") ?? "") {
+                errors.append("Opening Pullback 후보 선정 방식은 거래대금 순위/급등률 순위 중 하나여야 합니다.")
+            }
+            if !(1...30).contains(activeStrategyParams.intValue(for: "top_n") ?? 0) {
+                errors.append("Opening Pullback 후보 관찰 범위는 1~30 사이여야 합니다.")
+            }
+            if enabledSignalTypes.isEmpty {
+                errors.append("Opening Pullback 활성 신호 유형은 최소 1개 이상 필요합니다.")
+            }
+            if enabledSignalTypes.contains(where: { !strategySupportedSignalTypes.contains($0) }) {
+                errors.append("Opening Pullback 활성 신호 유형에 지원되지 않는 값이 포함되어 있습니다.")
+            }
+            if observeMinutes == nil || candidateStartMinutes == nil || candidateEndMinutes == nil || entryEndMinutes == nil {
+                errors.append("Opening Pullback 시간대는 HH:MM 형식이어야 합니다.")
+            } else if let observeMinutes, let candidateStartMinutes, let candidateEndMinutes, let entryEndMinutes {
+                if observeMinutes > candidateStartMinutes {
+                    errors.append("Opening Pullback 관찰 시작 시각은 후보 시작 시각보다 늦을 수 없습니다.")
+                }
+                if candidateStartMinutes > candidateEndMinutes {
+                    errors.append("Opening Pullback 후보 시작 시각은 후보 종료 시각보다 늦을 수 없습니다.")
+                }
+                if candidateEndMinutes > entryEndMinutes {
+                    errors.append("Opening Pullback 후보 종료 시각은 진입 종료 시각보다 늦을 수 없습니다.")
+                }
+            }
+
+            let openImpulseMin = activeStrategyParams.doubleValue(for: "open_impulse_min_return_pct") ?? -1
+            let openImpulseMax = activeStrategyParams.doubleValue(for: "open_impulse_max_return_pct") ?? -1
+            if openImpulseMin <= 0 || openImpulseMax <= 0 || openImpulseMin > openImpulseMax {
+                errors.append("Opening impulse 수익률 범위를 다시 확인하세요.")
+            }
+
+            let pullbackRetraceMin = activeStrategyParams.doubleValue(for: "pullback_retrace_min_pct") ?? -1
+            let pullbackRetraceMax = activeStrategyParams.doubleValue(for: "pullback_retrace_max_pct") ?? -1
+            if pullbackRetraceMin <= 0 || pullbackRetraceMax <= 0 || pullbackRetraceMin > pullbackRetraceMax {
+                errors.append("눌림 되돌림 범위를 다시 확인하세요.")
+            }
+
+            let pullbackBarsMin = activeStrategyParams.intValue(for: "pullback_bars_min") ?? 0
+            let pullbackBarsMax = activeStrategyParams.intValue(for: "pullback_bars_max") ?? 0
+            if !(1...30).contains(pullbackBarsMin) || !(1...60).contains(pullbackBarsMax) || pullbackBarsMin > pullbackBarsMax {
+                errors.append("눌림 봉 수 범위를 다시 확인하세요.")
+            }
+
+            let reentryVolumeMultiplier = activeStrategyParams.doubleValue(for: "reentry_volume_multiplier") ?? 0
+            if reentryVolumeMultiplier <= 0 || reentryVolumeMultiplier > 20 {
+                errors.append("재상승 거래량 배수는 0 초과 20 이하 범위여야 합니다.")
+            }
+
+            let initialStopPct = activeStrategyParams.doubleValue(for: "initial_stop_pct") ?? 0
+            if initialStopPct <= 0 || initialStopPct > 20 {
+                errors.append("초기 손절 비율은 0 초과 20 이하 범위여야 합니다.")
+            }
+
+            let firstTakeProfitR = activeStrategyParams.doubleValue(for: "first_take_profit_r_multiple") ?? 0
+            if firstTakeProfitR <= 0 || firstTakeProfitR > 10 {
+                errors.append("1차 익절 R 배수는 0 초과 10 이하 범위여야 합니다.")
+            }
+
+            let firstTakeProfitPartialRatio = activeStrategyParams.doubleValue(for: "first_take_profit_partial_ratio") ?? 0
+            if firstTakeProfitPartialRatio <= 0 || firstTakeProfitPartialRatio >= 1 {
+                errors.append("1차 익절 분할 비율은 0 초과 1 미만 범위여야 합니다.")
+            }
+
+            let hardTimeStopMinutes = activeStrategyParams.intValue(for: "time_stop_hard_minutes") ?? 0
+            if !(1...480).contains(hardTimeStopMinutes) {
+                errors.append("하드 시간청산은 1~480분 범위여야 합니다.")
+            }
+
+            if let softTimeStopMinutes = activeStrategyParams.intValue(for: "time_stop_soft_minutes") {
+                if !(1...240).contains(softTimeStopMinutes) {
+                    errors.append("소프트 시간청산은 1~240분 범위여야 합니다.")
+                }
+                if softTimeStopMinutes > hardTimeStopMinutes {
+                    errors.append("소프트 시간청산은 하드 시간청산보다 길 수 없습니다.")
+                }
+            }
+        }
+
         return errors
+    }
+
+    private func parseHHMMMinutes(_ value: String) -> Int? {
+        let parts = value.split(separator: ":")
+        guard parts.count == 2,
+              let hour = Int(parts[0]),
+              let minute = Int(parts[1]),
+              (0...23).contains(hour),
+              (0...59).contains(minute) else {
+            return nil
+        }
+        return hour * 60 + minute
     }
 
     private func buildStrategyUpdatePayload(

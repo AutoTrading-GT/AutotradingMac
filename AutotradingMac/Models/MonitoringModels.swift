@@ -487,7 +487,17 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
         _ templates: [StrategyTemplateSnapshot],
         activeStrategyId: String
     ) -> [StrategyTemplateSnapshot] {
-        let base = templates.isEmpty ? fallbackCatalog(activeStrategyId: activeStrategyId) : templates
+        let fallback = fallbackCatalog(activeStrategyId: activeStrategyId)
+        let base: [StrategyTemplateSnapshot]
+        if templates.isEmpty {
+            base = fallback
+        } else {
+            var merged = templates
+            for template in fallback where !merged.contains(where: { $0.strategyId == template.strategyId }) {
+                merged.append(template)
+            }
+            base = merged
+        }
         return base.map { template in
             StrategyTemplateSnapshot(
                 strategyId: template.strategyId,
@@ -643,6 +653,148 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                         description: "상위권 유지 신호 판정에 허용하는 순위 편차입니다.",
                         options: nil,
                         unit: "rank",
+                        wired: true
+                    ),
+                ]
+            ),
+            StrategyTemplateSnapshot(
+                strategyId: "opening_pullback_reentry",
+                displayName: "Opening Pullback Re-entry",
+                shortDescription: "개장 초 강한 유동성 모멘텀 종목의 눌림 후 재상승 구간만 추려 진입하는 전략입니다.",
+                category: "opening_momentum",
+                status: activeStrategyId == "opening_pullback_reentry" ? "active" : "available",
+                wiredToEngine: true,
+                selectable: true,
+                implementationNote: "1차 버전은 rank 상위 후보 + 1분봉 + VWAP + 부분익절/시간청산까지 엔진에 연결되어 있습니다. 호가/VI/시장경보 필터는 아직 미구현입니다.",
+                configurableFields: [
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "selection_mode",
+                        label: "후보 랭킹 기준",
+                        inputType: "enum",
+                        group: "candidate",
+                        description: "거래대금 순위와 급등률 순위 중 어떤 랭킹을 후보 풀로 사용할지 정합니다.",
+                        options: ["turnover", "surge"],
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "top_n",
+                        label: "후보 관찰 범위",
+                        inputType: "int",
+                        group: "candidate",
+                        description: "개장 초 pullback 패턴을 감시할 rank 상위 종목 수입니다.",
+                        options: nil,
+                        unit: "symbols",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "observe_start_time",
+                        label: "관찰 시작 시각",
+                        inputType: "time",
+                        group: "time",
+                        description: "당일 1분봉 패턴을 읽기 시작할 시각입니다.",
+                        options: nil,
+                        unit: "KST",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "candidate_end_time",
+                        label: "후보 종료 시각",
+                        inputType: "time",
+                        group: "time",
+                        description: "opening impulse 후보를 인정하는 마지막 시각입니다.",
+                        options: nil,
+                        unit: "KST",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "entry_end_time",
+                        label: "진입 종료 시각",
+                        inputType: "time",
+                        group: "time",
+                        description: "re-entry 돌파 진입을 허용하는 마지막 시각입니다.",
+                        options: nil,
+                        unit: "KST",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "open_impulse_min_return_pct",
+                        label: "opening impulse 최소 수익률",
+                        inputType: "float",
+                        group: "candidate",
+                        description: "전일 종가 대비 개장 초 상승폭의 최소 기준입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "pullback_retrace_min_pct",
+                        label: "눌림 최소 되돌림",
+                        inputType: "float",
+                        group: "pullback",
+                        description: "첫 상승폭 대비 눌림이 최소 어느 정도 나와야 하는지 정합니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "pullback_bars_max",
+                        label: "눌림 최대 봉 수",
+                        inputType: "int",
+                        group: "pullback",
+                        description: "패턴이 늘어지기 전에 진입 후보를 정리하기 위한 최대 1분봉 개수입니다.",
+                        options: nil,
+                        unit: "bars",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "reentry_volume_multiplier",
+                        label: "재상승 거래량 배수",
+                        inputType: "float",
+                        group: "reentry",
+                        description: "re-entry 봉의 거래량이 pullback 평균 대비 얼마나 커야 하는지 정합니다.",
+                        options: nil,
+                        unit: "x",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "use_vwap_filter",
+                        label: "VWAP 필터 사용",
+                        inputType: "bool",
+                        group: "reentry",
+                        description: "VWAP 위 유지/회복 여부를 진입 필터로 사용할지 정합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "initial_stop_pct",
+                        label: "초기 손절 비율",
+                        inputType: "float",
+                        group: "exit",
+                        description: "진입가 대비 초기 손절 상한입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "first_take_profit_r_multiple",
+                        label: "1차 익절 R 배수",
+                        inputType: "float",
+                        group: "exit",
+                        description: "초기 리스크(R) 대비 1차 부분익절 배수입니다.",
+                        options: nil,
+                        unit: "R",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "time_stop_hard_minutes",
+                        label: "하드 시간청산",
+                        inputType: "int",
+                        group: "exit",
+                        description: "잔여 포지션을 강제로 청산하는 최대 보유 시간입니다.",
+                        options: nil,
+                        unit: "minutes",
                         wired: true
                     ),
                 ]
@@ -875,6 +1027,29 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
                 "rank_jump_window_seconds": .number(Double(advanced.signal.rankJumpWindowSeconds)),
                 "rank_hold_tolerance": .number(Double(advanced.signal.rankHoldTolerance)),
             ],
+            "opening_pullback_reentry": [
+                "selection_mode": .string("turnover"),
+                "top_n": .number(8),
+                "enabled_signal_types": .array([.string("opening_pullback_reentry")]),
+                "observe_start_time": .string("09:00"),
+                "candidate_start_time": .string("09:02"),
+                "candidate_end_time": .string("09:20"),
+                "entry_end_time": .string("10:00"),
+                "open_impulse_min_return_pct": .number(2.0),
+                "open_impulse_max_return_pct": .number(8.0),
+                "pullback_retrace_min_pct": .number(25.0),
+                "pullback_retrace_max_pct": .number(55.0),
+                "pullback_bars_min": .number(2),
+                "pullback_bars_max": .number(6),
+                "reentry_volume_multiplier": .number(1.4),
+                "use_vwap_filter": .bool(true),
+                "require_vwap_reclaim": .bool(false),
+                "initial_stop_pct": .number(1.2),
+                "first_take_profit_r_multiple": .number(1.5),
+                "first_take_profit_partial_ratio": .number(0.5),
+                "time_stop_soft_minutes": .number(15),
+                "time_stop_hard_minutes": .number(45),
+            ],
             "intraday_breakout": [
                 "breakout_window_minutes": .number(15),
                 "breakout_threshold_pct": .number(2.2),
@@ -891,6 +1066,13 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
         basic: BasicStrategySettingsSnapshot,
         risk: RiskSettingsSnapshot
     ) -> [String: JSONValue] {
+        let allowedSignalTypes: [String] = {
+            var values = risk.allowedSignalTypes
+            if !values.contains("opening_pullback_reentry") {
+                values.append("opening_pullback_reentry")
+            }
+            return values
+        }()
         [
             "position_size_pct": .number(basic.risk.positionSizePct),
             "max_loss_limit_pct": .number(basic.risk.maxLossLimitPct),
@@ -898,7 +1080,7 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
             "daily_trade_limit_count": .number(Double(basic.risk.dailyTradeLimitCount)),
             "max_concurrent_positions": .number(Double(basic.risk.maxConcurrentPositions)),
             "force_close_on_market_close": .bool(basic.exit.forceCloseOnMarketClose),
-            "allowed_signal_types": .array(risk.allowedSignalTypes.map(JSONValue.string)),
+            "allowed_signal_types": .array(allowedSignalTypes.map(JSONValue.string)),
             "cooldown_minutes": .number(Double(risk.cooldownMinutes)),
             "signal_window_minutes": .number(Double(risk.signalWindowMinutes)),
             "concurrency_window_minutes": .number(Double(risk.concurrencyWindowMinutes)),

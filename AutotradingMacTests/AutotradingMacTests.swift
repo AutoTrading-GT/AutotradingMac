@@ -13,14 +13,54 @@ final class AutotradingMacTests: XCTestCase {
         let snapshot = Self.makeStrategySettingsSnapshot()
 
         XCTAssertEqual(snapshot.activeStrategyId, "turnover_surge_momentum")
-        XCTAssertEqual(snapshot.strategyTemplates.map(\.strategyId), ["turnover_surge_momentum", "intraday_breakout"])
+        XCTAssertEqual(
+            snapshot.strategyTemplates.map(\.strategyId),
+            ["turnover_surge_momentum", "opening_pullback_reentry", "intraday_breakout"]
+        )
         XCTAssertEqual(snapshot.template(id: "turnover_surge_momentum")?.status, "active")
+        XCTAssertEqual(snapshot.template(id: "opening_pullback_reentry")?.status, "available")
         XCTAssertEqual(snapshot.template(id: "intraday_breakout")?.status, "preview_only")
         XCTAssertEqual(
             snapshot.strategyParams["turnover_surge_momentum"]?["selection_mode"]?.stringValue,
             "turnover"
         )
+        XCTAssertEqual(
+            snapshot.strategyParams["opening_pullback_reentry"]?["candidate_end_time"]?.stringValue,
+            "09:20"
+        )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
+        XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
+    }
+
+    @MainActor
+    func test_monitoringStore_allowsOpeningPullbackStrategyActivation() async {
+        let snapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(strategyEnvelope: envelope),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadStrategySettings()
+        store.updateStrategyActiveTemplate("opening_pullback_reentry")
+
+        XCTAssertEqual(store.strategyDraft?.activeStrategyId, "opening_pullback_reentry")
+        XCTAssertEqual(store.strategyDraft?.template(id: "opening_pullback_reentry")?.status, "active")
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["time_stop_hard_minutes"]?.intValue,
+            45
+        )
+        XCTAssertTrue(
+            store.strategyDraft?.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false
+        )
+        XCTAssertEqual(store.strategyDraft?.basic.exit.stopLossPct ?? 0, 1.2, accuracy: 0.0001)
+        XCTAssertNil(store.lastStrategySettingsErrorMessage)
     }
 
     @MainActor

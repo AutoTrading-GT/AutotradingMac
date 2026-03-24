@@ -140,13 +140,16 @@
     - `common_risk_params`
   - 현재 템플릿:
     - `turnover_surge_momentum`: 실제 엔진 연결 전략, 선택 가능
+    - `opening_pullback_reentry`: 실제 엔진 연결 전략, 선택 가능
     - `intraday_breakout`: `preview_only`, 메타/파라미터 프리뷰만 가능
   - 정보 구조/정렬 원칙:
     - 카드 전체 폭 양 끝에 라벨/값을 두는 긴 폼 구조를 줄이고, 내부 읽기 폭을 좁힌 그룹형 패널로 정리
     - `현재 전략 요약`은 `전략 핵심 요약` + `적용 상태` 2블록으로 나눠 핵심 기준과 현재 상태를 분리 표시
     - `전략 선택`은 segmented control 대신 카드형 목록으로 유지해 향후 전략 추가에 대비한다
     - 활성 전략 편집 패널과 공통 리스크/실행 패널은 시각적으로 분리한다
-    - 현재 `turnover_surge_momentum`만 전략별 편집 UI를 제공하고, preview 템플릿은 값 미리보기만 제공한다
+    - `turnover_surge_momentum`는 기존 Basic Strategy + Advanced Settings 편집 UI를 유지한다
+    - `opening_pullback_reentry`는 `시간대 / 후보 선정 / 눌림 정의 / 재진입 조건 / 청산` 전용 폼을 사용한다
+    - `intraday_breakout` 같은 preview 템플릿은 값 미리보기만 제공한다
     - 공통 설정은 전략을 바꿔도 유지되며, 전략 전환과 별도의 패널에서 조정한다
     - `Basic Strategy`는 현재 활성 전략의 편집 패널로서 작은 카드 여러 개 대신 하나의 긴 가로 패널로 정리한다
       - 진입: `후보 선정 방식` / `관찰 후보 수` / `진입 신호`
@@ -174,6 +177,16 @@
     - 진입: 후보 선정 방식, 관찰 Top-N, 주요 진입 신호 유형
     - 청산: 목표 수익률, 손절 기준, 최대 보유시간
     - 공통 리스크/실행: 최대 손실 한도, 포지션 크기(전체 자산 대비 %), 일일 거래 제한 사용/최대 횟수, 동시 보유 제한, 장 마감 5분 전 전체 청산
+  - Opening Pullback Re-entry 편집 항목:
+    - 시간대: `observe_start_time`, `candidate_start_time`, `candidate_end_time`, `entry_end_time`
+    - 후보 선정: `selection_mode`, `top_n`, `open_impulse_min/max_return_pct`
+    - 눌림 정의: `pullback_retrace_min/max_pct`, `pullback_bars_min/max`
+    - 재진입 조건: `reentry_volume_multiplier`, `use_vwap_filter`, `require_vwap_reclaim`
+    - 청산: `initial_stop_pct`, `first_take_profit_r_multiple`, `first_take_profit_partial_ratio`, `time_stop_soft_minutes`, `time_stop_hard_minutes`
+  - 1차 구현 범위/제약:
+    - 현재 엔진 연결 범위는 1분봉 OHLCV, 거래대금/급등률 rank, VWAP, 부분익절, 시간청산까지다
+    - 호가 잔량, 스프레드, VI/시장경보/신규상장 필터는 아직 UI에도 별도 노출하지 않는다
+    - 포지션 사이징은 공통 `position_size_pct`를 그대로 사용하며 risk-per-trade sizing은 TODO다
   - 입력 컨트롤 규칙:
     - 정수 범위/단계값(`Top-N`, 보유시간, 최대 거래 횟수, 동시 보유 수)은 stepper형
     - 퍼센트/직접 입력값(`목표 수익률`, `손절`, `최대 손실`, `포지션 크기`, 고급 필터값)은 compact numeric field형
