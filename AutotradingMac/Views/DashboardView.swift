@@ -183,9 +183,9 @@ struct DashboardView: View {
     }
 
     private var holdingsPanel: some View {
-        dashboardPanel(title: "보유 종목", subtitle: "\(store.currentPositions.count)개", noPadding: true) {
+        dashboardPanel(title: "보유 종목", subtitle: "\(store.currentPositions.count)개 · \(holdingsBasisText)", noPadding: true) {
             if holdingItems.isEmpty {
-                panelEmptyState("현재 보유 종목이 없습니다.")
+                panelEmptyState("\(holdingsBasisText) 보유 종목이 없습니다.")
             } else {
                 VStack(spacing: 0) {
                     ForEach(holdingItems) { item in
@@ -312,6 +312,8 @@ struct DashboardView: View {
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(item.iconColor)
                                     .frame(width: 14)
+                                StatusBadge(text: logModeBadgeText(item.mode), tone: logModeTone(item.mode))
+                                    .frame(width: 58, alignment: .leading)
                                 HStack(spacing: 3) {
                                     Text(item.message)
                                         .font(.callout)
@@ -470,6 +472,17 @@ struct DashboardView: View {
         }
     }
 
+    private var holdingsBasisText: String {
+        let mode = normalizedModeLabel(store.runtime?.accountMode)
+        if mode == "LIVE" {
+            if let label = accountSummary?.accountLabel, !label.isEmpty {
+                return "\(label) 기준"
+            }
+            return "LIVE 계좌 기준"
+        }
+        return "PAPER 내부계좌 기준"
+    }
+
     private var signalItems: [DashboardSignalSummaryRow] {
         DashboardSignalSummaryBuilder.build(
             signals: store.recentSignals,
@@ -532,7 +545,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: "sell",
                     status: row.reasonCode ?? row.reason,
-                    sourceSignalReference: row.sourceSignalReference
+                    sourceSignalReference: row.sourceSignalReference,
+                    mode: row.orderMode ?? row.executionMode
                 )
             }
         )
@@ -552,7 +566,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: row.side,
                     status: nil,
-                    sourceSignalReference: nil
+                    sourceSignalReference: nil,
+                    mode: row.orderMode ?? row.executionMode
                 )
             }
         )
@@ -577,7 +592,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: row.side,
                     status: row.status,
-                    sourceSignalReference: row.sourceSignalReference
+                    sourceSignalReference: row.sourceSignalReference,
+                    mode: row.orderMode ?? row.executionMode
                 )
             }
         )
@@ -606,7 +622,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: row.signalType.map(signalSide),
                     status: row.reasonCode ?? row.reason,
-                    sourceSignalReference: nil
+                    sourceSignalReference: nil,
+                    mode: row.orderMode ?? row.executionMode
                 )
             }
         )
@@ -637,7 +654,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: row.signalType.map(signalSide),
                     status: row.decision,
-                    sourceSignalReference: nil
+                    sourceSignalReference: nil,
+                    mode: row.orderMode ?? row.executionMode
                 )
             }
         )
@@ -662,7 +680,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: nil,
                     status: row.signalType,
-                    sourceSignalReference: nil
+                    sourceSignalReference: nil,
+                    mode: row.orderMode ?? row.executionMode
                 )
             }
         )
@@ -684,6 +703,7 @@ struct DashboardView: View {
                     side: "sell",
                     status: row.reasonCode ?? row.reason,
                     sourceSignalReference: row.sourceSignalReference,
+                    mode: row.orderMode ?? row.executionMode,
                     trailingAmount: "(\(DisplayFormatters.pnl(row.realizedPnl)))",
                     trailingAmountColor: EventVisualStyleResolver.amountColor(forPnL: row.realizedPnl)
                 )
@@ -704,7 +724,8 @@ struct DashboardView: View {
                     sourceOrderId: nil,
                     side: nil,
                     status: nil,
-                    sourceSignalReference: nil
+                    sourceSignalReference: nil,
+                    mode: store.runtime?.orderMode
                 )
             }
         )
@@ -788,6 +809,35 @@ struct DashboardView: View {
 
     private var currentOrderModeLabel: String {
         currentOrderModeForWinRate.uppercased()
+    }
+
+    private func logModeBadgeText(_ raw: String?) -> String {
+        normalizedModeLabel(raw)
+    }
+
+    private func logModeTone(_ raw: String?) -> StatusTone {
+        switch normalizedModeLabel(raw) {
+        case "LIVE":
+            return .danger
+        case "PAPER":
+            return .neutral
+        default:
+            return .warning
+        }
+    }
+
+    private func normalizedModeLabel(_ raw: String?) -> String {
+        let normalized = (raw ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        switch normalized {
+        case "live":
+            return "LIVE"
+        case "paper":
+            return "PAPER"
+        default:
+            return "UNKNOWN"
+        }
     }
 
     private var weeklyClosedPositionsForCurrentMode: [ClosedPositionSnapshotItem] {
@@ -1049,6 +1099,7 @@ private struct DashboardLogItem: Identifiable {
     let side: String?
     let status: String?
     let sourceSignalReference: String?
+    let mode: String?
     let trailingAmount: String?
     let trailingAmountColor: Color?
 
@@ -1065,6 +1116,7 @@ private struct DashboardLogItem: Identifiable {
         side: String?,
         status: String?,
         sourceSignalReference: String?,
+        mode: String? = nil,
         trailingAmount: String? = nil,
         trailingAmountColor: Color? = nil
     ) {
@@ -1080,6 +1132,7 @@ private struct DashboardLogItem: Identifiable {
         self.side = side
         self.status = status
         self.sourceSignalReference = sourceSignalReference
+        self.mode = mode
         self.trailingAmount = trailingAmount
         self.trailingAmountColor = trailingAmountColor
     }

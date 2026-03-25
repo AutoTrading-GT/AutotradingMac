@@ -239,6 +239,7 @@ struct SettingsView: View {
                 strategySnapshotCard(
                     title: "일일 손실 한도",
                     value: riskDailyLossSnapshotText,
+                    detail: riskDailyLossModeDetailText,
                     badge: riskDailyLossRuntimeBadgeText,
                     tone: riskDailyLossRuntimeTone
                 )
@@ -3567,12 +3568,12 @@ struct SettingsView: View {
             if let todayTotalPnl {
                 let pnlText = DisplayFormatters.krw(todayTotalPnl)
                 let state = reached ? "한도 도달" : "정상"
-                return "오늘 손익 \(pnlText), 손실률 \(lossText) / 한도 \(limitText) (\(state))"
+                return "\(currentOrderModeSummaryText) 오늘 손익 \(pnlText), 손실률 \(lossText) / 한도 \(limitText) (\(state))"
             }
             let state = reached ? "한도 도달" : "정상"
-            return "오늘 손실률 \(lossText) / 한도 \(limitText) (\(state))"
+            return "\(currentOrderModeSummaryText) 손실률 \(lossText) / 한도 \(limitText) (\(state))"
         }
-        return "한도 \(limitText) · 오늘 손실률 계산 대기"
+        return "\(currentOrderModeSummaryText) 한도 \(limitText) · 오늘 손실률 계산 대기"
     }
 
     private var riskDailyLossSnapshotText: String {
@@ -3585,20 +3586,25 @@ struct SettingsView: View {
         let todayLossPct = effective?["today_loss_pct"]?.doubleValue ?? 0.0
 
         if effective?["today_loss_pct"]?.doubleValue == nil {
-            return "한도 \(DisplayFormatters.percent(maxLossLimitPct))"
+            return "\(currentOrderModeSummaryText) 한도 \(DisplayFormatters.percent(maxLossLimitPct))"
         }
-        return "손실률 \(DisplayFormatters.percent(todayLossPct)) / 한도 \(DisplayFormatters.percent(maxLossLimitPct))"
+        return "\(currentOrderModeSummaryText) 손실률 \(DisplayFormatters.percent(todayLossPct)) / 한도 \(DisplayFormatters.percent(maxLossLimitPct))"
+    }
+
+    private var riskDailyLossModeDetailText: String {
+        "\(currentOrderModeSummaryText) 손익 기준으로 일일 손실 한도를 집계합니다."
     }
 
     private var riskDailyLossRuntimeBadgeText: String {
         let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
+        let prefix = currentOrderModeShortLabel
         if (effective?["daily_loss_limit_reached"]?.boolValue ?? false) {
-            return "한도 도달"
+            return "\(prefix) 한도"
         }
         if effective?["today_loss_pct"]?.doubleValue == nil {
-            return "계산 대기"
+            return "\(prefix) 대기"
         }
-        return "정상"
+        return "\(prefix) 정상"
     }
 
     private var riskDailyLossRuntimeTone: StatusTone {
@@ -3610,6 +3616,15 @@ struct SettingsView: View {
             return .warning
         }
         return .neutral
+    }
+
+    private var currentOrderModeShortLabel: String {
+        let normalized = (store.runtime?.orderMode ?? "paper").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized == "live" ? "LIVE" : "PAPER"
+    }
+
+    private var currentOrderModeSummaryText: String {
+        "\(currentOrderModeShortLabel) 주문 기준"
     }
 
     private var apiConnectionPanel: some View {
