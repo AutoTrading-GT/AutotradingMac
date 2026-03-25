@@ -601,47 +601,46 @@ struct SettingsView: View {
     private func openingPullbackStrategyPanel(
         template: StrategyTemplateSnapshot
     ) -> some View {
-        guard let context = openingPullbackRenderContext(template: template) else {
-            openingPullbackPlaceholderPanel(template: template)
-            return
-        }
+        if let context = openingPullbackRenderContext(template: template) {
+            strategyPanel(
+                title: "선택한 전략 설정",
+                subtitle: "\(template.displayName)의 개장 초 impulse → pullback → re-entry 규칙을 전용 폼으로 편집합니다."
+            ) {
+                VStack(alignment: .leading, spacing: 22) {
+                    openingTimingSection()
+                    openingCandidateSection()
+                    openingPullbackSection()
+                    openingReentrySection()
+                    openingMarketSafetySection()
+                    openingExecutionQualitySection()
+                    openingSizingSection()
+                    openingExitSection()
 
-        strategyPanel(
-            title: "선택한 전략 설정",
-            subtitle: "\(template.displayName)의 개장 초 impulse → pullback → re-entry 규칙을 전용 폼으로 편집합니다."
-        ) {
-            VStack(alignment: .leading, spacing: 22) {
-                openingTimingSection()
-                openingCandidateSection()
-                openingPullbackSection()
-                openingReentrySection()
-                openingMarketSafetySection()
-                openingExecutionQualitySection()
-                openingSizingSection()
-                openingExitSection()
-
-                strategyPanel(
-                    title: "구현 메모",
-                    subtitle: "현재는 stop 기반 risk-per-trade sizing까지 연결되어 있고, 더 정교한 체결 모델은 아직 포함하지 않습니다.",
-                    prominence: .secondary
-                ) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        strategyCompactNote(
-                            title: "현재 적용",
-                            detail: "수량은 stop price 우선, 없으면 pullback low, 마지막으로 signal payload의 initial_stop_pct 기반으로 계산합니다."
-                        )
-                        strategyCompactNote(
-                            title: "현재 제약",
-                            detail: "고급 슬리피지 모델이나 예상 체결량 모델은 아직 없고, 보수 버퍼와 포지션 상한으로만 과도한 사이징을 막습니다."
-                        )
+                    strategyPanel(
+                        title: "구현 메모",
+                        subtitle: "현재는 stop 기반 risk-per-trade sizing까지 연결되어 있고, 더 정교한 체결 모델은 아직 포함하지 않습니다.",
+                        prominence: .secondary
+                    ) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            strategyCompactNote(
+                                title: "현재 적용",
+                                detail: "수량은 stop price 우선, 없으면 pullback low, 마지막으로 signal payload의 initial_stop_pct 기반으로 계산합니다."
+                            )
+                            strategyCompactNote(
+                                title: "현재 제약",
+                                detail: "고급 슬리피지 모델이나 예상 체결량 모델은 아직 없고, 보수 버퍼와 포지션 상한으로만 과도한 사이징을 막습니다."
+                            )
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 18)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 18)
                 }
+                .id(context.renderIdentity)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 18)
             }
-            .id(context.renderIdentity)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 18)
+        } else {
+            openingPullbackPlaceholderPanel(template: template)
         }
     }
 
