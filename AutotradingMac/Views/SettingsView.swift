@@ -597,576 +597,28 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
     private func openingPullbackStrategyPanel(
         template: StrategyTemplateSnapshot
     ) -> some View {
-        return strategyPanel(
+        guard let context = openingPullbackRenderContext(template: template) else {
+            openingPullbackPlaceholderPanel(template: template)
+            return
+        }
+
+        strategyPanel(
             title: "선택한 전략 설정",
             subtitle: "\(template.displayName)의 개장 초 impulse → pullback → re-entry 규칙을 전용 폼으로 편집합니다."
         ) {
             VStack(alignment: .leading, spacing: 22) {
-                strategyCategoryBlock(
-                    title: "시간대",
-                    summary: "개장 초 관찰 시작, 후보 인정 종료, 진입 허용 종료 시각을 분리합니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "관찰 시작 / 후보 시작",
-                                tooltip: "관찰은 observe_start_time부터 시작하고, 후보 인정은 candidate_start_time 이후부터 허용합니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandTextField(
-                                        label: "관찰 시작",
-                                        placeholder: "09:00",
-                                        unit: "KST",
-                                        text: activeStrategyStringBinding("observe_start_time")
-                                    )
-                                    strategyBandTextField(
-                                        label: "후보 시작",
-                                        placeholder: "09:02",
-                                        unit: "KST",
-                                        text: activeStrategyStringBinding("candidate_start_time")
-                                    )
-                                }
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(
-                                title: "후보 종료 / 진입 종료",
-                                tooltip: "opening impulse 후보를 인정할 마지막 시각과, 실제 재진입 매수를 허용할 마지막 시각을 따로 둡니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandTextField(
-                                        label: "후보 종료",
-                                        placeholder: "09:20",
-                                        unit: "KST",
-                                        text: activeStrategyStringBinding("candidate_end_time")
-                                    )
-                                    strategyBandTextField(
-                                        label: "진입 종료",
-                                        placeholder: "10:00",
-                                        unit: "KST",
-                                        text: activeStrategyStringBinding("entry_end_time")
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(title: "운용 메모") {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    strategyCompactNote(
-                                        title: "현재 구현",
-                                        detail: "1분봉, 거래대금/급등률 rank, VWAP, 시장제도 필터, 1호가 스프레드/잔량 필터, 부분익절, 시간청산까지 반영됩니다."
-                                    )
-                                    strategyCompactNote(
-                                        title: "시장제도 필터",
-                                        detail: "신규상장, 단기과열, 시장경보, 최근 VI 회피 필터를 후보/신호 단계에 함께 적용합니다."
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "후보 선정",
-                    summary: "어떤 rank 후보를 opening impulse 감시 대상으로 삼을지 정합니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "후보 랭킹 기준",
-                                tooltip: "개장 초 강세 후보를 거래대금 중심 또는 급등률 중심 rank에서 고릅니다."
-                            ) {
-                                strategySegmentedControl(
-                                    options: [
-                                        AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
-                                        AppSegmentedOption(value: "surge", title: "급등률 중심"),
-                                    ],
-                                    selection: activeStrategyStringBinding("selection_mode", defaultValue: "turnover"),
-                                    minSegmentWidth: 138,
-                                    height: 38
-                                )
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(title: "관찰 범위") {
-                                strategyBandStepperTile(
-                                    label: "감시 후보 수",
-                                    value: activeStrategyIntValue("top_n", defaultValue: 8),
-                                    range: 1...30,
-                                    step: 1,
-                                    unit: "Top-N",
-                                    onChange: { store.updateActiveStrategyParamInt("top_n", value: $0, range: 1...30) }
-                                )
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(
-                                title: "Opening Impulse",
-                                tooltip: "전일 종가 대비 개장 초 상승폭이 이 범위 안에 있어야 후보로 인정합니다."
-                            ) {
-                                HStack(alignment: .top, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "최소 상승폭",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "open_impulse_min_return_pct",
-                                            defaultValue: 0.1,
-                                            range: 0.1...20
-                                        )
-                                    )
-                                    strategyBandNumericField(
-                                        label: "최대 상승폭",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "open_impulse_max_return_pct",
-                                            defaultValue: 0.1,
-                                            range: 0.1...20
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "눌림 정의",
-                    summary: "첫 상승 구간 뒤 어느 정도 조정이 나와야 눌림으로 볼지 정합니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "되돌림 범위",
-                                tooltip: "opening impulse 폭 대비 몇 % 되돌림까지를 유효한 pullback으로 볼지 정합니다."
-                            ) {
-                                HStack(alignment: .top, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "최소 되돌림",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "pullback_retrace_min_pct",
-                                            defaultValue: 0.1,
-                                            range: 0.1...100
-                                        )
-                                    )
-                                    strategyBandNumericField(
-                                        label: "최대 되돌림",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "pullback_retrace_max_pct",
-                                            defaultValue: 0.1,
-                                            range: 0.1...100
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(title: "눌림 봉 수") {
-                                HStack(alignment: .top, spacing: 12) {
-                                    strategyBandStepperTile(
-                                        label: "최소 봉 수",
-                                        value: activeStrategyIntValue("pullback_bars_min", defaultValue: 2),
-                                        range: 1...30,
-                                        step: 1,
-                                        unit: "봉",
-                                        onChange: { store.updateActiveStrategyParamInt("pullback_bars_min", value: $0, range: 1...30) }
-                                    )
-                                    strategyBandStepperTile(
-                                        label: "최대 봉 수",
-                                        value: activeStrategyIntValue("pullback_bars_max", defaultValue: 6),
-                                        range: 1...60,
-                                        step: 1,
-                                        unit: "봉",
-                                        onChange: { store.updateActiveStrategyParamInt("pullback_bars_max", value: $0, range: 1...60) }
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(title: "패턴 원칙") {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    strategyCompactNote(
-                                        title: "현재 구현 기준",
-                                        detail: "1차 버전은 1분봉 기준 retrace 범위와 pullback 봉 수를 함께 만족해야 다음 재상승 트리거를 평가합니다."
-                                    )
-                                    strategyCompactNote(
-                                        title: "주의",
-                                        detail: "호가 미시구조나 체결강도 기반 눌림 판정은 아직 포함되지 않습니다."
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "재진입 조건",
-                    summary: "눌림 뒤 재상승이 실제 매수 신호로 이어지기 위한 거래량과 VWAP 조건입니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "거래량 재증가",
-                                tooltip: "re-entry 봉의 거래량이 pullback 평균 대비 이 배수 이상이어야 합니다."
-                            ) {
-                                strategyBandNumericField(
-                                    label: "거래량 배수",
-                                    unit: "x",
-                                    text: activeStrategyDoubleTextBinding(
-                                        "reentry_volume_multiplier",
-                                        defaultValue: 0.1,
-                                        range: 0.1...20
-                                    )
-                                )
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(
-                                title: "VWAP 필터",
-                                tooltip: "pullback 중 VWAP 위 유지 또는 재상승 시 VWAP 회복 여부를 진입 조건으로 씁니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "VWAP 필터 사용",
-                                        isOn: activeStrategyBoolBinding("use_vwap_filter", defaultValue: true)
-                                    )
-                                    strategyBandToggleControl(
-                                        title: "재진입 시 VWAP 재돌파 요구",
-                                        isOn: activeStrategyBoolBinding("require_vwap_reclaim", defaultValue: false)
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(title: "신호 타입") {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    strategyBadge(text: "ENGINE WIRED", tone: .success, size: .compact)
-                                    strategyCompactNote(
-                                        title: "실행 신호",
-                                        detail: localizedSignalDescription("opening_pullback_reentry")
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "시장제도 / 거래안전 필터",
-                    summary: "실전에서 피해야 할 신규상장, 단기과열, 시장경보, 최근 VI 종목을 opening 전략 전용으로 제외합니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "신규상장 제외",
-                                tooltip: "전용 상장일 마스터 대신 KIS 일봉 이력 개수로 최근 상장 여부를 판단합니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "신규상장 제외 사용",
-                                        isOn: activeStrategyBoolBinding("exclude_recently_listed_enabled", defaultValue: true)
-                                    )
-                                    strategyBandStepperTile(
-                                        label: "제외 기준",
-                                        value: activeStrategyIntValue("exclude_recently_listed_days", defaultValue: 5),
-                                        range: 1...60,
-                                        step: 1,
-                                        unit: "거래일",
-                                        onChange: {
-                                            store.updateActiveStrategyParamInt(
-                                                "exclude_recently_listed_days",
-                                                value: $0,
-                                                range: 1...60
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(
-                                title: "단기과열 / 시장경보",
-                                tooltip: "KIS 현재가 payload의 단기과열 플래그와 투자주의/경고/위험 코드를 사용합니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "단기과열 종목 제외",
-                                        isOn: activeStrategyBoolBinding("exclude_short_term_overheated_enabled", defaultValue: true)
-                                    )
-                                    strategyBandToggleControl(
-                                        title: "시장경보 종목 제외",
-                                        isOn: activeStrategyBoolBinding("exclude_market_warning_enabled", defaultValue: true)
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(
-                                title: "최근 VI 회피",
-                                tooltip: "최근 market.tick 이력에서 VI 관련 플래그가 보인 종목은 지정 시간 동안 진입을 막습니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "최근 VI 종목 제외",
-                                        isOn: activeStrategyBoolBinding("exclude_recent_vi_enabled", defaultValue: true)
-                                    )
-                                    strategyBandStepperTile(
-                                        label: "확인 시간",
-                                        value: activeStrategyIntValue("recent_vi_lookback_minutes", defaultValue: 10),
-                                        range: 1...120,
-                                        step: 1,
-                                        unit: "분",
-                                        onChange: {
-                                            store.updateActiveStrategyParamInt(
-                                                "recent_vi_lookback_minutes",
-                                                value: $0,
-                                                range: 1...120
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "체결 품질 필터",
-                    summary: "최우선 호가 스프레드와 1호가 잔량/불균형을 확인해 실제 체결 품질이 나쁜 종목을 제외합니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "스프레드",
-                                tooltip: "최우선 매도호가와 매수호가의 차이를 mid price 대비 비율로 계산합니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "스프레드 필터 사용",
-                                        isOn: activeStrategyBoolBinding("use_spread_filter", defaultValue: true)
-                                    )
-                                    strategyBandNumericField(
-                                        label: "최대 스프레드",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "max_spread_pct",
-                                            defaultValue: 0.01,
-                                            range: 0.01...10
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(
-                                title: "최소 잔량",
-                                tooltip: "최우선 매수/매도호가 잔량이 너무 얇으면 실제 진입 주문 슬리피지가 커질 수 있습니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "호가잔량 필터 사용",
-                                        isOn: activeStrategyBoolBinding("use_orderbook_depth_filter", defaultValue: true)
-                                    )
-                                    strategyBandStepperTile(
-                                        label: "최소 매수호가 잔량",
-                                        value: activeStrategyIntValue("min_best_bid_size", defaultValue: 300),
-                                        range: 1...1_000_000,
-                                        step: 50,
-                                        unit: "주",
-                                        onChange: {
-                                            store.updateActiveStrategyParamInt(
-                                                "min_best_bid_size",
-                                                value: $0,
-                                                range: 1...1_000_000
-                                            )
-                                        }
-                                    )
-                                    strategyBandStepperTile(
-                                        label: "최소 매도호가 잔량",
-                                        value: activeStrategyIntValue("min_best_ask_size", defaultValue: 300),
-                                        range: 1...1_000_000,
-                                        step: 50,
-                                        unit: "주",
-                                        onChange: {
-                                            store.updateActiveStrategyParamInt(
-                                                "min_best_ask_size",
-                                                value: $0,
-                                                range: 1...1_000_000
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(
-                                title: "호가 불균형",
-                                tooltip: "현재 엔진은 호가/예상체결 API의 최우선 1호가 잔량만 사용합니다. 2~10호가 깊이는 후속 TODO입니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "최대 비율",
-                                        unit: "x",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "max_orderbook_imbalance_ratio",
-                                            defaultValue: 1.0,
-                                            range: 1...100
-                                        )
-                                    )
-                                    strategyCompactNote(
-                                        title: "현재 구현 범위",
-                                        detail: "KIS `주식현재가 호가/예상체결` 응답의 1호가(`askp1/bidp1`, `askp_rsqn1/bidp_rsqn1`) 기준으로만 차단합니다."
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "포지션 사이징",
-                    summary: "이 전략은 진입 금액 비율이 아니라, 한 거래에서 허용할 손실과 손절 거리로 수량을 계산할 수 있습니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(
-                                title: "리스크 기준",
-                                tooltip: "계좌의 몇 %를 살지가 아니라, 한 거래에서 계좌의 몇 %까지 손실을 허용할지를 먼저 정합니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandToggleControl(
-                                        title: "리스크 사이징 사용",
-                                        isOn: activeStrategyBoolBinding("use_risk_per_trade_sizing", defaultValue: true)
-                                    )
-                                    strategyBandNumericField(
-                                        label: "거래당 최대 손실",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "risk_per_trade_pct",
-                                            defaultValue: 0.01,
-                                            range: 0.01...10
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(
-                                title: "안전 상한",
-                                tooltip: "손절폭이 매우 좁을 때 risk-per-trade 결과가 과도하게 커지지 않도록 포지션 금액 상한을 둡니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "최대 포지션 상한",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "max_position_size_pct_cap",
-                                            defaultValue: 0.1,
-                                            range: 0.1...100
-                                        )
-                                    )
-                                    strategyCompactNote(
-                                        title: "공통 포지션 비율과의 관계",
-                                        detail: "다른 전략은 계속 공통 `position_size_pct`를 사용하고, Opening 전략은 리스크 사이징을 끄면 그 경로로 fallback합니다."
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(
-                                title: "보수 버퍼",
-                                tooltip: "체결가가 예상보다 조금 불리하게 나올 수 있다는 가정으로 주당 리스크를 더 크게 잡습니다."
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "슬리피지 버퍼",
-                                        unit: "%",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "sizing_slippage_buffer_pct",
-                                            defaultValue: 0,
-                                            range: 0.0...5.0
-                                        )
-                                    )
-                                    strategyCompactNote(
-                                        title: "현재 계산식",
-                                        detail: "허용 손실 금액 / (주당 손절 리스크 + 버퍼)로 수량을 계산하고, 최종 수량은 1주 단위로 내림 처리합니다."
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-
-                strategyCategoryBlock(
-                    title: "청산",
-                    summary: "초기 손절, 1차 부분익절, soft/hard time stop으로 1차 버전 청산 규칙을 관리합니다."
-                ) {
-                    strategyBandPanel(
-                        first: {
-                            strategyBandSegment(title: "초기 손절") {
-                                strategyBandNumericField(
-                                    label: "초기 손절",
-                                    unit: "%",
-                                    text: activeStrategyDoubleTextBinding(
-                                        "initial_stop_pct",
-                                        defaultValue: 0.1,
-                                        range: 0.1...20
-                                    )
-                                )
-                            }
-                        },
-                        second: {
-                            strategyBandSegment(title: "1차 익절") {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "R 배수",
-                                        unit: "R",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "first_take_profit_r_multiple",
-                                            defaultValue: 0.1,
-                                            range: 0.1...10
-                                        )
-                                    )
-                                    strategyBandNumericField(
-                                        label: "분할 비율",
-                                        unit: "ratio",
-                                        text: activeStrategyDoubleTextBinding(
-                                            "first_take_profit_partial_ratio",
-                                            defaultValue: 0.01,
-                                            range: 0.01...0.99
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        third: {
-                            strategyBandSegment(title: "시간청산") {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    strategyBandNumericField(
-                                        label: "Soft Time Stop",
-                                        unit: "분",
-                                        text: activeStrategyOptionalIntTextBinding(
-                                            "time_stop_soft_minutes",
-                                            range: 1...240
-                                        )
-                                    )
-                                    strategyBandStepperTile(
-                                        label: "Hard Time Stop",
-                                        value: activeStrategyIntValue("time_stop_hard_minutes", defaultValue: 45),
-                                        range: 1...480,
-                                        step: 1,
-                                        unit: "분",
-                                        onChange: { store.updateActiveStrategyParamInt("time_stop_hard_minutes", value: $0, range: 1...480) }
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
+                openingTimingSection()
+                openingCandidateSection()
+                openingPullbackSection()
+                openingReentrySection()
+                openingMarketSafetySection()
+                openingExecutionQualitySection()
+                openingSizingSection()
+                openingExitSection()
 
                 strategyPanel(
                     title: "구현 메모",
@@ -1185,6 +637,580 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 18)
+                }
+            }
+            .id(context.renderIdentity)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 18)
+        }
+    }
+
+    private func openingTimingSection() -> some View {
+        strategyCategoryBlock(
+            title: "시간대",
+            summary: "개장 초 관찰 시작, 후보 인정 종료, 진입 허용 종료 시각을 분리합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "관찰 시작 / 후보 시작",
+                    tooltip: "관찰은 observe_start_time부터 시작하고, 후보 인정은 candidate_start_time 이후부터 허용합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandTextField(
+                            label: "관찰 시작",
+                            placeholder: "09:00",
+                            unit: "KST",
+                            text: activeStrategyStringBinding("observe_start_time")
+                        )
+                        strategyBandTextField(
+                            label: "후보 시작",
+                            placeholder: "09:02",
+                            unit: "KST",
+                            text: activeStrategyStringBinding("candidate_start_time")
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "후보 종료 / 진입 종료",
+                    tooltip: "opening impulse 후보를 인정할 마지막 시각과, 실제 재진입 매수를 허용할 마지막 시각을 따로 둡니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandTextField(
+                            label: "후보 종료",
+                            placeholder: "09:20",
+                            unit: "KST",
+                            text: activeStrategyStringBinding("candidate_end_time")
+                        )
+                        strategyBandTextField(
+                            label: "진입 종료",
+                            placeholder: "10:00",
+                            unit: "KST",
+                            text: activeStrategyStringBinding("entry_end_time")
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "운용 메모") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        strategyCompactNote(
+                            title: "현재 구현",
+                            detail: "1분봉, 거래대금/급등률 rank, VWAP, 시장제도 필터, 1호가 스프레드/잔량 필터, 부분익절, 시간청산까지 반영됩니다."
+                        )
+                        strategyCompactNote(
+                            title: "시장제도 필터",
+                            detail: "신규상장, 단기과열, 시장경보, 최근 VI 회피 필터를 후보/신호 단계에 함께 적용합니다."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingCandidateSection() -> some View {
+        strategyCategoryBlock(
+            title: "후보 선정",
+            summary: "어떤 rank 후보를 opening impulse 감시 대상으로 삼을지 정합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "후보 랭킹 기준",
+                    tooltip: "개장 초 강세 후보를 거래대금 중심 또는 급등률 중심 rank에서 고릅니다."
+                ) {
+                    strategySegmentedControl(
+                        options: [
+                            AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
+                            AppSegmentedOption(value: "surge", title: "급등률 중심"),
+                        ],
+                        selection: activeStrategyStringBinding("selection_mode", defaultValue: "turnover"),
+                        minSegmentWidth: 138,
+                        height: 38
+                    )
+                }
+
+                openingStrategyFieldCard(title: "관찰 범위") {
+                    strategyBandStepperTile(
+                        label: "감시 후보 수",
+                        value: activeStrategyIntValue("top_n", defaultValue: 8),
+                        range: 1...30,
+                        step: 1,
+                        unit: "Top-N",
+                        onChange: { store.updateActiveStrategyParamInt("top_n", value: $0, range: 1...30) }
+                    )
+                }
+
+                openingStrategyFieldCard(
+                    title: "Opening Impulse",
+                    tooltip: "전일 종가 대비 개장 초 상승폭이 이 범위 안에 있어야 후보로 인정합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최소 상승폭",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "open_impulse_min_return_pct",
+                                defaultValue: 0.1,
+                                range: 0.1...20
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최대 상승폭",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "open_impulse_max_return_pct",
+                                defaultValue: 0.1,
+                                range: 0.1...20
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingPullbackSection() -> some View {
+        strategyCategoryBlock(
+            title: "눌림 정의",
+            summary: "첫 상승 구간 뒤 어느 정도 조정이 나와야 눌림으로 볼지 정합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "되돌림 범위",
+                    tooltip: "opening impulse 폭 대비 몇 % 되돌림까지를 유효한 pullback으로 볼지 정합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최소 되돌림",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "pullback_retrace_min_pct",
+                                defaultValue: 0.1,
+                                range: 0.1...100
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최대 되돌림",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "pullback_retrace_max_pct",
+                                defaultValue: 0.1,
+                                range: 0.1...100
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "눌림 봉 수") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandStepperTile(
+                            label: "최소 봉 수",
+                            value: activeStrategyIntValue("pullback_bars_min", defaultValue: 2),
+                            range: 1...30,
+                            step: 1,
+                            unit: "봉",
+                            onChange: { store.updateActiveStrategyParamInt("pullback_bars_min", value: $0, range: 1...30) }
+                        )
+                        strategyBandStepperTile(
+                            label: "최대 봉 수",
+                            value: activeStrategyIntValue("pullback_bars_max", defaultValue: 6),
+                            range: 1...60,
+                            step: 1,
+                            unit: "봉",
+                            onChange: { store.updateActiveStrategyParamInt("pullback_bars_max", value: $0, range: 1...60) }
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "패턴 원칙") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        strategyCompactNote(
+                            title: "현재 구현 기준",
+                            detail: "1차 버전은 1분봉 기준 retrace 범위와 pullback 봉 수를 함께 만족해야 다음 재상승 트리거를 평가합니다."
+                        )
+                        strategyCompactNote(
+                            title: "주의",
+                            detail: "호가 미시구조나 체결강도 기반 눌림 판정은 아직 포함되지 않습니다."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingReentrySection() -> some View {
+        strategyCategoryBlock(
+            title: "재진입 조건",
+            summary: "눌림 뒤 재상승이 실제 매수 신호로 이어지기 위한 거래량과 VWAP 조건입니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "거래량 재증가",
+                    tooltip: "re-entry 봉의 거래량이 pullback 평균 대비 이 배수 이상이어야 합니다."
+                ) {
+                    strategyBandNumericField(
+                        label: "거래량 배수",
+                        unit: "x",
+                        text: activeStrategyDoubleTextBinding(
+                            "reentry_volume_multiplier",
+                            defaultValue: 0.1,
+                            range: 0.1...20
+                        )
+                    )
+                }
+
+                openingStrategyFieldCard(
+                    title: "VWAP 필터",
+                    tooltip: "pullback 중 VWAP 위 유지 또는 재상승 시 VWAP 회복 여부를 진입 조건으로 씁니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "VWAP 필터 사용",
+                            isOn: activeStrategyBoolBinding("use_vwap_filter", defaultValue: true)
+                        )
+                        strategyBandToggleControl(
+                            title: "재진입 시 VWAP 재돌파 요구",
+                            isOn: activeStrategyBoolBinding("require_vwap_reclaim", defaultValue: false)
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "신호 타입") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        strategyBadge(text: "ENGINE WIRED", tone: .success, size: .compact)
+                        strategyCompactNote(
+                            title: "실행 신호",
+                            detail: localizedSignalDescription("opening_pullback_reentry")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingMarketSafetySection() -> some View {
+        strategyCategoryBlock(
+            title: "시장제도 / 거래안전 필터",
+            summary: "실전에서 피해야 할 신규상장, 단기과열, 시장경보, 최근 VI 종목을 opening 전략 전용으로 제외합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "신규상장 제외",
+                    tooltip: "전용 상장일 마스터 대신 KIS 일봉 이력 개수로 최근 상장 여부를 판단합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "신규상장 제외 사용",
+                            isOn: activeStrategyBoolBinding("exclude_recently_listed_enabled", defaultValue: true)
+                        )
+                        strategyBandStepperTile(
+                            label: "제외 기준",
+                            value: activeStrategyIntValue("exclude_recently_listed_days", defaultValue: 5),
+                            range: 1...60,
+                            step: 1,
+                            unit: "거래일",
+                            onChange: {
+                                store.updateActiveStrategyParamInt(
+                                    "exclude_recently_listed_days",
+                                    value: $0,
+                                    range: 1...60
+                                )
+                            }
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "단기과열 / 시장경보",
+                    tooltip: "KIS 현재가 payload의 단기과열 플래그와 투자주의/경고/위험 코드를 사용합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "단기과열 종목 제외",
+                            isOn: activeStrategyBoolBinding("exclude_short_term_overheated_enabled", defaultValue: true)
+                        )
+                        strategyBandToggleControl(
+                            title: "시장경보 종목 제외",
+                            isOn: activeStrategyBoolBinding("exclude_market_warning_enabled", defaultValue: true)
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "최근 VI 회피",
+                    tooltip: "최근 market.tick 이력에서 VI 관련 플래그가 보인 종목은 지정 시간 동안 진입을 막습니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "최근 VI 종목 제외",
+                            isOn: activeStrategyBoolBinding("exclude_recent_vi_enabled", defaultValue: true)
+                        )
+                        strategyBandStepperTile(
+                            label: "확인 시간",
+                            value: activeStrategyIntValue("recent_vi_lookback_minutes", defaultValue: 10),
+                            range: 1...120,
+                            step: 1,
+                            unit: "분",
+                            onChange: {
+                                store.updateActiveStrategyParamInt(
+                                    "recent_vi_lookback_minutes",
+                                    value: $0,
+                                    range: 1...120
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingExecutionQualitySection() -> some View {
+        strategyCategoryBlock(
+            title: "체결 품질 필터",
+            summary: "최우선 호가 스프레드와 1호가 잔량/불균형을 확인해 실제 체결 품질이 나쁜 종목을 제외합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "스프레드",
+                    tooltip: "최우선 매도호가와 매수호가의 차이를 mid price 대비 비율로 계산합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "스프레드 필터 사용",
+                            isOn: activeStrategyBoolBinding("use_spread_filter", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "최대 스프레드",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_spread_pct",
+                                defaultValue: 0.01,
+                                range: 0.01...10
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "최소 잔량",
+                    tooltip: "최우선 매수/매도호가 잔량이 너무 얇으면 실제 진입 주문 슬리피지가 커질 수 있습니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "호가잔량 필터 사용",
+                            isOn: activeStrategyBoolBinding("use_orderbook_depth_filter", defaultValue: true)
+                        )
+                        strategyBandStepperTile(
+                            label: "최소 매수호가 잔량",
+                            value: activeStrategyIntValue("min_best_bid_size", defaultValue: 300),
+                            range: 1...1_000_000,
+                            step: 50,
+                            unit: "주",
+                            onChange: {
+                                store.updateActiveStrategyParamInt(
+                                    "min_best_bid_size",
+                                    value: $0,
+                                    range: 1...1_000_000
+                                )
+                            }
+                        )
+                        strategyBandStepperTile(
+                            label: "최소 매도호가 잔량",
+                            value: activeStrategyIntValue("min_best_ask_size", defaultValue: 300),
+                            range: 1...1_000_000,
+                            step: 50,
+                            unit: "주",
+                            onChange: {
+                                store.updateActiveStrategyParamInt(
+                                    "min_best_ask_size",
+                                    value: $0,
+                                    range: 1...1_000_000
+                                )
+                            }
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "호가 불균형",
+                    tooltip: "현재 엔진은 호가/예상체결 API의 최우선 1호가 잔량만 사용합니다. 2~10호가 깊이는 후속 TODO입니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최대 비율",
+                            unit: "x",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_orderbook_imbalance_ratio",
+                                defaultValue: 1.0,
+                                range: 1...100
+                            )
+                        )
+                        strategyCompactNote(
+                            title: "현재 구현 범위",
+                            detail: "KIS `주식현재가 호가/예상체결` 응답의 1호가(`askp1/bidp1`, `askp_rsqn1/bidp_rsqn1`) 기준으로만 차단합니다."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingSizingSection() -> some View {
+        strategyCategoryBlock(
+            title: "포지션 사이징",
+            summary: "이 전략은 진입 금액 비율이 아니라, 한 거래에서 허용할 손실과 손절 거리로 수량을 계산할 수 있습니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(
+                    title: "리스크 기준",
+                    tooltip: "계좌의 몇 %를 살지가 아니라, 한 거래에서 계좌의 몇 %까지 손실을 허용할지를 먼저 정합니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "리스크 사이징 사용",
+                            isOn: activeStrategyBoolBinding("use_risk_per_trade_sizing", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "거래당 최대 손실",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "risk_per_trade_pct",
+                                defaultValue: 0.01,
+                                range: 0.01...10
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "안전 상한",
+                    tooltip: "손절폭이 매우 좁을 때 risk-per-trade 결과가 과도하게 커지지 않도록 포지션 금액 상한을 둡니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최대 포지션 상한",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_position_size_pct_cap",
+                                defaultValue: 0.1,
+                                range: 0.1...100
+                            )
+                        )
+                        strategyCompactNote(
+                            title: "공통 포지션 비율과의 관계",
+                            detail: "다른 전략은 계속 공통 `position_size_pct`를 사용하고, Opening 전략은 리스크 사이징을 끄면 그 경로로 fallback합니다."
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(
+                    title: "보수 버퍼",
+                    tooltip: "체결가가 예상보다 조금 불리하게 나올 수 있다는 가정으로 주당 리스크를 더 크게 잡습니다."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "슬리피지 버퍼",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "sizing_slippage_buffer_pct",
+                                defaultValue: 0,
+                                range: 0.0...5.0
+                            )
+                        )
+                        strategyCompactNote(
+                            title: "현재 계산식",
+                            detail: "허용 손실 금액 / (주당 손절 리스크 + 버퍼)로 수량을 계산하고, 최종 수량은 1주 단위로 내림 처리합니다."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func openingExitSection() -> some View {
+        strategyCategoryBlock(
+            title: "청산",
+            summary: "초기 손절, 1차 부분익절, soft/hard time stop으로 1차 버전 청산 규칙을 관리합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "초기 손절") {
+                    strategyBandNumericField(
+                        label: "초기 손절",
+                        unit: "%",
+                        text: activeStrategyDoubleTextBinding(
+                            "initial_stop_pct",
+                            defaultValue: 0.1,
+                            range: 0.1...20
+                        )
+                    )
+                }
+
+                openingStrategyFieldCard(title: "1차 익절") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "R 배수",
+                            unit: "R",
+                            text: activeStrategyDoubleTextBinding(
+                                "first_take_profit_r_multiple",
+                                defaultValue: 0.1,
+                                range: 0.1...10
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "분할 비율",
+                            unit: "ratio",
+                            text: activeStrategyDoubleTextBinding(
+                                "first_take_profit_partial_ratio",
+                                defaultValue: 0.01,
+                                range: 0.01...0.99
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "시간청산") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "Soft Time Stop",
+                            unit: "분",
+                            text: activeStrategyOptionalIntTextBinding(
+                                "time_stop_soft_minutes",
+                                range: 1...240
+                            )
+                        )
+                        strategyBandStepperTile(
+                            label: "Hard Time Stop",
+                            value: activeStrategyIntValue("time_stop_hard_minutes", defaultValue: 45),
+                            range: 1...480,
+                            step: 1,
+                            unit: "분",
+                            onChange: { store.updateActiveStrategyParamInt("time_stop_hard_minutes", value: $0, range: 1...480) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func openingPullbackPlaceholderPanel(
+        template: StrategyTemplateSnapshot
+    ) -> some View {
+        strategyPanel(
+            title: "전략 설정 준비 중",
+            subtitle: "\(template.displayName) 파라미터를 동기화한 뒤 편집 폼을 표시합니다."
+        ) {
+            HStack(alignment: .center, spacing: 12) {
+                ProgressView()
+                    .controlSize(.small)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("opening 전략 템플릿과 draft 상태를 확인하는 중입니다.")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    Text("활성 전략, 템플릿 메타, strategy params가 모두 준비되기 전에는 전용 패널을 렌더링하지 않습니다.")
+                        .font(.system(size: 12.5, weight: .regular))
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, 18)
@@ -2025,6 +2051,60 @@ struct SettingsView: View {
         }
     }
 
+    private func openingStrategyFieldGrid<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        LazyVGrid(columns: strategyAdaptiveColumns(minimum: 292), alignment: .leading, spacing: 12) {
+            content()
+        }
+    }
+
+    private func openingStrategyFieldCard<Content: View>(
+        title: String,
+        tooltip: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 6) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                if let tooltip {
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                        .help(tooltip)
+                }
+            }
+            content()
+        }
+        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .background(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.72),
+                            DesignTokens.Colors.surface1.opacity(0.52),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg, style: .continuous)
+                .stroke(DesignTokens.Colors.borderSubtle.opacity(0.82), lineWidth: 0.9)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.Radius.lg - 1, style: .continuous)
+                .stroke(Color.white.opacity(0.024), lineWidth: 0.7)
+                .padding(1)
+        )
+    }
+
     private func strategyBandPanel<First: View, Second: View, Third: View>(
         @ViewBuilder first: () -> First,
         @ViewBuilder second: () -> Second,
@@ -2759,13 +2839,30 @@ struct SettingsView: View {
     }
 
     private var currentActiveStrategyParams: [String: JSONValue] {
-        guard let draft = store.strategyDraft else { return [:] }
+        guard let draft = currentStrategyDraftSnapshot else { return [:] }
         let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
         return draft.strategyParams[strategyId] ?? [:]
     }
 
+    private struct OpeningPullbackRenderContext {
+        let renderIdentity: String
+    }
+
     private var currentStrategyDraftSnapshot: StrategySettingsSnapshot? {
         store.strategyDraft ?? store.strategySettings
+    }
+
+    private func openingPullbackRenderContext(
+        template: StrategyTemplateSnapshot
+    ) -> OpeningPullbackRenderContext? {
+        guard let draft = currentStrategyDraftSnapshot else { return nil }
+        guard draft.activeStrategyId == template.strategyId else { return nil }
+        guard let resolvedTemplate = draft.template(id: template.strategyId), resolvedTemplate.selectable else { return nil }
+        let params = draft.strategyParams[template.strategyId] ?? [:]
+        guard !params.isEmpty else { return nil }
+        return OpeningPullbackRenderContext(
+            renderIdentity: "\(resolvedTemplate.strategyId)-\(params.count)-\(draft.strategyTemplates.count)"
+        )
     }
 
     private var currentBasicSettings: BasicStrategySettingsSnapshot? {
@@ -3000,21 +3097,21 @@ struct SettingsView: View {
 
     private func signalEnabledBinding(type: String) -> Binding<Bool> {
         Binding(
-            get: { store.strategyDraft?.signal.enabledSignalTypes.contains(type) ?? false },
+            get: { currentSignalEnabledTypes.contains(type) },
             set: { store.updateStrategySignalTypeEnabled(type, isEnabled: $0) }
         )
     }
 
     private func basicSignalEnabledBinding(type: String) -> Binding<Bool> {
         Binding(
-            get: { store.strategyDraft?.basic.entry.enabledSignalTypes.contains(type) ?? false },
+            get: { basicEnabledSignalTypes.contains(type) },
             set: { store.updateStrategyBasicSignalTypeEnabled(type, isEnabled: $0) }
         )
     }
 
     private func riskAllowedBinding(type: String) -> Binding<Bool> {
         Binding(
-            get: { store.strategyDraft?.risk.allowedSignalTypes.contains(type) ?? false },
+            get: { currentRiskAllowedSignalTypes.contains(type) },
             set: { store.updateStrategyRiskTypeAllowed(type, isAllowed: $0) }
         )
     }
@@ -3022,7 +3119,7 @@ struct SettingsView: View {
     private func scannerWeightBinding(mode: String, key: String, fallback: Double) -> Binding<Double> {
         Binding(
             get: {
-                guard let weights = store.strategyDraft?.scanner.scoreDefinition.weights[mode] else { return fallback }
+                guard let weights = currentScannerSettings?.scoreDefinition.weights[mode] else { return fallback }
                 switch key {
                 case "rank": return weights.rank
                 case "turnover": return weights.turnover
