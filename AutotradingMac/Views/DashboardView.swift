@@ -138,12 +138,12 @@ struct DashboardView: View {
     }
 
     private var scannerPanel: some View {
-        dashboardPanel(title: "스캔 종목", subtitle: "마지막 스캔: \(lastScanText)", noPadding: true) {
-            if scannerItems.isEmpty {
-                panelEmptyState("표시 가능한 스캔 종목이 없습니다.")
+        dashboardPanel(title: "스캔 종목", subtitle: scannerPanelSubtitle, noPadding: true) {
+            if visibleScannerItems.isEmpty {
+                panelEmptyState(scannerEmptyStateText)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(scannerItems) { item in
+                    ForEach(visibleScannerItems) { item in
                         dashboardRow {
                             HStack(alignment: .center, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -224,12 +224,12 @@ struct DashboardView: View {
     }
 
     private var signalsPanel: some View {
-        dashboardPanel(title: "매매 신호", noPadding: true) {
-            if signalItems.isEmpty {
-                panelEmptyState("현재 요약할 매매 액션이 없습니다.")
+        dashboardPanel(title: "매매 신호", subtitle: signalsPanelSubtitle, noPadding: true) {
+            if visibleSignalItems.isEmpty {
+                panelEmptyState(signalsEmptyStateText)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(signalItems) { item in
+                    ForEach(visibleSignalItems) { item in
                         dashboardRow {
                             HStack(alignment: .center, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 3) {
@@ -454,6 +454,10 @@ struct DashboardView: View {
         }
     }
 
+    private var visibleScannerItems: [ScannerItem] {
+        isMarketClosedIdle ? [] : scannerItems
+    }
+
     private var holdingItems: [HoldingItem] {
         Array(store.currentPositions.prefix(6)).map { row in
             let price = row.markPrice ?? row.avgPrice
@@ -493,6 +497,48 @@ struct DashboardView: View {
             closedPositions: store.recentClosedPositions,
             symbolByCode: symbolByCode
         )
+    }
+
+    private var visibleSignalItems: [DashboardSignalSummaryRow] {
+        isMarketClosedIdle ? [] : signalItems
+    }
+
+    private var isMarketClosedIdle: Bool {
+        if let marketClosedIdle = store.runtime?.marketClosedIdle {
+            return marketClosedIdle
+        }
+        if let marketTradingActive = store.runtime?.marketTradingActive {
+            return marketTradingActive == false
+        }
+        return false
+    }
+
+    private var scannerPanelSubtitle: String {
+        if isMarketClosedIdle {
+            return "장 종료 · 장중 마지막 기록 숨김"
+        }
+        return "마지막 스캔: \(lastScanText)"
+    }
+
+    private var signalsPanelSubtitle: String? {
+        if isMarketClosedIdle {
+            return "장 종료 · 장중 마지막 기록 숨김"
+        }
+        return nil
+    }
+
+    private var scannerEmptyStateText: String {
+        if isMarketClosedIdle {
+            return "장 종료 후에는 스캔 종목을 표시하지 않습니다."
+        }
+        return "표시 가능한 스캔 종목이 없습니다."
+    }
+
+    private var signalsEmptyStateText: String {
+        if isMarketClosedIdle {
+            return "장 종료 후에는 장중 매매 신호를 숨깁니다."
+        }
+        return "현재 요약할 매매 액션이 없습니다."
     }
 
     private var openOrderItems: [OpenOrderItem] {
