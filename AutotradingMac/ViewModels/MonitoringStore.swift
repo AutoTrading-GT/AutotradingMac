@@ -74,6 +74,7 @@ final class MonitoringStore: ObservableObject {
     private var started = false
     private let maxRecentItems = 100
     private var runtimeRefreshTask: Task<Void, Never>?
+    private var livePositionsRefreshTask: Task<Void, Never>?
     private var snapshotRetryTask: Task<Void, Never>?
     private var chartFetchDebounceTask: Task<Void, Never>?
     private var chartFetchTasks: [String: Task<Void, Never>] = [:]
@@ -134,6 +135,8 @@ final class MonitoringStore: ObservableObject {
     func stop() {
         runtimeRefreshTask?.cancel()
         runtimeRefreshTask = nil
+        livePositionsRefreshTask?.cancel()
+        livePositionsRefreshTask = nil
         snapshotRetryTask?.cancel()
         snapshotRetryTask = nil
         chartFetchDebounceTask?.cancel()
@@ -2312,25 +2315,41 @@ final class MonitoringStore: ObservableObject {
         case "fill.received":
             if let payload = decodePayload(FillReceivedPayload.self, from: event.data) {
                 appendFill(payload: payload)
-                scheduleRuntimeRefresh()
+                if usesLiveAccountPositions {
+                    scheduleSnapshotRefreshForLivePositions()
+                } else {
+                    scheduleRuntimeRefresh()
+                }
                 Task {
                     await notifyFillIfNeeded(payload: payload)
                 }
             }
         case "position.updated":
             if let payload = decodePayload(PositionUpdatedPayload.self, from: event.data) {
-                appendOrUpdatePosition(payload: payload)
-                scheduleRuntimeRefresh()
+                if usesLiveAccountPositions {
+                    scheduleSnapshotRefreshForLivePositions()
+                } else {
+                    appendOrUpdatePosition(payload: payload)
+                    scheduleRuntimeRefresh()
+                }
             }
         case "position.pnl_updated":
             if let payload = decodePayload(PositionPnlUpdatedPayload.self, from: event.data) {
-                applyPositionPnL(payload: payload)
-                scheduleRuntimeRefresh()
+                if usesLiveAccountPositions {
+                    scheduleSnapshotRefreshForLivePositions()
+                } else {
+                    applyPositionPnL(payload: payload)
+                    scheduleRuntimeRefresh()
+                }
             }
         case "position.closed":
             if let payload = decodePayload(PositionClosedPayload.self, from: event.data) {
-                applyPositionClosed(payload: payload)
-                scheduleRuntimeRefresh()
+                if usesLiveAccountPositions {
+                    scheduleSnapshotRefreshForLivePositions()
+                } else {
+                    applyPositionClosed(payload: payload)
+                    scheduleRuntimeRefresh()
+                }
             }
         default:
             break
@@ -2661,6 +2680,12 @@ final class MonitoringStore: ObservableObject {
             upsertOrder(created)
         }
     }
+
+#if DEBUG
+    func handleEventForTesting(_ envelope: EventEnvelope) {
+        handle(event: envelope)
+    }
+#endif
 
     private func appendFill(payload: FillReceivedPayload) {
         guard let fillID = payload.fillId else { return }
@@ -3135,6 +3160,21 @@ final class MonitoringStore: ObservableObject {
             guard let self else { return }
             await self.refreshRuntimeStatusIfNeeded()
             self.runtimeRefreshTask = nil
+        }
+    }
+
+    private var usesLiveAccountPositions: Bool {
+        let mode = runtime?.accountMode.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return mode == "live"
+    }
+
+    private func scheduleSnapshotRefreshForLivePositions() {
+        guard livePositionsRefreshTask == nil else { return }
+        livePositionsRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard let self else { return }
+            await self.reloadSnapshot()
+            self.livePositionsRefreshTask = nil
         }
     }
 

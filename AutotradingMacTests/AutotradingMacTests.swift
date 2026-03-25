@@ -282,6 +282,53 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertTrue(store.lastStrategySettingsErrorMessage?.contains("프리뷰") ?? false)
     }
 
+    @MainActor
+    func test_monitoringStore_ignoresLocalPositionEventsWhenAccountModeIsLive() async throws {
+        let strategySnapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: strategySnapshot,
+            defaults: strategySnapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let snapshot = try Self.makeMonitoringSnapshotResponse(
+            orderMode: "live",
+            accountMode: "live",
+            currentPositions: []
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(
+                strategyEnvelope: envelope,
+                snapshot: snapshot,
+                runtimeSnapshot: snapshot.runtime
+            ),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadSnapshot()
+        XCTAssertEqual(store.runtime?.accountMode, "live")
+        XCTAssertTrue(store.currentPositions.isEmpty)
+
+        store.handleEventForTesting(
+            EventEnvelope(
+                type: "position.updated",
+                ts: Date(),
+                source: "execution-worker",
+                data: [
+                    "timestamp": .string("2026-03-25T06:00:00Z"),
+                    "code": .string("Q530036"),
+                    "symbol": .string("삼성 인버스 2X WTI원유 선물 ETN"),
+                    "side": .string("long"),
+                    "qty": .number(1),
+                    "avg_price": .number(10000)
+                ]
+            )
+        )
+
+        XCTAssertTrue(store.currentPositions.isEmpty)
+    }
+
     func test_resultFeedReducer_prefersCloseOverOrderAndFillInSameFlow() {
         let now = Date()
         let candidates: [ResultFeedEventCandidate] = [
@@ -1035,6 +1082,59 @@ final class AutotradingMacTests: XCTestCase {
             )
         )
     }
+
+    private static func makeMonitoringSnapshotResponse(
+        orderMode: String,
+        accountMode: String,
+        currentPositions: [[String: Any]]
+    ) throws -> MonitoringSnapshotResponse {
+        let jsonObject: [String: Any] = [
+            "runtime": [
+                "timestamp": "2026-03-25T06:00:00Z",
+                "app_name": "autotrading-core",
+                "app_version": "0.1.0",
+                "env": "dev",
+                "app_status": "ready",
+                "order_mode": orderMode,
+                "account_mode": accountMode,
+                "database_status": "connected",
+                "database_connected": true,
+                "readiness_status": "ready",
+                "startup_ok": true,
+                "startup_status": "ok",
+                "active_ws_clients": 1,
+                "workers": [
+                    "summary": [
+                        "count": 4,
+                        "running": 4,
+                        "error": 0,
+                        "stopping": 0,
+                        "starting": 0,
+                        "stopped": 0
+                    ],
+                    "workers": [:]
+                ]
+            ],
+            "market_top_ranks": [],
+            "recent_signals": [],
+            "recent_strategy_events": [],
+            "recent_exit_events": [],
+            "recent_risk_decisions": [],
+            "recent_orders": [],
+            "recent_fills": [],
+            "current_positions": currentPositions,
+            "recent_closed_positions": [],
+            "pnl_summary": [
+                "open_positions": 0,
+                "unrealized_pnl_total": NSNull(),
+                "realized_pnl_recent_total": NSNull(),
+                "recent_closed_count": 0
+            ],
+            "limits": [:]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: jsonObject)
+        return try MonitoringCoding.decoder().decode(MonitoringSnapshotResponse.self, from: data)
+    }
 }
 
 private struct MockLocalNotificationService: LocalNotificationServiceProtocol {
@@ -1056,13 +1156,24 @@ private struct MockLocalNotificationService: LocalNotificationServiceProtocol {
 
 private struct MockMonitoringAPIClient: MonitoringAPIClientProtocol {
     let strategyEnvelope: StrategySettingsResponseEnvelope
+    var snapshot: MonitoringSnapshotResponse? = nil
+    var runtimeSnapshot: RuntimeStatusSnapshot? = nil
 
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
-        fatalError("unused in test")
+        guard let snapshot else {
+            fatalError("unused in test")
+        }
+        return snapshot
     }
 
     func fetchRuntime() async throws -> RuntimeStatusSnapshot {
-        fatalError("unused in test")
+        if let runtimeSnapshot {
+            return runtimeSnapshot
+        }
+        guard let snapshot else {
+            fatalError("unused in test")
+        }
+        return snapshot.runtime
     }
 
     func fetchStrategySettings() async throws -> StrategySettingsResponseEnvelope {
