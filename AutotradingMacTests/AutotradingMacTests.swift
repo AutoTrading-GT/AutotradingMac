@@ -150,6 +150,81 @@ final class AutotradingMacTests: XCTestCase {
     }
 
     @MainActor
+    func test_monitoringStore_keepsSharedDraftValuesCurrentAcrossStrategyPanels() async {
+        let snapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(strategyEnvelope: envelope),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadStrategySettings()
+        store.updateStrategyBasicTopN(7)
+        store.updateStrategyBasicDailyTradeLimitEnabled(true)
+        store.updateStrategyBasicDailyTradeLimitCount(6)
+        store.updateStrategyBasicForceCloseOnMarketClose(true)
+        store.updateStrategyScannerMinTurnover(250_000_000)
+        store.updateStrategyScannerMinChangePct(3.4)
+        store.updateStrategyRankJumpThreshold(5)
+        store.updateStrategySignalWindowMinutes(14)
+        store.updateStrategyConcurrencyWindowMinutes(21)
+
+        XCTAssertEqual(store.strategyDraft?.basic.entry.topN, 7)
+        XCTAssertEqual(store.strategyDraft?.scanner.topN, 7)
+        XCTAssertEqual(store.strategyDraft?.signal.topN, 7)
+        XCTAssertEqual(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled, true)
+        XCTAssertEqual(store.strategyDraft?.basic.risk.dailyTradeLimitCount, 6)
+        XCTAssertEqual(store.strategyDraft?.basic.exit.forceCloseOnMarketClose, true)
+        XCTAssertEqual(store.strategyDraft?.scanner.minTurnover, 250_000_000, accuracy: 0.0001)
+        XCTAssertEqual(store.strategyDraft?.scanner.minChangePct, 3.4, accuracy: 0.0001)
+        XCTAssertEqual(store.strategyDraft?.signal.rankJumpThreshold, 5)
+        XCTAssertEqual(store.strategyDraft?.risk.signalWindowMinutes, 14)
+        XCTAssertEqual(store.strategyDraft?.risk.concurrencyWindowMinutes, 21)
+    }
+
+    @MainActor
+    func test_monitoringStore_preservesStrategySpecificAndSharedDraftAfterTemplateSwitch() async {
+        let snapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(strategyEnvelope: envelope),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadStrategySettings()
+        store.updateStrategyBasicPositionSizePct(12.5)
+        store.updateStrategyBasicDailyTradeLimitCount(8)
+        store.updateStrategyActiveTemplate("opening_pullback_reentry")
+        store.updateActiveStrategyParamString("candidate_end_time", value: "09:17")
+        store.updateActiveStrategyParamBool("exclude_recent_vi_enabled", value: false)
+        store.updateStrategyActiveTemplate("turnover_surge_momentum")
+
+        XCTAssertEqual(store.strategyDraft?.activeStrategyId, "turnover_surge_momentum")
+        XCTAssertEqual(store.strategyDraft?.basic.risk.positionSizePct ?? 0, 12.5, accuracy: 0.0001)
+        XCTAssertEqual(store.strategyDraft?.basic.risk.dailyTradeLimitCount, 8)
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["candidate_end_time"]?.stringValue,
+            "09:17"
+        )
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["exclude_recent_vi_enabled"]?.boolValue,
+            false
+        )
+    }
+
+    @MainActor
     func test_monitoringStore_rejectsPreviewOnlyStrategyActivation() async {
         let snapshot = Self.makeStrategySettingsSnapshot()
         let envelope = StrategySettingsResponseEnvelope(

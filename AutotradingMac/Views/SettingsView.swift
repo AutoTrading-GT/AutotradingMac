@@ -361,8 +361,8 @@ struct SettingsView: View {
             openingPullbackStrategyPanel(template: template)
         } else {
             VStack(alignment: .leading, spacing: strategySectionSpacing) {
-                basicStrategyPanel(draft.basic, template: template)
-                advancedSettingsPanel(draft)
+                basicStrategyPanel(template: template)
+                advancedSettingsPanel()
             }
         }
     }
@@ -428,8 +428,7 @@ struct SettingsView: View {
                                 strategyBandNumericField(
                                     label: "손실 한도",
                                     unit: "%",
-                                    text: basicMaxLossLimitText,
-                                    onChange: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
+                                    text: basicMaxLossLimitTextBinding
                                 )
                             }
                         },
@@ -441,13 +440,11 @@ struct SettingsView: View {
                                 strategyBandNumericField(
                                     label: "1회 진입 비중",
                                     unit: "%",
-                                    text: basicPositionSizePctText,
-                                    onChange: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
+                                    text: basicPositionSizePctTextBinding
                                 )
                             }
                         },
                         third: {
-                            let limitEnabled = store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? draft.basic.risk.dailyTradeLimitEnabled
                             strategyBandSegment(
                                 title: "거래 제한 / 장마감 가드",
                                 tooltip: "일일 신규 진입 횟수, 동시 보유 수, 장마감 청산 정책을 함께 관리합니다."
@@ -455,27 +452,24 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "일일 거래 횟수 제한 사용",
-                                        isOn: Binding(
-                                            get: { store.strategyDraft?.basic.risk.dailyTradeLimitEnabled ?? draft.basic.risk.dailyTradeLimitEnabled },
-                                            set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
-                                        )
+                                        isOn: basicDailyTradeLimitEnabledBinding
                                     )
 
                                     HStack(alignment: .top, spacing: 12) {
                                         strategyBandStepperTile(
                                             label: "최대 거래 횟수",
-                                            value: draft.basic.risk.dailyTradeLimitCount,
+                                            value: basicDailyTradeLimitCountValue(defaultValue: draft.basic.risk.dailyTradeLimitCount),
                                             range: 1...1_000,
                                             step: 1,
                                             unit: "회",
                                             onChange: { store.updateStrategyBasicDailyTradeLimitCount($0) }
                                         )
-                                        .disabled(!limitEnabled)
-                                        .opacity(limitEnabled ? 1.0 : 0.42)
+                                        .disabled(!basicDailyTradeLimitEnabledValue(defaultValue: draft.basic.risk.dailyTradeLimitEnabled))
+                                        .opacity(basicDailyTradeLimitEnabledValue(defaultValue: draft.basic.risk.dailyTradeLimitEnabled) ? 1.0 : 0.42)
 
                                         strategyBandStepperTile(
                                             label: "동시 보유 종목 수",
-                                            value: draft.basic.risk.maxConcurrentPositions,
+                                            value: basicMaxConcurrentPositionsValue(defaultValue: draft.basic.risk.maxConcurrentPositions),
                                             range: 1...50,
                                             step: 1,
                                             unit: "개",
@@ -485,10 +479,7 @@ struct SettingsView: View {
 
                                     strategyBandToggleControl(
                                         title: "장 마감 5분 전 전체 청산",
-                                        isOn: Binding(
-                                            get: { store.strategyDraft?.basic.exit.forceCloseOnMarketClose ?? draft.basic.exit.forceCloseOnMarketClose },
-                                            set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
-                                        )
+                                        isOn: basicForceCloseOnMarketCloseBinding
                                     )
                                 }
                             }
@@ -496,7 +487,7 @@ struct SettingsView: View {
                     )
                 }
 
-                riskSettingsPanel(draft.advanced.risk)
+                riskSettingsPanel(defaultRisk: draft.advanced.risk)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 18)
@@ -504,7 +495,6 @@ struct SettingsView: View {
     }
 
     private func basicStrategyPanel(
-        _ basic: BasicStrategySettingsSnapshot,
         template: StrategyTemplateSnapshot
     ) -> some View {
         strategyPanel(
@@ -527,10 +517,7 @@ struct SettingsView: View {
                                         AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
                                         AppSegmentedOption(value: "surge", title: "급등률 중심"),
                                     ],
-                                    selection: Binding(
-                                        get: { store.strategyDraft?.basic.entry.selectionMode ?? basic.entry.selectionMode },
-                                        set: { store.updateStrategyBasicSelectionMode($0) }
-                                    ),
+                                    selection: basicSelectionModeBinding,
                                     minSegmentWidth: 138,
                                     height: 38
                                 )
@@ -539,7 +526,7 @@ struct SettingsView: View {
                         second: {
                             strategyBandSegment(title: "관찰 후보 수") {
                                 strategyBandStepperControl(
-                                    value: basic.entry.topN,
+                                    value: basicTopNValue,
                                     range: 1...30,
                                     step: 1,
                                     unit: "Top-N",
@@ -554,7 +541,7 @@ struct SettingsView: View {
                             ) {
                                 strategySignalToggleList(
                                     options: momentumSignalTypeOptions,
-                                    selected: basic.entry.enabledSignalTypes,
+                                    selected: basicEnabledSignalTypes,
                                     binding: basicSignalEnabledBinding
                                 )
                             }
@@ -573,14 +560,12 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "익절",
                                         unit: "%",
-                                        text: basicTargetProfitText,
-                                        onChange: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
+                                        text: basicTargetProfitTextBinding
                                     )
                                     strategyBandNumericField(
                                         label: "손절",
                                         unit: "%",
-                                        text: basicStopLossText,
-                                        onChange: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
+                                        text: basicStopLossTextBinding
                                     )
                                 }
                             }
@@ -588,7 +573,7 @@ struct SettingsView: View {
                         second: {
                             strategyBandSegment(title: "보유 시간 제한") {
                                 strategyBandStepperControl(
-                                    value: basic.exit.maxHoldingMinutes,
+                                    value: basicMaxHoldingMinutesValue,
                                     range: 1...10_080,
                                     step: 1,
                                     unit: "분",
@@ -1207,7 +1192,7 @@ struct SettingsView: View {
         }
     }
 
-    private func advancedSettingsPanel(_ draft: StrategySettingsSnapshot) -> some View {
+    private func advancedSettingsPanel() -> some View {
         strategyPanel(
             title: "전략별 고급 설정",
             subtitle: "선택한 전략 템플릿에만 적용되는 세부 스캐너/신호 튜닝입니다.",
@@ -1215,8 +1200,8 @@ struct SettingsView: View {
         ) {
             DisclosureGroup(isExpanded: $showAdvancedSettings) {
                 VStack(alignment: .leading, spacing: 14) {
-                    scannerSettingsPanel(draft.advanced.scanner, basicEntry: draft.basic.entry)
-                    signalSettingsPanel(draft.advanced.signal)
+                    scannerSettingsPanel()
+                    signalSettingsPanel()
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -1244,17 +1229,14 @@ struct SettingsView: View {
         }
     }
 
-    private func scannerSettingsPanel(
-        _ scanner: ScannerSettingsSnapshot,
-        basicEntry: BasicEntrySettingsSnapshot
-    ) -> some View {
+    private func scannerSettingsPanel() -> some View {
         advancedSectionCard(
             title: "Scanner",
             summary: "Basic Strategy의 방향 위에 세부 필터와 가중치만 더합니다.",
             trailing: {
                 advancedSectionMeta(
                     title: "Basic 기준",
-                    value: "\(localizedScannerMode(basicEntry.selectionMode)) · Top \(basicEntry.topN)"
+                    value: "\(localizedScannerMode(basicSelectionModeValue)) · Top \(basicTopNValue)"
                 )
             }
         ) {
@@ -1268,14 +1250,12 @@ struct SettingsView: View {
                         strategyBandNumericField(
                             label: "최소 거래대금",
                             unit: "원",
-                            text: scannerMinTurnoverText,
-                            onChange: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
+                            text: scannerMinTurnoverTextBinding
                         )
                         strategyBandNumericField(
                             label: "최소 등락률",
                             unit: "%",
-                            text: scannerMinChangePctText,
-                            onChange: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
+                            text: scannerMinChangePctTextBinding
                         )
                     }
                 }
@@ -1287,7 +1267,10 @@ struct SettingsView: View {
                 ) {
                     advancedWeightEditor(
                         mode: "turnover",
-                        weights: scanner.scoreDefinition.weights["turnover"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+                        weights: currentScannerWeights(
+                            mode: "turnover",
+                            fallback: ScannerScoreWeightsSnapshot(rank: 40, turnover: 45, changePct: 15)
+                        )
                     )
                 }
             } third: {
@@ -1298,14 +1281,17 @@ struct SettingsView: View {
                 ) {
                     advancedWeightEditor(
                         mode: "surge",
-                        weights: scanner.scoreDefinition.weights["surge"] ?? ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
+                        weights: currentScannerWeights(
+                            mode: "surge",
+                            fallback: ScannerScoreWeightsSnapshot(rank: 40, turnover: 15, changePct: 45)
+                        )
                     )
                 }
             }
         }
     }
 
-    private func signalSettingsPanel(_ signal: SignalSettingsSnapshot) -> some View {
+    private func signalSettingsPanel() -> some View {
         advancedSectionCard(
             title: "Signal",
             summary: "Basic 신호를 보완하는 세부 판단 임계값만 조정합니다."
@@ -1318,7 +1304,7 @@ struct SettingsView: View {
                 ) {
                     strategyBandStepperTile(
                         label: "평가 대상 범위",
-                        value: signal.topN,
+                        value: signalTopNValue,
                         range: 1...30,
                         step: 1,
                         unit: "Top-N",
@@ -1334,7 +1320,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         strategyBandStepperTile(
                             label: "급상승 임계값",
-                            value: signal.rankJumpThreshold,
+                            value: signalRankJumpThresholdValue,
                             range: 1...50,
                             step: 1,
                             unit: "단계",
@@ -1342,7 +1328,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "급상승 윈도우",
-                            value: signal.rankJumpWindowSeconds,
+                            value: signalRankJumpWindowSecondsValue,
                             range: 10...86_400,
                             step: 10,
                             unit: "초",
@@ -1350,7 +1336,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "상위권 유지 편차",
-                            value: signal.rankHoldTolerance,
+                            value: signalRankHoldToleranceValue,
                             range: 0...20,
                             step: 1,
                             unit: "단계",
@@ -1366,7 +1352,7 @@ struct SettingsView: View {
                 ) {
                     strategySignalToggleList(
                         options: momentumSignalTypeOptions,
-                        selected: signal.enabledSignalTypes,
+                        selected: currentSignalEnabledTypes,
                         binding: signalEnabledBinding
                     )
                 }
@@ -1374,7 +1360,7 @@ struct SettingsView: View {
         }
     }
 
-    private func riskSettingsPanel(_ risk: RiskSettingsSnapshot) -> some View {
+    private func riskSettingsPanel(defaultRisk: RiskSettingsSnapshot) -> some View {
         advancedSectionCard(
             title: "Shared Risk Runtime",
             summary: "전략 템플릿과 분리된 공통 리스크 게이트와 시간창을 조정합니다."
@@ -1387,7 +1373,7 @@ struct SettingsView: View {
                 ) {
                     strategySignalToggleList(
                         options: strategySignalTypeOptions,
-                        selected: risk.allowedSignalTypes,
+                        selected: currentRiskAllowedSignalTypes,
                         binding: riskAllowedBinding
                     )
                 }
@@ -1400,7 +1386,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandStepperTile(
                             label: "최대 동시 후보 수",
-                            value: risk.maxConcurrentCandidates,
+                            value: riskMaxConcurrentCandidatesValue(defaultValue: defaultRisk.maxConcurrentCandidates),
                             range: 1...50,
                             step: 1,
                             unit: "개",
@@ -1408,10 +1394,7 @@ struct SettingsView: View {
                         )
                         strategyBandToggleControl(
                             title: "보유 시 신규 진입 차단",
-                            isOn: Binding(
-                                get: { store.strategyDraft?.risk.blockWhenPositionExists ?? risk.blockWhenPositionExists },
-                                set: { store.updateStrategyBlockWhenPositionExists($0) }
-                            )
+                            isOn: riskBlockWhenPositionExistsBinding(defaultValue: defaultRisk.blockWhenPositionExists)
                         )
                     }
                 }
@@ -1424,7 +1407,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         strategyBandStepperTile(
                             label: "재진입 대기 시간",
-                            value: risk.cooldownMinutes,
+                            value: riskCooldownMinutesValue(defaultValue: defaultRisk.cooldownMinutes),
                             range: 1...1_440,
                             step: 1,
                             unit: "분",
@@ -1432,7 +1415,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "신호 유효 시간",
-                            value: risk.signalWindowMinutes,
+                            value: riskSignalWindowMinutesValue(defaultValue: defaultRisk.signalWindowMinutes),
                             range: 1...1_440,
                             step: 1,
                             unit: "분",
@@ -1440,7 +1423,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "동시성 계산 시간창",
-                            value: risk.concurrencyWindowMinutes,
+                            value: riskConcurrencyWindowMinutesValue(defaultValue: defaultRisk.concurrencyWindowMinutes),
                             range: 1...1_440,
                             step: 1,
                             unit: "분",
@@ -2781,6 +2764,66 @@ struct SettingsView: View {
         return draft.strategyParams[strategyId] ?? [:]
     }
 
+    private var currentStrategyDraftSnapshot: StrategySettingsSnapshot? {
+        store.strategyDraft ?? store.strategySettings
+    }
+
+    private var currentBasicSettings: BasicStrategySettingsSnapshot? {
+        currentStrategyDraftSnapshot?.basic
+    }
+
+    private var currentScannerSettings: ScannerSettingsSnapshot? {
+        currentStrategyDraftSnapshot?.scanner
+    }
+
+    private var currentSignalSettings: SignalSettingsSnapshot? {
+        currentStrategyDraftSnapshot?.signal
+    }
+
+    private var currentRiskSettings: RiskSettingsSnapshot? {
+        currentStrategyDraftSnapshot?.risk
+    }
+
+    private var basicSelectionModeValue: String {
+        currentBasicSettings?.entry.selectionMode ?? "turnover"
+    }
+
+    private var basicTopNValue: Int {
+        currentBasicSettings?.entry.topN ?? 10
+    }
+
+    private var basicEnabledSignalTypes: [String] {
+        currentBasicSettings?.entry.enabledSignalTypes ?? []
+    }
+
+    private var basicMaxHoldingMinutesValue: Int {
+        currentBasicSettings?.exit.maxHoldingMinutes ?? 60
+    }
+
+    private var currentSignalEnabledTypes: [String] {
+        currentSignalSettings?.enabledSignalTypes ?? []
+    }
+
+    private var currentRiskAllowedSignalTypes: [String] {
+        currentRiskSettings?.allowedSignalTypes ?? []
+    }
+
+    private var signalTopNValue: Int {
+        currentSignalSettings?.topN ?? 10
+    }
+
+    private var signalRankJumpThresholdValue: Int {
+        currentSignalSettings?.rankJumpThreshold ?? 3
+    }
+
+    private var signalRankJumpWindowSecondsValue: Int {
+        currentSignalSettings?.rankJumpWindowSeconds ?? 600
+    }
+
+    private var signalRankHoldToleranceValue: Int {
+        currentSignalSettings?.rankHoldTolerance ?? 1
+    }
+
     private func activeStrategyStringValue(_ key: String, defaultValue: String = "") -> String {
         currentActiveStrategyParams.stringValue(for: key) ?? defaultValue
     }
@@ -2839,34 +2882,120 @@ struct SettingsView: View {
         )
     }
 
-    private var scannerMinTurnoverText: String {
-        guard let value = store.strategyDraft?.scanner.minTurnover else { return "" }
-        return DisplayFormatters.number(value)
+    private var basicSelectionModeBinding: Binding<String> {
+        Binding(
+            get: { basicSelectionModeValue },
+            set: { store.updateStrategyBasicSelectionMode($0) }
+        )
     }
 
-    private var scannerMinChangePctText: String {
-        guard let value = store.strategyDraft?.scanner.minChangePct else { return "" }
-        return DisplayFormatters.number(value)
+    private var basicDailyTradeLimitEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { currentBasicSettings?.risk.dailyTradeLimitEnabled ?? false },
+            set: { store.updateStrategyBasicDailyTradeLimitEnabled($0) }
+        )
     }
 
-    private var basicTargetProfitText: String {
-        guard let value = store.strategyDraft?.basic.exit.targetProfitPct else { return "" }
-        return DisplayFormatters.number(value)
+    private var basicForceCloseOnMarketCloseBinding: Binding<Bool> {
+        Binding(
+            get: { currentBasicSettings?.exit.forceCloseOnMarketClose ?? false },
+            set: { store.updateStrategyBasicForceCloseOnMarketClose($0) }
+        )
     }
 
-    private var basicStopLossText: String {
-        guard let value = store.strategyDraft?.basic.exit.stopLossPct else { return "" }
-        return DisplayFormatters.number(value)
+    private func basicDailyTradeLimitEnabledValue(defaultValue: Bool) -> Bool {
+        currentBasicSettings?.risk.dailyTradeLimitEnabled ?? defaultValue
     }
 
-    private var basicMaxLossLimitText: String {
-        guard let value = store.strategyDraft?.basic.risk.maxLossLimitPct else { return "" }
-        return DisplayFormatters.number(value)
+    private func basicDailyTradeLimitCountValue(defaultValue: Int) -> Int {
+        currentBasicSettings?.risk.dailyTradeLimitCount ?? defaultValue
     }
 
-    private var basicPositionSizePctText: String {
-        guard let value = store.strategyDraft?.basic.risk.positionSizePct else { return "" }
-        return DisplayFormatters.number(value)
+    private func basicMaxConcurrentPositionsValue(defaultValue: Int) -> Int {
+        currentBasicSettings?.risk.maxConcurrentPositions ?? defaultValue
+    }
+
+    private func riskMaxConcurrentCandidatesValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.maxConcurrentCandidates ?? defaultValue
+    }
+
+    private func riskCooldownMinutesValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.cooldownMinutes ?? defaultValue
+    }
+
+    private func riskSignalWindowMinutesValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.signalWindowMinutes ?? defaultValue
+    }
+
+    private func riskConcurrencyWindowMinutesValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.concurrencyWindowMinutes ?? defaultValue
+    }
+
+    private func riskBlockWhenPositionExistsBinding(defaultValue: Bool) -> Binding<Bool> {
+        Binding(
+            get: { currentRiskSettings?.blockWhenPositionExists ?? defaultValue },
+            set: { store.updateStrategyBlockWhenPositionExists($0) }
+        )
+    }
+
+    private var scannerMinTurnoverTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentScannerSettings?.minTurnover else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: { store.updateStrategyScannerMinTurnover(parseOptionalDouble($0)) }
+        )
+    }
+
+    private var scannerMinChangePctTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentScannerSettings?.minChangePct else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: { store.updateStrategyScannerMinChangePct(parseOptionalDouble($0)) }
+        )
+    }
+
+    private var basicTargetProfitTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentBasicSettings?.exit.targetProfitPct else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: { store.updateStrategyBasicTargetProfitPct(parseOptionalDouble($0) ?? 0) }
+        )
+    }
+
+    private var basicStopLossTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentBasicSettings?.exit.stopLossPct else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: { store.updateStrategyBasicStopLossPct(parseOptionalDouble($0) ?? 0.1) }
+        )
+    }
+
+    private var basicMaxLossLimitTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentBasicSettings?.risk.maxLossLimitPct else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: { store.updateStrategyBasicMaxLossLimitPct(parseOptionalDouble($0) ?? 0) }
+        )
+    }
+
+    private var basicPositionSizePctTextBinding: Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentBasicSettings?.risk.positionSizePct else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: { store.updateStrategyBasicPositionSizePct(parseOptionalDouble($0) ?? 0.1) }
+        )
     }
 
     private func signalEnabledBinding(type: String) -> Binding<Bool> {
@@ -2903,6 +3032,10 @@ struct SettingsView: View {
             },
             set: { store.updateStrategyScannerWeight(mode: mode, key: key, value: $0) }
         )
+    }
+
+    private func currentScannerWeights(mode: String, fallback: ScannerScoreWeightsSnapshot) -> ScannerScoreWeightsSnapshot {
+        currentScannerSettings?.scoreDefinition.weights[mode] ?? fallback
     }
 
     private func advancedWeightEditor(
