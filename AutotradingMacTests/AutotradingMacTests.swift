@@ -110,6 +110,46 @@ final class AutotradingMacTests: XCTestCase {
     }
 
     @MainActor
+    func test_monitoringStore_updatesOpeningPullbackParamsAfterActivation() async {
+        let snapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(strategyEnvelope: envelope),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadStrategySettings()
+        store.updateStrategyActiveTemplate("opening_pullback_reentry")
+        store.updateActiveStrategyParamString("candidate_end_time", value: "09:18")
+        store.updateActiveStrategyParamBool("exclude_recent_vi_enabled", value: false)
+        store.updateActiveStrategyParamDouble("risk_per_trade_pct", value: 0.42, range: 0.01...10)
+
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["candidate_end_time"]?.stringValue,
+            "09:18"
+        )
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["exclude_recent_vi_enabled"]?.boolValue,
+            false
+        )
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["risk_per_trade_pct"]?.doubleValue,
+            0.42,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["candidate_start_time"]?.stringValue,
+            "09:02"
+        )
+    }
+
+    @MainActor
     func test_monitoringStore_rejectsPreviewOnlyStrategyActivation() async {
         let snapshot = Self.makeStrategySettingsSnapshot()
         let envelope = StrategySettingsResponseEnvelope(

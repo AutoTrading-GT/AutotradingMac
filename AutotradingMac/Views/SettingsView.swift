@@ -358,7 +358,7 @@ struct SettingsView: View {
         template: StrategyTemplateSnapshot
     ) -> some View {
         if template.strategyId == "opening_pullback_reentry" {
-            openingPullbackStrategyPanel(draft, template: template)
+            openingPullbackStrategyPanel(template: template)
         } else {
             VStack(alignment: .leading, spacing: strategySectionSpacing) {
                 basicStrategyPanel(draft.basic, template: template)
@@ -613,10 +613,8 @@ struct SettingsView: View {
     }
 
     private func openingPullbackStrategyPanel(
-        _ draft: StrategySettingsSnapshot,
         template: StrategyTemplateSnapshot
     ) -> some View {
-        let params = draft.strategyParams[template.strategyId] ?? [:]
         return strategyPanel(
             title: "선택한 전략 설정",
             subtitle: "\(template.displayName)의 개장 초 impulse → pullback → re-entry 규칙을 전용 폼으로 편집합니다."
@@ -637,15 +635,13 @@ struct SettingsView: View {
                                         label: "관찰 시작",
                                         placeholder: "09:00",
                                         unit: "KST",
-                                        text: params.stringValue(for: "observe_start_time") ?? "",
-                                        onChange: { store.updateActiveStrategyParamString("observe_start_time", value: $0) }
+                                        text: activeStrategyStringBinding("observe_start_time")
                                     )
                                     strategyBandTextField(
                                         label: "후보 시작",
                                         placeholder: "09:02",
                                         unit: "KST",
-                                        text: params.stringValue(for: "candidate_start_time") ?? "",
-                                        onChange: { store.updateActiveStrategyParamString("candidate_start_time", value: $0) }
+                                        text: activeStrategyStringBinding("candidate_start_time")
                                     )
                                 }
                             }
@@ -660,15 +656,13 @@ struct SettingsView: View {
                                         label: "후보 종료",
                                         placeholder: "09:20",
                                         unit: "KST",
-                                        text: params.stringValue(for: "candidate_end_time") ?? "",
-                                        onChange: { store.updateActiveStrategyParamString("candidate_end_time", value: $0) }
+                                        text: activeStrategyStringBinding("candidate_end_time")
                                     )
                                     strategyBandTextField(
                                         label: "진입 종료",
                                         placeholder: "10:00",
                                         unit: "KST",
-                                        text: params.stringValue(for: "entry_end_time") ?? "",
-                                        onChange: { store.updateActiveStrategyParamString("entry_end_time", value: $0) }
+                                        text: activeStrategyStringBinding("entry_end_time")
                                     )
                                 }
                             }
@@ -705,10 +699,7 @@ struct SettingsView: View {
                                         AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
                                         AppSegmentedOption(value: "surge", title: "급등률 중심"),
                                     ],
-                                    selection: Binding(
-                                        get: { params.stringValue(for: "selection_mode") ?? "turnover" },
-                                        set: { store.updateActiveStrategyParamString("selection_mode", value: $0) }
-                                    ),
+                                    selection: activeStrategyStringBinding("selection_mode", defaultValue: "turnover"),
                                     minSegmentWidth: 138,
                                     height: 38
                                 )
@@ -718,7 +709,7 @@ struct SettingsView: View {
                             strategyBandSegment(title: "관찰 범위") {
                                 strategyBandStepperTile(
                                     label: "감시 후보 수",
-                                    value: params.intValue(for: "top_n") ?? 8,
+                                    value: activeStrategyIntValue("top_n", defaultValue: 8),
                                     range: 1...30,
                                     step: 1,
                                     unit: "Top-N",
@@ -735,26 +726,20 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "최소 상승폭",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "open_impulse_min_return_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "open_impulse_min_return_pct",
-                                                value: parseOptionalDouble($0) ?? 0.1,
-                                                range: 0.1...20
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "open_impulse_min_return_pct",
+                                            defaultValue: 0.1,
+                                            range: 0.1...20
+                                        )
                                     )
                                     strategyBandNumericField(
                                         label: "최대 상승폭",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "open_impulse_max_return_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "open_impulse_max_return_pct",
-                                                value: parseOptionalDouble($0) ?? 0.1,
-                                                range: 0.1...20
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "open_impulse_max_return_pct",
+                                            defaultValue: 0.1,
+                                            range: 0.1...20
+                                        )
                                     )
                                 }
                             }
@@ -776,26 +761,20 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "최소 되돌림",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "pullback_retrace_min_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "pullback_retrace_min_pct",
-                                                value: parseOptionalDouble($0) ?? 0.1,
-                                                range: 0.1...100
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "pullback_retrace_min_pct",
+                                            defaultValue: 0.1,
+                                            range: 0.1...100
+                                        )
                                     )
                                     strategyBandNumericField(
                                         label: "최대 되돌림",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "pullback_retrace_max_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "pullback_retrace_max_pct",
-                                                value: parseOptionalDouble($0) ?? 0.1,
-                                                range: 0.1...100
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "pullback_retrace_max_pct",
+                                            defaultValue: 0.1,
+                                            range: 0.1...100
+                                        )
                                     )
                                 }
                             }
@@ -805,7 +784,7 @@ struct SettingsView: View {
                                 HStack(alignment: .top, spacing: 12) {
                                     strategyBandStepperTile(
                                         label: "최소 봉 수",
-                                        value: params.intValue(for: "pullback_bars_min") ?? 2,
+                                        value: activeStrategyIntValue("pullback_bars_min", defaultValue: 2),
                                         range: 1...30,
                                         step: 1,
                                         unit: "봉",
@@ -813,7 +792,7 @@ struct SettingsView: View {
                                     )
                                     strategyBandStepperTile(
                                         label: "최대 봉 수",
-                                        value: params.intValue(for: "pullback_bars_max") ?? 6,
+                                        value: activeStrategyIntValue("pullback_bars_max", defaultValue: 6),
                                         range: 1...60,
                                         step: 1,
                                         unit: "봉",
@@ -852,14 +831,11 @@ struct SettingsView: View {
                                 strategyBandNumericField(
                                     label: "거래량 배수",
                                     unit: "x",
-                                    text: openingDoubleText(params, key: "reentry_volume_multiplier"),
-                                    onChange: {
-                                        store.updateActiveStrategyParamDouble(
-                                            "reentry_volume_multiplier",
-                                            value: parseOptionalDouble($0) ?? 0.1,
-                                            range: 0.1...20
-                                        )
-                                    }
+                                    text: activeStrategyDoubleTextBinding(
+                                        "reentry_volume_multiplier",
+                                        defaultValue: 0.1,
+                                        range: 0.1...20
+                                    )
                                 )
                             }
                         },
@@ -871,17 +847,11 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "VWAP 필터 사용",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "use_vwap_filter") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("use_vwap_filter", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("use_vwap_filter", defaultValue: true)
                                     )
                                     strategyBandToggleControl(
                                         title: "재진입 시 VWAP 재돌파 요구",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "require_vwap_reclaim") ?? false },
-                                            set: { store.updateActiveStrategyParamBool("require_vwap_reclaim", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("require_vwap_reclaim", defaultValue: false)
                                     )
                                 }
                             }
@@ -913,14 +883,11 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "신규상장 제외 사용",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "exclude_recently_listed_enabled") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("exclude_recently_listed_enabled", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("exclude_recently_listed_enabled", defaultValue: true)
                                     )
                                     strategyBandStepperTile(
                                         label: "제외 기준",
-                                        value: params.intValue(for: "exclude_recently_listed_days") ?? 5,
+                                        value: activeStrategyIntValue("exclude_recently_listed_days", defaultValue: 5),
                                         range: 1...60,
                                         step: 1,
                                         unit: "거래일",
@@ -943,17 +910,11 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "단기과열 종목 제외",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "exclude_short_term_overheated_enabled") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("exclude_short_term_overheated_enabled", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("exclude_short_term_overheated_enabled", defaultValue: true)
                                     )
                                     strategyBandToggleControl(
                                         title: "시장경보 종목 제외",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "exclude_market_warning_enabled") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("exclude_market_warning_enabled", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("exclude_market_warning_enabled", defaultValue: true)
                                     )
                                 }
                             }
@@ -966,14 +927,11 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "최근 VI 종목 제외",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "exclude_recent_vi_enabled") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("exclude_recent_vi_enabled", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("exclude_recent_vi_enabled", defaultValue: true)
                                     )
                                     strategyBandStepperTile(
                                         label: "확인 시간",
-                                        value: params.intValue(for: "recent_vi_lookback_minutes") ?? 10,
+                                        value: activeStrategyIntValue("recent_vi_lookback_minutes", defaultValue: 10),
                                         range: 1...120,
                                         step: 1,
                                         unit: "분",
@@ -1004,22 +962,16 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "스프레드 필터 사용",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "use_spread_filter") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("use_spread_filter", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("use_spread_filter", defaultValue: true)
                                     )
                                     strategyBandNumericField(
                                         label: "최대 스프레드",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "max_spread_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "max_spread_pct",
-                                                value: parseOptionalDouble($0) ?? 0.01,
-                                                range: 0.01...10
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "max_spread_pct",
+                                            defaultValue: 0.01,
+                                            range: 0.01...10
+                                        )
                                     )
                                 }
                             }
@@ -1032,14 +984,11 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "호가잔량 필터 사용",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "use_orderbook_depth_filter") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("use_orderbook_depth_filter", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("use_orderbook_depth_filter", defaultValue: true)
                                     )
                                     strategyBandStepperTile(
                                         label: "최소 매수호가 잔량",
-                                        value: params.intValue(for: "min_best_bid_size") ?? 300,
+                                        value: activeStrategyIntValue("min_best_bid_size", defaultValue: 300),
                                         range: 1...1_000_000,
                                         step: 50,
                                         unit: "주",
@@ -1053,7 +1002,7 @@ struct SettingsView: View {
                                     )
                                     strategyBandStepperTile(
                                         label: "최소 매도호가 잔량",
-                                        value: params.intValue(for: "min_best_ask_size") ?? 300,
+                                        value: activeStrategyIntValue("min_best_ask_size", defaultValue: 300),
                                         range: 1...1_000_000,
                                         step: 50,
                                         unit: "주",
@@ -1077,14 +1026,11 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "최대 비율",
                                         unit: "x",
-                                        text: openingDoubleText(params, key: "max_orderbook_imbalance_ratio"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "max_orderbook_imbalance_ratio",
-                                                value: parseOptionalDouble($0) ?? 1.0,
-                                                range: 1...100
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "max_orderbook_imbalance_ratio",
+                                            defaultValue: 1.0,
+                                            range: 1...100
+                                        )
                                     )
                                     strategyCompactNote(
                                         title: "현재 구현 범위",
@@ -1109,22 +1055,16 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
                                         title: "리스크 사이징 사용",
-                                        isOn: Binding(
-                                            get: { params.boolValue(for: "use_risk_per_trade_sizing") ?? true },
-                                            set: { store.updateActiveStrategyParamBool("use_risk_per_trade_sizing", value: $0) }
-                                        )
+                                        isOn: activeStrategyBoolBinding("use_risk_per_trade_sizing", defaultValue: true)
                                     )
                                     strategyBandNumericField(
                                         label: "거래당 최대 손실",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "risk_per_trade_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "risk_per_trade_pct",
-                                                value: parseOptionalDouble($0) ?? 0.01,
-                                                range: 0.01...10
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "risk_per_trade_pct",
+                                            defaultValue: 0.01,
+                                            range: 0.01...10
+                                        )
                                     )
                                 }
                             }
@@ -1138,14 +1078,11 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "최대 포지션 상한",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "max_position_size_pct_cap"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "max_position_size_pct_cap",
-                                                value: parseOptionalDouble($0) ?? 0.1,
-                                                range: 0.1...100
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "max_position_size_pct_cap",
+                                            defaultValue: 0.1,
+                                            range: 0.1...100
+                                        )
                                     )
                                     strategyCompactNote(
                                         title: "공통 포지션 비율과의 관계",
@@ -1163,14 +1100,11 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "슬리피지 버퍼",
                                         unit: "%",
-                                        text: openingDoubleText(params, key: "sizing_slippage_buffer_pct"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "sizing_slippage_buffer_pct",
-                                                value: parseOptionalDouble($0) ?? 0,
-                                                range: 0.0...5.0
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "sizing_slippage_buffer_pct",
+                                            defaultValue: 0,
+                                            range: 0.0...5.0
+                                        )
                                     )
                                     strategyCompactNote(
                                         title: "현재 계산식",
@@ -1192,14 +1126,11 @@ struct SettingsView: View {
                                 strategyBandNumericField(
                                     label: "초기 손절",
                                     unit: "%",
-                                    text: openingDoubleText(params, key: "initial_stop_pct"),
-                                    onChange: {
-                                        store.updateActiveStrategyParamDouble(
-                                            "initial_stop_pct",
-                                            value: parseOptionalDouble($0) ?? 0.1,
-                                            range: 0.1...20
-                                        )
-                                    }
+                                    text: activeStrategyDoubleTextBinding(
+                                        "initial_stop_pct",
+                                        defaultValue: 0.1,
+                                        range: 0.1...20
+                                    )
                                 )
                             }
                         },
@@ -1209,26 +1140,20 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "R 배수",
                                         unit: "R",
-                                        text: openingDoubleText(params, key: "first_take_profit_r_multiple"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "first_take_profit_r_multiple",
-                                                value: parseOptionalDouble($0) ?? 0.1,
-                                                range: 0.1...10
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "first_take_profit_r_multiple",
+                                            defaultValue: 0.1,
+                                            range: 0.1...10
+                                        )
                                     )
                                     strategyBandNumericField(
                                         label: "분할 비율",
                                         unit: "ratio",
-                                        text: openingDoubleText(params, key: "first_take_profit_partial_ratio"),
-                                        onChange: {
-                                            store.updateActiveStrategyParamDouble(
-                                                "first_take_profit_partial_ratio",
-                                                value: parseOptionalDouble($0) ?? 0.01,
-                                                range: 0.01...0.99
-                                            )
-                                        }
+                                        text: activeStrategyDoubleTextBinding(
+                                            "first_take_profit_partial_ratio",
+                                            defaultValue: 0.01,
+                                            range: 0.01...0.99
+                                        )
                                     )
                                 }
                             }
@@ -1239,19 +1164,14 @@ struct SettingsView: View {
                                     strategyBandNumericField(
                                         label: "Soft Time Stop",
                                         unit: "분",
-                                        text: openingOptionalIntText(params, key: "time_stop_soft_minutes"),
-                                        onChange: {
-                                            let value = parseOptionalDouble($0).map(Int.init)
-                                            store.updateActiveStrategyParamOptionalInt(
-                                                "time_stop_soft_minutes",
-                                                value: value,
-                                                range: 1...240
-                                            )
-                                        }
+                                        text: activeStrategyOptionalIntTextBinding(
+                                            "time_stop_soft_minutes",
+                                            range: 1...240
+                                        )
                                     )
                                     strategyBandStepperTile(
                                         label: "Hard Time Stop",
-                                        value: params.intValue(for: "time_stop_hard_minutes") ?? 45,
+                                        value: activeStrategyIntValue("time_stop_hard_minutes", defaultValue: 45),
                                         range: 1...480,
                                         step: 1,
                                         unit: "분",
@@ -2229,8 +2149,7 @@ struct SettingsView: View {
     private func strategyBandNumericField(
         label: String,
         unit: String,
-        text: String,
-        onChange: @escaping (String) -> Void
+        text: Binding<String>
     ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(label)
@@ -2238,19 +2157,74 @@ struct SettingsView: View {
                 .foregroundStyle(DesignTokens.Colors.textTertiary)
 
             HStack(spacing: 8) {
-                TextField(
-                    "미설정",
-                    text: Binding(
-                        get: { text },
-                        set: onChange
-                    )
-                )
-                .textFieldStyle(.plain)
-                .font(.system(size: 13.5, weight: .medium, design: .monospaced))
+                TextField("미설정", text: text)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13.5, weight: .medium, design: .monospaced))
 
                 Text(unit)
                     .font(.system(size: 12.5, weight: .regular))
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
+            }
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DesignTokens.Colors.surface1.opacity(0.95),
+                                DesignTokens.Colors.surface2.opacity(0.62),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
+                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.92), lineWidth: 0.9)
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func strategyBandNumericField(
+        label: String,
+        unit: String,
+        text: String,
+        onChange: @escaping (String) -> Void
+    ) -> some View {
+        strategyBandNumericField(
+            label: label,
+            unit: unit,
+            text: Binding(
+                get: { text },
+                set: onChange
+            )
+        )
+    }
+
+    private func strategyBandTextField(
+        label: String,
+        placeholder: String,
+        unit: String? = nil,
+        text: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(DesignTokens.Colors.textTertiary)
+
+            HStack(spacing: 8) {
+                TextField(placeholder, text: text)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13.5, weight: .medium, design: .monospaced))
+
+                if let unit {
+                    Text(unit)
+                        .font(.system(size: 12.5, weight: .regular))
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
+                }
             }
             .padding(.horizontal, 11)
             .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
@@ -2282,49 +2256,15 @@ struct SettingsView: View {
         text: String,
         onChange: @escaping (String) -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(DesignTokens.Colors.textTertiary)
-
-            HStack(spacing: 8) {
-                TextField(
-                    placeholder,
-                    text: Binding(
-                        get: { text },
-                        set: onChange
-                    )
-                )
-                .textFieldStyle(.plain)
-                .font(.system(size: 13.5, weight: .medium, design: .monospaced))
-
-                if let unit {
-                    Text(unit)
-                        .font(.system(size: 12.5, weight: .regular))
-                        .foregroundStyle(DesignTokens.Colors.textQuaternary)
-                }
-            }
-            .padding(.horizontal, 11)
-            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                DesignTokens.Colors.surface1.opacity(0.95),
-                                DesignTokens.Colors.surface2.opacity(0.62),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+        strategyBandTextField(
+            label: label,
+            placeholder: placeholder,
+            unit: unit,
+            text: Binding(
+                get: { text },
+                set: onChange
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.Radius.md, style: .continuous)
-                    .stroke(DesignTokens.Colors.borderSubtle.opacity(0.92), lineWidth: 0.9)
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        )
     }
 
     private func strategyBandStepperControl(
@@ -2835,14 +2775,68 @@ struct SettingsView: View {
         ["new_entry", "rank_jump", "rank_maintained"]
     }
 
-    private func openingDoubleText(_ params: [String: JSONValue], key: String) -> String {
-        guard let value = params.doubleValue(for: key) else { return "" }
-        return DisplayFormatters.number(value)
+    private var currentActiveStrategyParams: [String: JSONValue] {
+        guard let draft = store.strategyDraft else { return [:] }
+        let strategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
+        return draft.strategyParams[strategyId] ?? [:]
     }
 
-    private func openingOptionalIntText(_ params: [String: JSONValue], key: String) -> String {
-        guard let value = params.intValue(for: key) else { return "" }
-        return String(value)
+    private func activeStrategyStringValue(_ key: String, defaultValue: String = "") -> String {
+        currentActiveStrategyParams.stringValue(for: key) ?? defaultValue
+    }
+
+    private func activeStrategyIntValue(_ key: String, defaultValue: Int) -> Int {
+        currentActiveStrategyParams.intValue(for: key) ?? defaultValue
+    }
+
+    private func activeStrategyStringBinding(_ key: String, defaultValue: String = "") -> Binding<String> {
+        Binding(
+            get: { activeStrategyStringValue(key, defaultValue: defaultValue) },
+            set: { store.updateActiveStrategyParamString(key, value: $0) }
+        )
+    }
+
+    private func activeStrategyBoolBinding(_ key: String, defaultValue: Bool) -> Binding<Bool> {
+        Binding(
+            get: { currentActiveStrategyParams.boolValue(for: key) ?? defaultValue },
+            set: { store.updateActiveStrategyParamBool(key, value: $0) }
+        )
+    }
+
+    private func activeStrategyDoubleTextBinding(
+        _ key: String,
+        defaultValue: Double,
+        range: ClosedRange<Double>
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentActiveStrategyParams.doubleValue(for: key) else { return "" }
+                return DisplayFormatters.number(value)
+            },
+            set: {
+                store.updateActiveStrategyParamDouble(
+                    key,
+                    value: parseOptionalDouble($0) ?? defaultValue,
+                    range: range
+                )
+            }
+        )
+    }
+
+    private func activeStrategyOptionalIntTextBinding(
+        _ key: String,
+        range: ClosedRange<Int>
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                guard let value = currentActiveStrategyParams.intValue(for: key) else { return "" }
+                return String(value)
+            },
+            set: {
+                let value = parseOptionalDouble($0).map(Int.init)
+                store.updateActiveStrategyParamOptionalInt(key, value: value, range: range)
+            }
+        )
     }
 
     private var scannerMinTurnoverText: String {
