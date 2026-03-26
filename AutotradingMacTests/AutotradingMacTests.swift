@@ -329,6 +329,44 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertTrue(store.currentPositions.isEmpty)
     }
 
+    @MainActor
+    func test_monitoringStore_pollsSnapshotPeriodicallyWhenAccountModeIsLive() async throws {
+        let strategySnapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: strategySnapshot,
+            defaults: strategySnapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let snapshot = try Self.makeMonitoringSnapshotResponse(
+            orderMode: "live",
+            accountMode: "live",
+            currentPositions: []
+        )
+        let counter = SnapshotFetchCounter()
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(
+                strategyEnvelope: envelope,
+                snapshot: snapshot,
+                runtimeSnapshot: snapshot.runtime,
+                onFetchSnapshot: {
+                    await counter.increment()
+                }
+            ),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService(),
+            connectWebSocketOnStart: false,
+            liveDashboardRefreshInterval: 0.05
+        )
+
+        await store.start()
+        defer { store.stop() }
+
+        try await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertGreaterThanOrEqual(await counter.currentValue(), 3)
+    }
+
     func test_resultFeedReducer_prefersCloseOverOrderAndFillInSameFlow() {
         let now = Date()
         let candidates: [ResultFeedEventCandidate] = [
@@ -1154,12 +1192,29 @@ private struct MockLocalNotificationService: LocalNotificationServiceProtocol {
     ) async {}
 }
 
+private actor SnapshotFetchCounter {
+    private var value = 0
+
+    func increment() {
+        value += 1
+    }
+
+    func currentValue() -> Int {
+        value
+    }
+}
+
 private struct MockMonitoringAPIClient: MonitoringAPIClientProtocol {
     let strategyEnvelope: StrategySettingsResponseEnvelope
     var snapshot: MonitoringSnapshotResponse? = nil
     var runtimeSnapshot: RuntimeStatusSnapshot? = nil
+    var appSettingsEnvelope: AppSettingsResponseEnvelope? = nil
+    var onFetchSnapshot: (@Sendable () async -> Void)? = nil
 
     func fetchSnapshot() async throws -> MonitoringSnapshotResponse {
+        if let onFetchSnapshot {
+            await onFetchSnapshot()
+        }
         guard let snapshot else {
             fatalError("unused in test")
         }
@@ -1185,7 +1240,35 @@ private struct MockMonitoringAPIClient: MonitoringAPIClientProtocol {
     }
 
     func fetchAppSettings() async throws -> AppSettingsResponseEnvelope {
-        fatalError("unused in test")
+        if let appSettingsEnvelope {
+            return appSettingsEnvelope
+        }
+        let snapshot = AppSettingsSnapshot(
+            notifications: NotificationSettingsSnapshot(
+                tradeFillNotificationsEnabled: true,
+                tradeSignalNotificationsEnabled: true,
+                systemErrorNotificationsEnabled: true
+            ),
+            dataManagement: DataManagementSettingsSnapshot(
+                autoBackupEnabled: true,
+                logRetentionDays: 7,
+                backupRetentionCount: 5,
+                storageUsageBytes: nil,
+                storageUsageLabel: nil,
+                lastCleanupAt: nil,
+                lastCleanupStatus: nil,
+                lastCleanupSummary: nil,
+                lastBackupAt: nil,
+                lastBackupStatus: nil,
+                lastBackupSummary: nil,
+                backupMode: nil
+            )
+        )
+        return AppSettingsResponseEnvelope(
+            data: snapshot,
+            defaults: snapshot,
+            updatedAt: Date()
+        )
     }
 
     func updateAppSettings(_ payload: AppSettingsUpdatePayload) async throws -> AppSettingsUpdateResponseEnvelope {

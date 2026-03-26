@@ -71,15 +71,19 @@ final class MonitoringStore: ObservableObject {
     private let apiClient: MonitoringAPIClientProtocol
     private let webSocketClient: MonitoringWebSocketClient
     private let localNotificationService: LocalNotificationServiceProtocol
+    private let connectWebSocketOnStart: Bool
     private var started = false
     private let maxRecentItems = 100
     private var runtimeRefreshTask: Task<Void, Never>?
+    private var liveDashboardRefreshTask: Task<Void, Never>?
+    private var liveDashboardRefreshTaskToken: UUID?
     private var livePositionsRefreshTask: Task<Void, Never>?
     private var snapshotRetryTask: Task<Void, Never>?
     private var chartFetchDebounceTask: Task<Void, Never>?
     private var chartFetchTasks: [String: Task<Void, Never>] = [:]
     private var lastRuntimeRefreshedAt: Date?
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
+    private let liveDashboardRefreshIntervalNanoseconds: UInt64
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private let scannerStep = 10
     private let scannerMaxLimit = 30
@@ -113,11 +117,17 @@ final class MonitoringStore: ObservableObject {
     init(
         apiClient: MonitoringAPIClientProtocol,
         webSocketClient: MonitoringWebSocketClient,
-        localNotificationService: LocalNotificationServiceProtocol
+        localNotificationService: LocalNotificationServiceProtocol,
+        connectWebSocketOnStart: Bool = true,
+        liveDashboardRefreshInterval: TimeInterval = 5.0
     ) {
         self.apiClient = apiClient
         self.webSocketClient = webSocketClient
         self.localNotificationService = localNotificationService
+        self.connectWebSocketOnStart = connectWebSocketOnStart
+        self.liveDashboardRefreshIntervalNanoseconds = UInt64(
+            (max(liveDashboardRefreshInterval, 0.05) * 1_000_000_000).rounded()
+        )
         self.backendBaseURLDraft = AppConfig.backendBaseURLInputString
         bindWebSocketCallbacks()
     }
@@ -129,12 +139,17 @@ final class MonitoringStore: ObservableObject {
         await reloadAppSettings()
         await refreshNotificationAuthorizationStatus()
         scheduleSnapshotRetryIfNeeded()
-        webSocketClient.connect()
+        if connectWebSocketOnStart {
+            webSocketClient.connect()
+        }
     }
 
     func stop() {
         runtimeRefreshTask?.cancel()
         runtimeRefreshTask = nil
+        liveDashboardRefreshTask?.cancel()
+        liveDashboardRefreshTask = nil
+        liveDashboardRefreshTaskToken = nil
         livePositionsRefreshTask?.cancel()
         livePositionsRefreshTask = nil
         snapshotRetryTask?.cancel()
@@ -2177,6 +2192,7 @@ final class MonitoringStore: ObservableObject {
 
     private func apply(snapshot: MonitoringSnapshotResponse) {
         runtime = snapshot.runtime
+        updateLiveDashboardRefreshState()
         updateAccountSummaryDiagnostics(from: runtime)
         marketTopRanks = snapshot.marketTopRanks
         scannerRankRowsByMode["turnover"] = snapshot.marketTopRanks
@@ -2424,6 +2440,7 @@ final class MonitoringStore: ObservableObject {
             runtime.engineUpdatedAt = parseISODate(updatedAtText)
         }
         self.runtime = runtime
+        updateLiveDashboardRefreshState()
     }
 
     private func applyEngineControlSnapshot(_ snapshot: EngineControlSnapshot) {
@@ -2441,6 +2458,7 @@ final class MonitoringStore: ObservableObject {
         runtime.executionMode = snapshot.orderMode
         runtime.appStatus = snapshot.state == "emergency_stopped" ? "degraded" : runtime.appStatus
         self.runtime = runtime
+        updateLiveDashboardRefreshState()
     }
 
     private func applyMarketRank(payload: MarketRankSnapshotPayload) {
@@ -3168,6 +3186,38 @@ final class MonitoringStore: ObservableObject {
         return mode == "live"
     }
 
+    private func updateLiveDashboardRefreshState() {
+        guard started, usesLiveAccountPositions else {
+            liveDashboardRefreshTask?.cancel()
+            liveDashboardRefreshTask = nil
+            liveDashboardRefreshTaskToken = nil
+            return
+        }
+
+        snapshotRetryTask?.cancel()
+        snapshotRetryTask = nil
+
+        guard liveDashboardRefreshTask == nil else { return }
+        let taskToken = UUID()
+        liveDashboardRefreshTaskToken = taskToken
+        liveDashboardRefreshTask = Task { @MainActor [weak self] in
+            while let self, self.started, self.usesLiveAccountPositions, !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: self.liveDashboardRefreshIntervalNanoseconds)
+                guard !Task.isCancelled, self.started, self.usesLiveAccountPositions else {
+                    break
+                }
+                guard self.isLoadingSnapshot == false else {
+                    continue
+                }
+                await self.reloadSnapshot()
+            }
+            if self?.liveDashboardRefreshTaskToken == taskToken {
+                self?.liveDashboardRefreshTask = nil
+                self?.liveDashboardRefreshTaskToken = nil
+            }
+        }
+    }
+
     private func scheduleSnapshotRefreshForLivePositions() {
         guard livePositionsRefreshTask == nil else { return }
         livePositionsRefreshTask = Task { [weak self] in
@@ -3187,6 +3237,7 @@ final class MonitoringStore: ObservableObject {
         do {
             let latestRuntime = try await apiClient.fetchRuntime()
             runtime = latestRuntime
+            updateLiveDashboardRefreshState()
             lastRuntimeRefreshedAt = now
             lastUpdatedAt = now
         } catch {
@@ -3200,6 +3251,7 @@ final class MonitoringStore: ObservableObject {
     private func scheduleSnapshotRetryIfNeeded() {
         guard started else { return }
         guard snapshotLoaded == false else { return }
+        guard usesLiveAccountPositions == false else { return }
         guard snapshotRetryTask == nil else { return }
 
         snapshotRetryTask = Task { @MainActor [weak self] in
