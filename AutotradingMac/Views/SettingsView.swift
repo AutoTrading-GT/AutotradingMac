@@ -664,7 +664,7 @@ struct SettingsView: View {
                         )
                         strategyBandTextField(
                             label: "후보 시작",
-                            placeholder: "09:02",
+                            placeholder: "09:03",
                             unit: "KST",
                             text: activeStrategyStringBinding("candidate_start_time")
                         )
@@ -684,7 +684,7 @@ struct SettingsView: View {
                         )
                         strategyBandTextField(
                             label: "진입 종료",
-                            placeholder: "10:00",
+                            placeholder: "09:50",
                             unit: "KST",
                             text: activeStrategyStringBinding("entry_end_time")
                         )
@@ -749,7 +749,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "open_impulse_min_return_pct",
-                                defaultValue: 0.1,
+                                defaultValue: 2.0,
                                 range: 0.1...20
                             )
                         )
@@ -758,7 +758,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "open_impulse_max_return_pct",
-                                defaultValue: 0.1,
+                                defaultValue: 8.0,
                                 range: 0.1...20
                             )
                         )
@@ -784,7 +784,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "pullback_retrace_min_pct",
-                                defaultValue: 0.1,
+                                defaultValue: 25.0,
                                 range: 0.1...100
                             )
                         )
@@ -793,7 +793,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "pullback_retrace_max_pct",
-                                defaultValue: 0.1,
+                                defaultValue: 45.0,
                                 range: 0.1...100
                             )
                         )
@@ -812,7 +812,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "최대 봉 수",
-                            value: activeStrategyIntValue("pullback_bars_max", defaultValue: 6),
+                            value: activeStrategyIntValue("pullback_bars_max", defaultValue: 5),
                             range: 1...60,
                             step: 1,
                             unit: "봉",
@@ -852,7 +852,7 @@ struct SettingsView: View {
                         unit: "x",
                         text: activeStrategyDoubleTextBinding(
                             "reentry_volume_multiplier",
-                            defaultValue: 0.1,
+                            defaultValue: 1.7,
                             range: 0.1...20
                         )
                     )
@@ -946,7 +946,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "확인 시간",
-                            value: activeStrategyIntValue("recent_vi_lookback_minutes", defaultValue: 10),
+                            value: activeStrategyIntValue("recent_vi_lookback_minutes", defaultValue: 15),
                             range: 1...120,
                             step: 1,
                             unit: "분",
@@ -984,7 +984,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "max_spread_pct",
-                                defaultValue: 0.01,
+                                defaultValue: 0.30,
                                 range: 0.01...10
                             )
                         )
@@ -1041,7 +1041,7 @@ struct SettingsView: View {
                             unit: "x",
                             text: activeStrategyDoubleTextBinding(
                                 "max_orderbook_imbalance_ratio",
-                                defaultValue: 1.0,
+                                defaultValue: 3.0,
                                 range: 1...100
                             )
                         )
@@ -1075,7 +1075,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "risk_per_trade_pct",
-                                defaultValue: 0.01,
+                                defaultValue: 0.30,
                                 range: 0.01...10
                             )
                         )
@@ -1092,7 +1092,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "max_position_size_pct_cap",
-                                defaultValue: 0.1,
+                                defaultValue: 7.0,
                                 range: 0.1...100
                             )
                         )
@@ -1113,7 +1113,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "sizing_slippage_buffer_pct",
-                                defaultValue: 0,
+                                defaultValue: 0.20,
                                 range: 0.0...5.0
                             )
                         )
@@ -1139,7 +1139,7 @@ struct SettingsView: View {
                         unit: "%",
                         text: activeStrategyDoubleTextBinding(
                             "initial_stop_pct",
-                            defaultValue: 0.1,
+                            defaultValue: 1.0,
                             range: 0.1...20
                         )
                     )
@@ -1152,7 +1152,7 @@ struct SettingsView: View {
                             unit: "R",
                             text: activeStrategyDoubleTextBinding(
                                 "first_take_profit_r_multiple",
-                                defaultValue: 0.1,
+                                defaultValue: 1.5,
                                 range: 0.1...10
                             )
                         )
@@ -1161,7 +1161,7 @@ struct SettingsView: View {
                             unit: "ratio",
                             text: activeStrategyDoubleTextBinding(
                                 "first_take_profit_partial_ratio",
-                                defaultValue: 0.01,
+                                defaultValue: 0.5,
                                 range: 0.01...0.99
                             )
                         )
@@ -1180,7 +1180,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "Hard Time Stop",
-                            value: activeStrategyIntValue("time_stop_hard_minutes", defaultValue: 45),
+                            value: activeStrategyIntValue("time_stop_hard_minutes", defaultValue: 30),
                             range: 1...480,
                             step: 1,
                             unit: "분",

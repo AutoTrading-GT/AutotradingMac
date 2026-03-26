@@ -34,11 +34,11 @@ final class AutotradingMacTests: XCTestCase {
         )
         XCTAssertEqual(
             snapshot.strategyParams["opening_pullback_reentry"]?["recent_vi_lookback_minutes"]?.intValue,
-            10
+            15
         )
         XCTAssertEqual(
             snapshot.strategyParams["opening_pullback_reentry"]?["max_spread_pct"]?.doubleValue,
-            0.35,
+            0.30,
             accuracy: 0.0001
         )
         XCTAssertEqual(
@@ -47,22 +47,22 @@ final class AutotradingMacTests: XCTestCase {
         )
         XCTAssertEqual(
             snapshot.strategyParams["opening_pullback_reentry"]?["max_orderbook_imbalance_ratio"]?.doubleValue,
-            4.0,
+            3.0,
             accuracy: 0.0001
         )
         XCTAssertEqual(
             snapshot.strategyParams["opening_pullback_reentry"]?["risk_per_trade_pct"]?.doubleValue,
-            0.35,
+            0.30,
             accuracy: 0.0001
         )
         XCTAssertEqual(
             snapshot.strategyParams["opening_pullback_reentry"]?["max_position_size_pct_cap"]?.doubleValue,
-            10.0,
+            7.0,
             accuracy: 0.0001
         )
         XCTAssertEqual(
             snapshot.strategyParams["opening_pullback_reentry"]?["sizing_slippage_buffer_pct"]?.doubleValue,
-            0.15,
+            0.20,
             accuracy: 0.0001
         )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
@@ -91,7 +91,7 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(store.strategyDraft?.template(id: "opening_pullback_reentry")?.status, "active")
         XCTAssertEqual(
             store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["time_stop_hard_minutes"]?.intValue,
-            45
+            30
         )
         XCTAssertEqual(
             store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["exclude_recently_listed_enabled"]?.boolValue,
@@ -99,13 +99,13 @@ final class AutotradingMacTests: XCTestCase {
         )
         XCTAssertEqual(
             store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["risk_per_trade_pct"]?.doubleValue,
-            0.35,
+            0.30,
             accuracy: 0.0001
         )
         XCTAssertTrue(
             store.strategyDraft?.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false
         )
-        XCTAssertEqual(store.strategyDraft?.basic.exit.stopLossPct ?? 0, 1.2, accuracy: 0.0001)
+        XCTAssertEqual(store.strategyDraft?.basic.exit.stopLossPct ?? 0, 1.0, accuracy: 0.0001)
         XCTAssertNil(store.lastStrategySettingsErrorMessage)
     }
 
@@ -145,7 +145,7 @@ final class AutotradingMacTests: XCTestCase {
         )
         XCTAssertEqual(
             store.strategyDraft?.strategyParams["opening_pullback_reentry"]?["candidate_start_time"]?.stringValue,
-            "09:02"
+            "09:03"
         )
     }
 
