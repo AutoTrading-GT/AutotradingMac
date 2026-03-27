@@ -34,10 +34,10 @@ struct DashboardView: View {
                 trend: .flat
             )
             dashboardMetricCard(
-                label: "평가손익",
-                value: valuationPnLText,
-                change: valuationPnLChangeText,
-                trend: trendForValue(store.pnlSummary.unrealizedPnlTotal)
+                label: "오늘 평가손익 합계",
+                value: todayTotalPnLText,
+                change: todayTotalPnLChangeText,
+                trend: trendForValue(todayTotalPnLValue)
             )
             dashboardMetricCard(
                 label: "최근 7일 승률",
@@ -846,12 +846,15 @@ struct DashboardView: View {
 
     private var cashText: String { DisplayFormatters.krw(accountSummary?.cashBalance) }
 
-    private var valuationPnLText: String { DisplayFormatters.pnl(accountSummary?.unrealizedPnlTotal) }
+    private var todayTotalPnLValue: Double? {
+        store.strategyGroupApplyStatus("risk")?.effectiveValue.doubleValue(for: "today_total_pnl")
+    }
 
-    private var valuationPnLChangeText: String? {
-        guard let pnl = accountSummary?.unrealizedPnlTotal else { return nil }
-        guard let total = totalEvaluationValue, total > 0 else { return nil }
-        return DisplayFormatters.percent((pnl / total) * 100.0)
+    private var todayTotalPnLText: String { DisplayFormatters.pnl(todayTotalPnLValue) }
+
+    private var todayTotalPnLChangeText: String? {
+        guard todayTotalPnLValue != nil else { return nil }
+        return "기준: \(currentOrderModeLabel) · 오늘"
     }
 
     private var winRateValue: Double? {
