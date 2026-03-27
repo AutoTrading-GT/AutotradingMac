@@ -44,7 +44,9 @@ struct DashboardView: View {
                 value: winRateText,
                 change: winRateChangeText,
                 trend: .flat,
-                iconSystemName: "target"
+                iconSystemName: "target",
+                secondaryValue: weeklyRealizedPnLText,
+                secondaryTrend: trendForValue(weeklyRealizedPnLSum)
             )
         }
     }
@@ -54,7 +56,9 @@ struct DashboardView: View {
         value: String,
         change: String?,
         trend: DashboardTrend,
-        iconSystemName: String? = nil
+        iconSystemName: String? = nil,
+        secondaryValue: String? = nil,
+        secondaryTrend: DashboardTrend? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -68,10 +72,29 @@ struct DashboardView: View {
                 }
             }
 
-            Text(value)
-                .font(.title3.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+            if let secondaryValue {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(value)
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    Text("|")
+                        .font(.headline.weight(.light))
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary.opacity(0.45))
+
+                    Text(secondaryValue)
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle((secondaryTrend ?? .flat).color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            } else {
+                Text(value)
+                    .font(.title3.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
 
             if let change {
                 HStack(spacing: 6) {
@@ -846,6 +869,17 @@ struct DashboardView: View {
     private var winRateChangeText: String? {
         guard winRateValue != nil else { return nil }
         return "기준: \(currentOrderModeLabel) · 최근 7일"
+    }
+
+    private var weeklyRealizedPnLSum: Double? {
+        let pnls = weeklyClosedPositionsForCurrentMode.compactMap(\.realizedPnl)
+        guard !pnls.isEmpty else { return nil }
+        return pnls.reduce(0.0, +)
+    }
+
+    private var weeklyRealizedPnLText: String? {
+        guard let weeklyRealizedPnLSum else { return nil }
+        return DisplayFormatters.pnl(weeklyRealizedPnLSum)
     }
 
     private var currentOrderModeForWinRate: String {
