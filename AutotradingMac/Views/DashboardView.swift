@@ -267,6 +267,20 @@ struct DashboardView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                                if item.action == .sell {
+                                    Group {
+                                        if let sellChangeText = signalSellChangeText(item) {
+                                            Text(sellChangeText)
+                                                .font(.caption.weight(.semibold).monospacedDigit())
+                                                .foregroundStyle(signalSellChangeColor(item))
+                                        } else {
+                                            Text(" ")
+                                                .font(.caption.weight(.semibold))
+                                        }
+                                    }
+                                    .frame(width: DashboardSignalColumns.sellChangeWidth, alignment: .trailing)
+                                }
+
                                 signalBadge(item.action.label, tone: actionTone(item.action))
                                     .frame(width: DashboardSignalColumns.actionWidth, alignment: .center)
 
@@ -513,6 +527,7 @@ struct DashboardView: View {
     private var signalItems: [DashboardSignalSummaryRow] {
         DashboardSignalSummaryBuilder.build(
             signals: store.recentSignals,
+            exitEvents: store.recentExitEvents,
             strategyEvents: store.recentStrategyEvents,
             riskDecisions: store.recentRiskDecisions,
             orders: store.recentOrders,
@@ -992,6 +1007,15 @@ struct DashboardView: View {
         return "\(strategyLabel) · \(item.summary)"
     }
 
+    private func signalSellChangeText(_ item: DashboardSignalSummaryRow) -> String? {
+        guard item.action == .sell else { return nil }
+        return DisplayFormatters.signedPercent(item.sellChangePct)
+    }
+
+    private func signalSellChangeColor(_ item: DashboardSignalSummaryRow) -> Color {
+        trendForValue(item.sellChangePct).color
+    }
+
     private func closeReasonText(_ reason: String?, summary: String?) -> String {
         if let summary, !summary.isEmpty {
             return summary
@@ -1132,6 +1156,7 @@ private enum DashboardScannerColumns {
 }
 
 private enum DashboardSignalColumns {
+    static let sellChangeWidth: CGFloat = 62
     static let actionWidth: CGFloat = 56
     static let statusWidth: CGFloat = 74
 }

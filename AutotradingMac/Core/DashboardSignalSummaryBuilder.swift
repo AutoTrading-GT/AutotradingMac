@@ -46,6 +46,7 @@ struct DashboardSignalSummaryRow: Identifiable {
     let summary: String
     let action: DashboardSignalAction
     let status: DashboardSignalStatus
+    let sellChangePct: Double?
     let timestamp: Date
 
     var id: String { code }
@@ -56,6 +57,7 @@ enum DashboardSignalSummaryBuilder {
 
     static func build(
         signals: [SignalSnapshotItem],
+        exitEvents: [ExitEventSnapshotItem],
         strategyEvents: [StrategyEventSnapshotItem],
         riskDecisions: [RiskDecisionSnapshotItem],
         orders: [OrderSnapshotItem],
@@ -66,6 +68,16 @@ enum DashboardSignalSummaryBuilder {
     ) -> [DashboardSignalSummaryRow] {
         var candidatesByCode: [String: [Candidate]] = [:]
         let orderByID = Dictionary(uniqueKeysWithValues: orders.map { ($0.orderId, $0) })
+        let latestExitPctByCode = latestSellPctByCode(
+            rows: exitEvents,
+            code: { $0.code },
+            percent: { $0.unrealizedPnlPct }
+        )
+        let latestClosedPctByCode = latestSellPctByCode(
+            rows: closedPositions,
+            code: { $0.code },
+            percent: { $0.realizedPnlPct }
+        )
 
         func append(_ candidate: Candidate?) {
             guard let candidate else { return }
@@ -82,6 +94,12 @@ enum DashboardSignalSummaryBuilder {
                     summary: row.summary ?? signalSummary(signalType: row.signalType),
                     action: action(forSignalType: row.signalType),
                     status: .monitoring,
+                    sellChangePct: sellChangePct(
+                        code: row.code,
+                        action: action(forSignalType: row.signalType),
+                        latestExitPctByCode: latestExitPctByCode,
+                        latestClosedPctByCode: latestClosedPctByCode
+                    ),
                     timestamp: row.createdAt,
                     priority: 10
                 )
@@ -99,6 +117,12 @@ enum DashboardSignalSummaryBuilder {
                     summary: row.summary ?? blockedSummary(reason: row.reasonCode ?? row.reason),
                     action: action(forSignalType: signalType),
                     status: .blocked,
+                    sellChangePct: sellChangePct(
+                        code: code,
+                        action: action(forSignalType: signalType),
+                        latestExitPctByCode: latestExitPctByCode,
+                        latestClosedPctByCode: latestClosedPctByCode
+                    ),
                     timestamp: row.createdAt,
                     priority: 25
                 )
@@ -120,6 +144,12 @@ enum DashboardSignalSummaryBuilder {
                         summary: row.summary ?? approvedSummary(signalType: signalType),
                         action: action(forSignalType: signalType),
                         status: .pending,
+                        sellChangePct: sellChangePct(
+                            code: code,
+                            action: action(forSignalType: signalType),
+                            latestExitPctByCode: latestExitPctByCode,
+                            latestClosedPctByCode: latestClosedPctByCode
+                        ),
                         timestamp: row.createdAt,
                         priority: 20
                     )
@@ -137,6 +167,12 @@ enum DashboardSignalSummaryBuilder {
                     summary: row.summary ?? blockedSummary(reason: blockedReason),
                     action: action(forSignalType: signalType),
                     status: .blocked,
+                    sellChangePct: sellChangePct(
+                        code: code,
+                        action: action(forSignalType: signalType),
+                        latestExitPctByCode: latestExitPctByCode,
+                        latestClosedPctByCode: latestClosedPctByCode
+                    ),
                     timestamp: row.createdAt,
                     priority: 30
                 )
@@ -159,6 +195,12 @@ enum DashboardSignalSummaryBuilder {
                         ),
                         action: action(forSide: row.side),
                         status: .pending,
+                        sellChangePct: sellChangePct(
+                            code: row.code,
+                            action: action(forSide: row.side),
+                            latestExitPctByCode: latestExitPctByCode,
+                            latestClosedPctByCode: latestClosedPctByCode
+                        ),
                         timestamp: row.updatedAt,
                         priority: 40
                     )
@@ -172,6 +214,12 @@ enum DashboardSignalSummaryBuilder {
                         summary: row.executionReason.map { blockedSummary(reason: $0) } ?? "주문 거부",
                         action: action(forSide: row.side),
                         status: .blocked,
+                        sellChangePct: sellChangePct(
+                            code: row.code,
+                            action: action(forSide: row.side),
+                            latestExitPctByCode: latestExitPctByCode,
+                            latestClosedPctByCode: latestClosedPctByCode
+                        ),
                         timestamp: row.updatedAt,
                         priority: 35
                     )
@@ -189,6 +237,12 @@ enum DashboardSignalSummaryBuilder {
                     summary: fillSummary(side: row.side, executionReason: relatedOrder?.executionReason),
                     action: action(forSide: row.side),
                     status: .executed,
+                    sellChangePct: sellChangePct(
+                        code: row.code,
+                        action: action(forSide: row.side),
+                        latestExitPctByCode: latestExitPctByCode,
+                        latestClosedPctByCode: latestClosedPctByCode
+                    ),
                     timestamp: row.filledAt,
                     priority: 50
                 )
@@ -205,6 +259,7 @@ enum DashboardSignalSummaryBuilder {
                     summary: row.summary ?? closeSummary(reason: row.reasonCode ?? row.reason),
                     action: .sell,
                     status: .executed,
+                    sellChangePct: normalizedPnLPercent(row.realizedPnlPct),
                     timestamp: row.createdAt,
                     priority: 60
                 )
@@ -225,6 +280,7 @@ enum DashboardSignalSummaryBuilder {
                     summary: $0.summary,
                     action: $0.action,
                     status: $0.status,
+                    sellChangePct: $0.sellChangePct,
                     timestamp: $0.timestamp
                 )
             }
@@ -430,6 +486,43 @@ enum DashboardSignalSummaryBuilder {
         return normalized
     }
 
+    private static func normalizedPnLPercent(_ value: Double?) -> Double? {
+        guard let value, value.isFinite else { return nil }
+        if abs(value) <= 1.5 {
+            return value * 100.0
+        }
+        return value
+    }
+
+    private static func sellChangePct(
+        code: String,
+        action: DashboardSignalAction,
+        latestExitPctByCode: [String: Double],
+        latestClosedPctByCode: [String: Double]
+    ) -> Double? {
+        guard action == .sell else { return nil }
+        let normalizedCode = normalizedCode(code)
+        guard let normalizedCode else { return nil }
+        return latestClosedPctByCode[normalizedCode] ?? latestExitPctByCode[normalizedCode]
+    }
+
+    private static func latestSellPctByCode<Row>(
+        rows: [Row],
+        code: (Row) -> String?,
+        percent: (Row) -> Double?
+    ) -> [String: Double] {
+        var result: [String: Double] = [:]
+        for row in rows {
+            guard
+                let normalizedCode = normalizedCode(code(row)),
+                result[normalizedCode] == nil,
+                let normalizedPct = normalizedPnLPercent(percent(row))
+            else { continue }
+            result[normalizedCode] = normalizedPct
+        }
+        return result
+    }
+
     private static func normalize(_ value: String?) -> String {
         (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
@@ -455,6 +548,7 @@ enum DashboardSignalSummaryBuilder {
         let summary: String
         let action: DashboardSignalAction
         let status: DashboardSignalStatus
+        let sellChangePct: Double?
         let timestamp: Date
         let priority: Int
     }
