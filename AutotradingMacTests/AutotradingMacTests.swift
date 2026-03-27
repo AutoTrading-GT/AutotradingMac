@@ -330,7 +330,7 @@ final class AutotradingMacTests: XCTestCase {
     }
 
     @MainActor
-    func test_monitoringStore_pollsSnapshotPeriodicallyWhenAccountModeIsLive() async throws {
+    func test_monitoringStore_doesNotPollSnapshotAutomaticallyWhenAccountModeIsLive() async throws {
         let strategySnapshot = Self.makeStrategySettingsSnapshot()
         let envelope = StrategySettingsResponseEnvelope(
             data: strategySnapshot,
@@ -355,8 +355,7 @@ final class AutotradingMacTests: XCTestCase {
             ),
             webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
             localNotificationService: MockLocalNotificationService(),
-            connectWebSocketOnStart: false,
-            liveDashboardRefreshInterval: 0.05
+            connectWebSocketOnStart: false
         )
 
         await store.start()
@@ -364,7 +363,7 @@ final class AutotradingMacTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 180_000_000)
 
-        XCTAssertGreaterThanOrEqual(await counter.currentValue(), 3)
+        XCTAssertEqual(await counter.currentValue(), 1)
     }
 
     func test_resultFeedReducer_prefersCloseOverOrderAndFillInSameFlow() {

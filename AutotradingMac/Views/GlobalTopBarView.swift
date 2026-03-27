@@ -63,24 +63,35 @@ struct GlobalTopBarView: View {
 
                 separatorPill
 
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("새로고침 \(lastUpdatedRelativeText)")
-                        .lineLimit(1)
+                Button {
+                    Task { await store.reloadSnapshot() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if store.isLoadingSnapshot {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        Text("새로고침 \(lastUpdatedRelativeText)")
+                            .lineLimit(1)
+                    }
+                    .font(DesignTokens.Typography.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(DesignTokens.Colors.surface1)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
+                    )
                 }
-                .font(DesignTokens.Typography.caption)
-                .foregroundStyle(DesignTokens.Colors.textSecondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(DesignTokens.Colors.surface1)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(DesignTokens.Colors.borderSubtle, lineWidth: 1)
-                )
+                .buttonStyle(.plain)
+                .disabled(store.isLoadingSnapshot)
 
                 separatorPill
 
