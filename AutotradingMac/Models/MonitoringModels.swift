@@ -269,6 +269,8 @@ struct AccountSummarySnapshot: Decodable {
     let totalAccountValue: Double?
     let cashBalance: Double?
     let unrealizedPnlTotal: Double?
+    let previousTotalAccountValue: Double?
+    let dailyAssetChange: Double?
 
     enum CodingKeys: String, CodingKey {
         case mode
@@ -281,6 +283,8 @@ struct AccountSummarySnapshot: Decodable {
         case totalAccountValue
         case cashBalance
         case unrealizedPnlTotal
+        case previousTotalAccountValue
+        case dailyAssetChange
     }
 
     init(from decoder: Decoder) throws {
@@ -295,6 +299,8 @@ struct AccountSummarySnapshot: Decodable {
         totalAccountValue = container.decodeDoubleFlexible(forKey: .totalAccountValue)
         cashBalance = container.decodeDoubleFlexible(forKey: .cashBalance)
         unrealizedPnlTotal = container.decodeDoubleFlexible(forKey: .unrealizedPnlTotal)
+        previousTotalAccountValue = container.decodeDoubleFlexible(forKey: .previousTotalAccountValue)
+        dailyAssetChange = container.decodeDoubleFlexible(forKey: .dailyAssetChange)
     }
 }
 

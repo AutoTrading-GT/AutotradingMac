@@ -34,10 +34,14 @@ struct DashboardView: View {
                 trend: .flat
             )
             dashboardMetricCard(
-                label: "오늘 평가손익 합계",
+                label: "Today 평가손익",
                 value: todayTotalPnLText,
                 change: todayTotalPnLChangeText,
-                trend: trendForValue(todayTotalPnLValue)
+                trend: trendForValue(todayTotalPnLValue),
+                secondaryValue: todayTotalPnLRateText,
+                secondaryTrend: trendForValue(todayTotalPnLValue),
+                secondarySeparator: nil,
+                valueColor: trendForValue(todayTotalPnLValue).color
             )
             dashboardMetricCard(
                 label: "최근 7일 승률",
@@ -58,7 +62,9 @@ struct DashboardView: View {
         trend: DashboardTrend,
         iconSystemName: String? = nil,
         secondaryValue: String? = nil,
-        secondaryTrend: DashboardTrend? = nil
+        secondaryTrend: DashboardTrend? = nil,
+        secondarySeparator: String? = "|",
+        valueColor: Color? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -76,12 +82,15 @@ struct DashboardView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(value)
                         .font(.title3.weight(.semibold))
+                        .foregroundStyle(valueColor ?? DesignTokens.Colors.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
 
-                    Text("|")
-                        .font(.headline.weight(.light))
-                        .foregroundStyle(DesignTokens.Colors.textQuaternary.opacity(0.45))
+                    if let secondarySeparator {
+                        Text(secondarySeparator)
+                            .font(.headline.weight(.light))
+                            .foregroundStyle(DesignTokens.Colors.textQuaternary.opacity(0.45))
+                    }
 
                     Text(secondaryValue)
                         .font(.title3.weight(.medium))
@@ -92,6 +101,7 @@ struct DashboardView: View {
             } else {
                 Text(value)
                     .font(.title3.weight(.semibold))
+                    .foregroundStyle(valueColor ?? DesignTokens.Colors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
@@ -866,6 +876,19 @@ struct DashboardView: View {
     }
 
     private var todayTotalPnLText: String { DisplayFormatters.pnl(todayTotalPnLValue) }
+
+    private var todayTotalPnLRateValue: Double? {
+        guard let todayTotalPnLValue else { return nil }
+        guard let previousTotalAccountValue = accountSummary?.previousTotalAccountValue, previousTotalAccountValue != 0 else {
+            return nil
+        }
+        return (todayTotalPnLValue / previousTotalAccountValue) * 100.0
+    }
+
+    private var todayTotalPnLRateText: String? {
+        guard let todayTotalPnLRateValue else { return nil }
+        return "(\(DisplayFormatters.signedPercent(todayTotalPnLRateValue)))"
+    }
 
     private var todayTotalPnLChangeText: String? {
         guard todayTotalPnLValue != nil else { return nil }
