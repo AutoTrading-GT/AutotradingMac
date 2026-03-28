@@ -15,10 +15,11 @@ final class AutotradingMacTests: XCTestCase {
         XCTAssertEqual(snapshot.activeStrategyId, "turnover_surge_momentum")
         XCTAssertEqual(
             snapshot.strategyTemplates.map(\.strategyId),
-            ["turnover_surge_momentum", "opening_pullback_reentry", "intraday_breakout"]
+            ["turnover_surge_momentum", "opening_pullback_reentry", "turnover_persistence_breakout", "intraday_breakout"]
         )
         XCTAssertEqual(snapshot.template(id: "turnover_surge_momentum")?.status, "active")
         XCTAssertEqual(snapshot.template(id: "opening_pullback_reentry")?.status, "available")
+        XCTAssertEqual(snapshot.template(id: "turnover_persistence_breakout")?.status, "available")
         XCTAssertEqual(snapshot.template(id: "intraday_breakout")?.status, "preview_only")
         XCTAssertEqual(
             snapshot.strategyParams["turnover_surge_momentum"]?["selection_mode"]?.stringValue,
@@ -65,8 +66,18 @@ final class AutotradingMacTests: XCTestCase {
             0.20,
             accuracy: 0.0001
         )
+        XCTAssertEqual(
+            snapshot.strategyParams["turnover_persistence_breakout"]?["top_n_watch"]?.intValue,
+            12
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["turnover_persistence_breakout"]?["min_presence_ratio"]?.doubleValue,
+            0.60,
+            accuracy: 0.0001
+        )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
+        XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("turnover_persistence_breakout") ?? false)
     }
 
     @MainActor

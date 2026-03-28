@@ -360,6 +360,8 @@ struct SettingsView: View {
     ) -> some View {
         if template.strategyId == "opening_pullback_reentry" {
             openingPullbackStrategyPanel(template: template)
+        } else if template.strategyId == "turnover_persistence_breakout" {
+            turnoverPersistenceBreakoutStrategyPanel(template: template)
         } else {
             VStack(alignment: .leading, spacing: strategySectionSpacing) {
                 basicStrategyPanel(template: template)
@@ -1187,6 +1189,345 @@ struct SettingsView: View {
                             onChange: { store.updateActiveStrategyParamInt("time_stop_hard_minutes", value: $0, range: 1...480) }
                         )
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func turnoverPersistenceBreakoutStrategyPanel(
+        template: StrategyTemplateSnapshot
+    ) -> some View {
+        if let context = turnoverPersistenceBreakoutRenderContext(template: template) {
+            strategyPanel(
+                title: "선택한 전략 설정",
+                subtitle: "\(template.displayName)의 watchlist → persistence → VWAP/box breakout 진입 규칙을 편집합니다."
+            ) {
+                VStack(alignment: .leading, spacing: 22) {
+                    persistenceWatchlistSection()
+                    persistenceRuleSection()
+                    persistenceBreakoutSection()
+                    persistenceSizingSection()
+                    persistenceExitSection()
+
+                    strategyPanel(
+                        title: "구현 메모",
+                        subtitle: "v1은 상태형 persistence + breakout 골격 구현이 목적이며, score 최적화와 고급 체결 모델은 아직 없습니다.",
+                        prominence: .secondary
+                    ) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            strategyCompactNote(
+                                title: "현재 적용",
+                                detail: "new_entry/rank_jump는 watchlist admission 재료로만 쓰고, 최종 진입은 persistence + VWAP + box breakout을 모두 통과해야 발생합니다."
+                            )
+                            strategyCompactNote(
+                                title: "현재 제약",
+                                detail: "정교한 persistence score, orderflow quality scoring, trailing exit은 아직 미구현이며 v1은 최소 골격만 연결돼 있습니다."
+                            )
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 18)
+                    }
+                }
+                .id(context.renderIdentity)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 18)
+            }
+        } else {
+            strategyPanel(
+                title: "전략 설정 준비 중",
+                subtitle: "\(template.displayName) 파라미터를 동기화한 뒤 편집 폼을 표시합니다."
+            ) {
+                HStack(alignment: .center, spacing: 12) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("persistence breakout 템플릿과 draft 상태를 확인하는 중입니다.")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 18)
+            }
+        }
+    }
+
+    private func persistenceWatchlistSection() -> some View {
+        strategyCategoryBlock(
+            title: "Watchlist",
+            summary: "rank event는 즉시 매수 신호가 아니라 감시 목록 편입 재료로만 사용합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "랭킹 기준") {
+                    strategySegmentedControl(
+                        options: [
+                            AppSegmentedOption(value: "turnover", title: "거래대금 중심"),
+                            AppSegmentedOption(value: "surge", title: "급등률 중심"),
+                        ],
+                        selection: activeStrategyStringBinding("selection_mode", defaultValue: "turnover"),
+                        minSegmentWidth: 138,
+                        height: 38
+                    )
+                }
+
+                openingStrategyFieldCard(title: "Watchlist 범위") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandStepperTile(
+                            label: "관찰 범위",
+                            value: activeStrategyIntValue("top_n_watch", defaultValue: 12),
+                            range: 1...30,
+                            step: 1,
+                            unit: "Top-N",
+                            onChange: { store.updateActiveStrategyParamInt("top_n_watch", value: $0, range: 1...30) }
+                        )
+                        strategyBandStepperTile(
+                            label: "진입 허용 순위",
+                            value: activeStrategyIntValue("top_n_trade", defaultValue: 8),
+                            range: 1...30,
+                            step: 1,
+                            unit: "Top-N",
+                            onChange: { store.updateActiveStrategyParamInt("top_n_trade", value: $0, range: 1...30) }
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "감시 시간대") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandTextField(
+                            label: "감시 시작",
+                            placeholder: "09:05",
+                            unit: "KST",
+                            text: activeStrategyStringBinding("candidate_start_time")
+                        )
+                        strategyBandTextField(
+                            label: "진입 종료",
+                            placeholder: "14:30",
+                            unit: "KST",
+                            text: activeStrategyStringBinding("entry_end_time")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistenceRuleSection() -> some View {
+        strategyCategoryBlock(
+            title: "Persistence",
+            summary: "watchlist 편입 후 최근 rank 잔류율이 충분해야만 breakout 후보로 남깁니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "지속성 기준") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandStepperTile(
+                            label: "확인 시간",
+                            value: activeStrategyIntValue("persistence_lookback_minutes", defaultValue: 10),
+                            range: 1...120,
+                            step: 1,
+                            unit: "분",
+                            onChange: {
+                                store.updateActiveStrategyParamInt(
+                                    "persistence_lookback_minutes",
+                                    value: $0,
+                                    range: 1...120
+                                )
+                            }
+                        )
+                        strategyBandNumericField(
+                            label: "최소 잔류 비율",
+                            unit: "ratio",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_presence_ratio",
+                                defaultValue: 0.60,
+                                range: 0.01...1.0
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "룰 메모") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        strategyCompactNote(
+                            title: "현재 구현",
+                            detail: "`rank_maintained`는 독립 매수신호가 아니라 persistence 계산 재료입니다."
+                        )
+                        strategyCompactNote(
+                            title: "현재 제약",
+                            detail: "100점 만점 persistence score는 아직 없고, v1은 통과/미통과 규칙으로만 판단합니다."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistenceBreakoutSection() -> some View {
+        strategyCategoryBlock(
+            title: "VWAP / Box Breakout",
+            summary: "최종 진입은 VWAP 상태와 최근 3~5개 1분봉 box 상단 돌파가 함께 확인될 때만 허용합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "VWAP 조건") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "VWAP 필터 사용",
+                            isOn: activeStrategyBoolBinding("use_vwap_filter", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "VWAP 위 종가 비율",
+                            unit: "ratio",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_above_vwap_ratio",
+                                defaultValue: 0.67,
+                                range: 0.01...1.0
+                            )
+                        )
+                        strategyBandToggleControl(
+                            title: "VWAP 재회복 허용",
+                            isOn: activeStrategyBoolBinding("allow_reclaim", defaultValue: true)
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "박스 정의") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandStepperTile(
+                            label: "최소 봉 수",
+                            value: activeStrategyIntValue("box_bars_min", defaultValue: 3),
+                            range: 2...20,
+                            step: 1,
+                            unit: "봉",
+                            onChange: { store.updateActiveStrategyParamInt("box_bars_min", value: $0, range: 2...20) }
+                        )
+                        strategyBandStepperTile(
+                            label: "최대 봉 수",
+                            value: activeStrategyIntValue("box_bars_max", defaultValue: 5),
+                            range: 2...30,
+                            step: 1,
+                            unit: "봉",
+                            onChange: { store.updateActiveStrategyParamInt("box_bars_max", value: $0, range: 2...30) }
+                        )
+                        strategyBandNumericField(
+                            label: "최대 박스 범위",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_box_retrace_pct",
+                                defaultValue: 1.8,
+                                range: 0.1...20.0
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "돌파 확인") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "돌파 거래량 배수",
+                            unit: "x",
+                            text: activeStrategyDoubleTextBinding(
+                                "breakout_volume_multiplier",
+                                defaultValue: 1.5,
+                                range: 0.1...20.0
+                            )
+                        )
+                        strategyBadge(text: "ENGINE WIRED", tone: .success, size: .compact)
+                        strategyCompactNote(
+                            title: "실행 신호",
+                            detail: localizedSignalDescription("turnover_persistence_breakout")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistenceSizingSection() -> some View {
+        strategyCategoryBlock(
+            title: "포지션 사이징",
+            summary: "v1은 공통 position_size_pct fallback 또는 box low 기반 risk-per-trade sizing을 함께 지원합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "리스크 기준") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "리스크 사이징 사용",
+                            isOn: activeStrategyBoolBinding("use_risk_per_trade_sizing", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "거래당 최대 손실",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "risk_per_trade_pct",
+                                defaultValue: 0.30,
+                                range: 0.01...10.0
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "상한 / 버퍼") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최대 포지션 상한",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_position_size_pct_cap",
+                                defaultValue: 10.0,
+                                range: 0.1...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "슬리피지 버퍼",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "sizing_slippage_buffer_pct",
+                                defaultValue: 0.15,
+                                range: 0.0...5.0
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistenceExitSection() -> some View {
+        strategyCategoryBlock(
+            title: "청산",
+            summary: "v1은 보수적인 손절 상한, 기본 익절, hard time stop만 연결합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "익절 / 손절") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "익절",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "target_profit_pct",
+                                defaultValue: 3.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "손절 상한",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "stop_loss_pct",
+                                defaultValue: 1.5,
+                                range: 0.1...100.0
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "시간청산") {
+                    strategyBandStepperTile(
+                        label: "최대 보유 시간",
+                        value: activeStrategyIntValue("max_holding_minutes", defaultValue: 45),
+                        range: 1...10_080,
+                        step: 1,
+                        unit: "분",
+                        onChange: { store.updateActiveStrategyParamInt("max_holding_minutes", value: $0, range: 1...10_080) }
+                    )
                 }
             }
         }
@@ -2831,7 +3172,13 @@ struct SettingsView: View {
     }
 
     private var strategySignalTypeOptions: [String] {
-        ["new_entry", "rank_jump", "rank_maintained", "opening_pullback_reentry"]
+        [
+            "new_entry",
+            "rank_jump",
+            "rank_maintained",
+            "opening_pullback_reentry",
+            "turnover_persistence_breakout",
+        ]
     }
 
     private var momentumSignalTypeOptions: [String] {
@@ -2848,6 +3195,10 @@ struct SettingsView: View {
         let renderIdentity: String
     }
 
+    private struct TurnoverPersistenceBreakoutRenderContext {
+        let renderIdentity: String
+    }
+
     private var currentStrategyDraftSnapshot: StrategySettingsSnapshot? {
         store.strategyDraft ?? store.strategySettings
     }
@@ -2861,6 +3212,19 @@ struct SettingsView: View {
         let params = draft.strategyParams[template.strategyId] ?? [:]
         guard !params.isEmpty else { return nil }
         return OpeningPullbackRenderContext(
+            renderIdentity: "\(resolvedTemplate.strategyId)-\(params.count)-\(draft.strategyTemplates.count)"
+        )
+    }
+
+    private func turnoverPersistenceBreakoutRenderContext(
+        template: StrategyTemplateSnapshot
+    ) -> TurnoverPersistenceBreakoutRenderContext? {
+        guard let draft = currentStrategyDraftSnapshot else { return nil }
+        guard draft.activeStrategyId == template.strategyId else { return nil }
+        guard let resolvedTemplate = draft.template(id: template.strategyId), resolvedTemplate.selectable else { return nil }
+        let params = draft.strategyParams[template.strategyId] ?? [:]
+        guard !params.isEmpty else { return nil }
+        return TurnoverPersistenceBreakoutRenderContext(
             renderIdentity: "\(resolvedTemplate.strategyId)-\(params.count)-\(draft.strategyTemplates.count)"
         )
     }
@@ -3236,6 +3600,8 @@ struct SettingsView: View {
             return "상위권 유지"
         case "opening_pullback_reentry":
             return "Opening Pullback Re-entry"
+        case "turnover_persistence_breakout":
+            return "Turnover Persistence Breakout"
         default:
             return type
         }
@@ -3251,6 +3617,8 @@ struct SettingsView: View {
             return "상위권을 유지하며 추세가 이어지는 종목"
         case "opening_pullback_reentry":
             return "개장 초 impulse 이후 눌림을 소화하고 단기 고점/VWAP 재확인 뒤 재상승하는 종목"
+        case "turnover_persistence_breakout":
+            return "watchlist 편입 후 persistence, VWAP, 1분봉 box breakout을 모두 통과한 종목"
         default:
             return "사용자 정의 신호"
         }

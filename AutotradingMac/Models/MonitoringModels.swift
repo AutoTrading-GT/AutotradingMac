@@ -932,6 +932,128 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                 ]
             ),
             StrategyTemplateSnapshot(
+                strategyId: "turnover_persistence_breakout",
+                displayName: "Turnover Persistence Breakout",
+                shortDescription: "거래대금 상위권 지속성과 VWAP/박스 돌파를 함께 확인한 뒤 진입하는 추세 지속 전략입니다.",
+                category: "persistence_breakout",
+                status: activeStrategyId == "turnover_persistence_breakout" ? "active" : "available",
+                wiredToEngine: true,
+                selectable: true,
+                implementationNote: "v1은 watchlist 편입 -> persistence 평가 -> VWAP/box breakout 확인 -> 진입의 최소 골격만 연결돼 있습니다. 정교한 scoring, quality scoring, 고급 trailing exit은 아직 없습니다.",
+                configurableFields: [
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "selection_mode",
+                        label: "랭킹 기준",
+                        inputType: "enum",
+                        group: "watchlist",
+                        description: "v1 기본은 거래대금이지만 랭킹 소스를 유지할 수 있습니다.",
+                        options: ["turnover", "surge"],
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "top_n_watch",
+                        label: "Watchlist 관찰 범위",
+                        inputType: "int",
+                        group: "watchlist",
+                        description: "watchlist 편입과 persistence 추적에 사용할 상위 범위입니다.",
+                        options: nil,
+                        unit: "symbols",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "top_n_trade",
+                        label: "최종 진입 허용 순위",
+                        inputType: "int",
+                        group: "watchlist",
+                        description: "최종 돌파 진입 시 허용할 rank 상한입니다.",
+                        options: nil,
+                        unit: "rank",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "persistence_lookback_minutes",
+                        label: "Persistence 확인 시간",
+                        inputType: "int",
+                        group: "persistence",
+                        description: "최근 몇 분의 랭킹 이력을 지속성 판단에 사용할지 정합니다.",
+                        options: nil,
+                        unit: "minutes",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "min_presence_ratio",
+                        label: "최소 잔류 비율",
+                        inputType: "float",
+                        group: "persistence",
+                        description: "lookback 구간에서 상위권에 남아 있어야 하는 최소 비율입니다.",
+                        options: nil,
+                        unit: "ratio",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "use_vwap_filter",
+                        label: "VWAP 필터 사용",
+                        inputType: "bool",
+                        group: "breakout",
+                        description: "VWAP 위 유지 또는 회복 여부를 최종 진입 전에 확인합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "box_bars_max",
+                        label: "박스 최대 봉 수",
+                        inputType: "int",
+                        group: "breakout",
+                        description: "박스 정의에 사용할 최대 1분봉 개수입니다.",
+                        options: nil,
+                        unit: "bars",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "breakout_volume_multiplier",
+                        label: "돌파 거래량 배수",
+                        inputType: "float",
+                        group: "breakout",
+                        description: "현재 1분봉 거래량이 최근 평균 대비 얼마나 커야 하는지 정합니다.",
+                        options: nil,
+                        unit: "x",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "target_profit_pct",
+                        label: "익절 기준",
+                        inputType: "float",
+                        group: "exit",
+                        description: "v1 기본 익절 비율입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "stop_loss_pct",
+                        label: "손절 상한",
+                        inputType: "float",
+                        group: "exit",
+                        description: "box low가 멀어질 때 사용할 보수적 손절 상한입니다.",
+                        options: nil,
+                        unit: "%",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_holding_minutes",
+                        label: "최대 보유 시간",
+                        inputType: "int",
+                        group: "exit",
+                        description: "v1 hard time stop 기준입니다.",
+                        options: nil,
+                        unit: "minutes",
+                        wired: true
+                    ),
+                ]
+            ),
+            StrategyTemplateSnapshot(
                 strategyId: "intraday_breakout",
                 displayName: "Intraday Breakout",
                 shortDescription: "장중 박스 상단 돌파와 거래량 확인 후 진입하는 돌파형 전략 초안입니다.",
@@ -1198,6 +1320,31 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
                 "time_stop_soft_minutes": .number(15),
                 "time_stop_hard_minutes": .number(30),
             ],
+            "turnover_persistence_breakout": [
+                "selection_mode": .string("turnover"),
+                "top_n": .number(12),
+                "top_n_watch": .number(12),
+                "top_n_trade": .number(8),
+                "enabled_signal_types": .array([.string("turnover_persistence_breakout")]),
+                "candidate_start_time": .string("09:05"),
+                "entry_end_time": .string("14:30"),
+                "persistence_lookback_minutes": .number(10),
+                "min_presence_ratio": .number(0.60),
+                "use_vwap_filter": .bool(true),
+                "min_above_vwap_ratio": .number(0.67),
+                "allow_reclaim": .bool(true),
+                "box_bars_min": .number(3),
+                "box_bars_max": .number(5),
+                "max_box_retrace_pct": .number(1.8),
+                "breakout_volume_multiplier": .number(1.5),
+                "target_profit_pct": .number(3.0),
+                "stop_loss_pct": .number(1.5),
+                "max_holding_minutes": .number(45),
+                "use_risk_per_trade_sizing": .bool(true),
+                "risk_per_trade_pct": .number(0.30),
+                "max_position_size_pct_cap": .number(10.0),
+                "sizing_slippage_buffer_pct": .number(0.15),
+            ],
             "intraday_breakout": [
                 "breakout_window_minutes": .number(15),
                 "breakout_threshold_pct": .number(2.2),
@@ -1218,6 +1365,9 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
             var values = risk.allowedSignalTypes
             if !values.contains("opening_pullback_reentry") {
                 values.append("opening_pullback_reentry")
+            }
+            if !values.contains("turnover_persistence_breakout") {
+                values.append("turnover_persistence_breakout")
             }
             return values
         }()

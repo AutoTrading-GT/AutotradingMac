@@ -5,6 +5,7 @@
 백엔드(`autotrading-core`)의 REST snapshot + WebSocket delta를 수신해 상태를 표시합니다.
 
 ## 현재 범위
+- 백엔드 전략 전용 로직은 이제 `app/strategies/*` 아래에 있고, macOS 앱이 소비하는 monitoring/chart/settings API 계약은 그대로 유지된다.
 - Sidebar 기반 화면
   - Dashboard
   - Scanner
@@ -21,6 +22,7 @@
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
 - snapshot에는 `recent_strategy_events`가 포함되며, websocket `strategy.signal_filtered` 이벤트도 별도로 반영
+- snapshot/websocket은 `strategy.watchlist_updated`도 반영해 상태형 전략의 watchlist admission 변화를 보여준다.
 - 페이지별 SwiftUI `#Preview` 지원
   - Dashboard / Scanner / Chart / Stategy / Logs / Settings / Dev
   - Dev 하위(`Signals / Risk`, `Orders / Fills`, `Positions / PnL`, `Runtime / Workers`) 및 `GlobalTopBarView` 포함
@@ -149,6 +151,7 @@
   - 현재 템플릿:
     - `turnover_surge_momentum`: 실제 엔진 연결 전략, 선택 가능
     - `opening_pullback_reentry`: 실제 엔진 연결 전략, 선택 가능
+    - `turnover_persistence_breakout`: 실제 엔진 연결 전략, 선택 가능
     - `intraday_breakout`: `preview_only`, 메타/파라미터 프리뷰만 가능
   - 정보 구조/정렬 원칙:
     - 카드 전체 폭 양 끝에 라벨/값을 두는 긴 폼 구조를 줄이고, 내부 읽기 폭을 좁힌 그룹형 패널로 정리
@@ -157,6 +160,7 @@
     - 활성 전략 편집 패널과 공통 리스크/실행 패널은 시각적으로 분리한다
     - `turnover_surge_momentum`는 기존 Basic Strategy + Advanced Settings 편집 UI를 유지한다
     - `opening_pullback_reentry`는 `시간대 / 후보 선정 / 눌림 정의 / 재진입 조건 / 시장제도·거래안전 필터 / 청산` 전용 폼을 사용한다
+    - `turnover_persistence_breakout`는 `watchlist / persistence / breakout / sizing / exit` 전용 폼을 사용한다
     - `intraday_breakout` 같은 preview 템플릿은 값 미리보기만 제공한다
     - 공통 설정은 전략을 바꿔도 유지되며, 전략 전환과 별도의 패널에서 조정한다
     - `Basic Strategy`는 현재 활성 전략의 편집 패널로서 작은 카드 여러 개 대신 하나의 긴 가로 패널로 정리한다

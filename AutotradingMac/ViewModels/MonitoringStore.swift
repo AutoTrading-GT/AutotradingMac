@@ -84,7 +84,13 @@ final class MonitoringStore: ObservableObject {
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private let scannerStep = 10
     private let scannerMaxLimit = 30
-    private let strategySupportedSignalTypes = ["new_entry", "rank_jump", "rank_maintained", "opening_pullback_reentry"]
+    private let strategySupportedSignalTypes = [
+        "new_entry",
+        "rank_jump",
+        "rank_maintained",
+        "opening_pullback_reentry",
+        "turnover_persistence_breakout",
+    ]
     private let strategySelectionModes = ["turnover", "surge"]
     private var apiConnectionStatusClearTask: Task<Void, Never>?
     private var notificationStatusClearTask: Task<Void, Never>?
@@ -1281,6 +1287,9 @@ final class MonitoringStore: ObservableObject {
         if draft.strategyParams["opening_pullback_reentry"] == nil {
             draft.strategyParams["opening_pullback_reentry"] = defaultOpeningPullbackStrategyParams()
         }
+        if draft.strategyParams["turnover_persistence_breakout"] == nil {
+            draft.strategyParams["turnover_persistence_breakout"] = defaultTurnoverPersistenceBreakoutStrategyParams()
+        }
         if draft.strategyParams["intraday_breakout"] == nil {
             draft.strategyParams["intraday_breakout"] = defaultPreviewStrategyParams()
         }
@@ -1304,6 +1313,9 @@ final class MonitoringStore: ObservableObject {
         if draft.strategyParams["opening_pullback_reentry"] == nil {
             draft.strategyParams["opening_pullback_reentry"] = defaultOpeningPullbackStrategyParams()
         }
+        if draft.strategyParams["turnover_persistence_breakout"] == nil {
+            draft.strategyParams["turnover_persistence_breakout"] = defaultTurnoverPersistenceBreakoutStrategyParams()
+        }
         if draft.strategyParams["intraday_breakout"] == nil {
             draft.strategyParams["intraday_breakout"] = defaultPreviewStrategyParams()
         }
@@ -1326,6 +1338,16 @@ final class MonitoringStore: ObservableObject {
             return
         }
 
+        if normalizedStrategyId == "turnover_persistence_breakout" {
+            if draft.strategyParams[normalizedStrategyId] == nil {
+                draft.strategyParams[normalizedStrategyId] = defaultTurnoverPersistenceBreakoutStrategyParams()
+            }
+            if draft.strategyParams[normalizedStrategyId]?["top_n_watch"] != nil {
+                draft.strategyParams[normalizedStrategyId]?["top_n"] = draft.strategyParams[normalizedStrategyId]?["top_n_watch"]
+            }
+            return
+        }
+
         if draft.strategyParams[normalizedStrategyId] == nil {
             draft.strategyParams[normalizedStrategyId] = defaultPreviewStrategyParams()
         }
@@ -1343,6 +1365,9 @@ final class MonitoringStore: ObservableObject {
         if !normalizedAllowedSignalTypes.contains("opening_pullback_reentry") {
             normalizedAllowedSignalTypes.append("opening_pullback_reentry")
         }
+        if !normalizedAllowedSignalTypes.contains("turnover_persistence_breakout") {
+            normalizedAllowedSignalTypes.append("turnover_persistence_breakout")
+        }
         commonRisk["allowed_signal_types"] = .array(normalizedAllowedSignalTypes.map(JSONValue.string))
         commonRisk["cooldown_minutes"] = .number(Double(draft.risk.cooldownMinutes))
         commonRisk["signal_window_minutes"] = .number(Double(draft.risk.signalWindowMinutes))
@@ -1354,9 +1379,16 @@ final class MonitoringStore: ObservableObject {
     private func syncLegacySectionsFromActiveTemplate(_ draft: inout StrategySettingsSnapshot) {
         let activeStrategyId = draft.activeStrategyId.isEmpty ? "turnover_surge_momentum" : draft.activeStrategyId
         let normalizedActiveParams = draft.strategyParams[activeStrategyId] ?? [:]
+        if activeStrategyId == "turnover_persistence_breakout" {
+            draft.strategyParams[activeStrategyId]?["top_n"] = normalizedActiveParams["top_n_watch"] ?? normalizedActiveParams["top_n"] ?? .number(12)
+        }
 
         draft.scanner.defaultMode = normalizedActiveParams.stringValue(for: "selection_mode") ?? draft.scanner.defaultMode
-        draft.scanner.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.scanner.topN
+        if activeStrategyId == "turnover_persistence_breakout" {
+            draft.scanner.topN = normalizedActiveParams.intValue(for: "top_n_watch") ?? draft.scanner.topN
+        } else {
+            draft.scanner.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.scanner.topN
+        }
         if activeStrategyId == "turnover_surge_momentum" {
             draft.scanner.minTurnover = normalizedActiveParams.doubleValue(for: "min_turnover")
             draft.scanner.minChangePct = normalizedActiveParams.doubleValue(for: "min_change_pct")
@@ -1370,7 +1402,11 @@ final class MonitoringStore: ObservableObject {
             )
         }
 
-        draft.signal.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.signal.topN
+        if activeStrategyId == "turnover_persistence_breakout" {
+            draft.signal.topN = normalizedActiveParams.intValue(for: "top_n_watch") ?? draft.signal.topN
+        } else {
+            draft.signal.topN = normalizedActiveParams.intValue(for: "top_n") ?? draft.signal.topN
+        }
         if activeStrategyId == "turnover_surge_momentum" {
             draft.signal.rankJumpThreshold = normalizedActiveParams.intValue(for: "rank_jump_threshold") ?? draft.signal.rankJumpThreshold
             draft.signal.rankJumpWindowSeconds = normalizedActiveParams.intValue(for: "rank_jump_window_seconds") ?? draft.signal.rankJumpWindowSeconds
@@ -1394,6 +1430,10 @@ final class MonitoringStore: ObservableObject {
             draft.basic.exit.targetProfitPct = max(0, initialStopPct * firstTakeProfitR)
             draft.basic.exit.stopLossPct = initialStopPct
             draft.basic.exit.maxHoldingMinutes = normalizedActiveParams.intValue(for: "time_stop_hard_minutes") ?? draft.basic.exit.maxHoldingMinutes
+        } else if activeStrategyId == "turnover_persistence_breakout" {
+            draft.basic.exit.targetProfitPct = normalizedActiveParams.doubleValue(for: "target_profit_pct") ?? draft.basic.exit.targetProfitPct
+            draft.basic.exit.stopLossPct = normalizedActiveParams.doubleValue(for: "stop_loss_pct") ?? draft.basic.exit.stopLossPct
+            draft.basic.exit.maxHoldingMinutes = normalizedActiveParams.intValue(for: "max_holding_minutes") ?? draft.basic.exit.maxHoldingMinutes
         } else {
             draft.basic.exit.targetProfitPct = normalizedActiveParams.doubleValue(for: "target_profit_pct") ?? draft.basic.exit.targetProfitPct
             draft.basic.exit.stopLossPct = normalizedActiveParams.doubleValue(for: "stop_loss_pct") ?? draft.basic.exit.stopLossPct
@@ -1483,6 +1523,34 @@ final class MonitoringStore: ObservableObject {
         ]
     }
 
+    private func defaultTurnoverPersistenceBreakoutStrategyParams() -> [String: JSONValue] {
+        [
+            "selection_mode": .string("turnover"),
+            "top_n": .number(12),
+            "top_n_watch": .number(12),
+            "top_n_trade": .number(8),
+            "enabled_signal_types": .array([.string("turnover_persistence_breakout")]),
+            "candidate_start_time": .string("09:05"),
+            "entry_end_time": .string("14:30"),
+            "persistence_lookback_minutes": .number(10),
+            "min_presence_ratio": .number(0.60),
+            "use_vwap_filter": .bool(true),
+            "min_above_vwap_ratio": .number(0.67),
+            "allow_reclaim": .bool(true),
+            "box_bars_min": .number(3),
+            "box_bars_max": .number(5),
+            "max_box_retrace_pct": .number(1.8),
+            "breakout_volume_multiplier": .number(1.5),
+            "target_profit_pct": .number(3.0),
+            "stop_loss_pct": .number(1.5),
+            "max_holding_minutes": .number(45),
+            "use_risk_per_trade_sizing": .bool(true),
+            "risk_per_trade_pct": .number(0.30),
+            "max_position_size_pct_cap": .number(10.0),
+            "sizing_slippage_buffer_pct": .number(0.15),
+        ]
+    }
+
     private func defaultMomentumStrategyParams() -> [String: JSONValue] {
         [
             "selection_mode": .string("turnover"),
@@ -1521,6 +1589,8 @@ final class MonitoringStore: ObservableObject {
                 ?? defaultMomentumStrategyParams()
         case "opening_pullback_reentry":
             return defaultOpeningPullbackStrategyParams()
+        case "turnover_persistence_breakout":
+            return defaultTurnoverPersistenceBreakoutStrategyParams()
         case "intraday_breakout":
             return defaultPreviewStrategyParams()
         default:
@@ -1811,6 +1881,85 @@ final class MonitoringStore: ObservableObject {
                 if softTimeStopMinutes > hardTimeStopMinutes {
                     errors.append("소프트 시간청산은 하드 시간청산보다 길 수 없습니다.")
                 }
+            }
+        } else if activeStrategyId == "turnover_persistence_breakout" {
+            let enabledSignalTypes = activeStrategyParams.arrayStringValues(for: "enabled_signal_types") ?? []
+            let candidateStartTime = activeStrategyParams.stringValue(for: "candidate_start_time") ?? ""
+            let entryEndTime = activeStrategyParams.stringValue(for: "entry_end_time") ?? ""
+            let candidateStartMinutes = parseHHMMMinutes(candidateStartTime)
+            let entryEndMinutes = parseHHMMMinutes(entryEndTime)
+
+            if !strategySelectionModes.contains(activeStrategyParams.stringValue(for: "selection_mode") ?? "") {
+                errors.append("Persistence Breakout 랭킹 기준은 거래대금 순위/급등률 순위 중 하나여야 합니다.")
+            }
+            let topNWatch = activeStrategyParams.intValue(for: "top_n_watch") ?? 0
+            let topNTrade = activeStrategyParams.intValue(for: "top_n_trade") ?? 0
+            if !(1...30).contains(topNWatch) {
+                errors.append("Persistence Breakout watchlist 범위는 1~30 사이여야 합니다.")
+            }
+            if !(1...30).contains(topNTrade) {
+                errors.append("Persistence Breakout 최종 진입 허용 순위는 1~30 사이여야 합니다.")
+            }
+            if topNTrade > topNWatch {
+                errors.append("Persistence Breakout 최종 진입 허용 순위는 watchlist 범위보다 클 수 없습니다.")
+            }
+            if enabledSignalTypes != ["turnover_persistence_breakout"] {
+                errors.append("Persistence Breakout 활성 신호 유형은 turnover_persistence_breakout 하나만 사용해야 합니다.")
+            }
+            if candidateStartMinutes == nil || entryEndMinutes == nil {
+                errors.append("Persistence Breakout 시간대는 HH:MM 형식이어야 합니다.")
+            } else if let candidateStartMinutes, let entryEndMinutes, candidateStartMinutes > entryEndMinutes {
+                errors.append("Persistence Breakout 감시 시작 시각은 진입 종료 시각보다 늦을 수 없습니다.")
+            }
+
+            let lookback = activeStrategyParams.intValue(for: "persistence_lookback_minutes") ?? 0
+            if !(1...120).contains(lookback) {
+                errors.append("Persistence Breakout persistence 확인 시간은 1~120분 범위여야 합니다.")
+            }
+            let presenceRatio = activeStrategyParams.doubleValue(for: "min_presence_ratio") ?? 0
+            if presenceRatio <= 0 || presenceRatio > 1 {
+                errors.append("Persistence Breakout 최소 잔류 비율은 0 초과 1 이하 범위여야 합니다.")
+            }
+            let aboveVWAPRatio = activeStrategyParams.doubleValue(for: "min_above_vwap_ratio") ?? 0
+            if aboveVWAPRatio <= 0 || aboveVWAPRatio > 1 {
+                errors.append("Persistence Breakout VWAP 위 종가 비율은 0 초과 1 이하 범위여야 합니다.")
+            }
+            let boxBarsMin = activeStrategyParams.intValue(for: "box_bars_min") ?? 0
+            let boxBarsMax = activeStrategyParams.intValue(for: "box_bars_max") ?? 0
+            if !(2...20).contains(boxBarsMin) || !(2...30).contains(boxBarsMax) || boxBarsMin > boxBarsMax {
+                errors.append("Persistence Breakout 박스 봉 수 범위를 다시 확인하세요.")
+            }
+            let maxBoxRetracePct = activeStrategyParams.doubleValue(for: "max_box_retrace_pct") ?? 0
+            if maxBoxRetracePct <= 0 || maxBoxRetracePct > 20 {
+                errors.append("Persistence Breakout 최대 박스 범위는 0 초과 20 이하 범위여야 합니다.")
+            }
+            let breakoutVolumeMultiplier = activeStrategyParams.doubleValue(for: "breakout_volume_multiplier") ?? 0
+            if breakoutVolumeMultiplier <= 0 || breakoutVolumeMultiplier > 20 {
+                errors.append("Persistence Breakout 돌파 거래량 배수는 0 초과 20 이하 범위여야 합니다.")
+            }
+            let targetProfitPct = activeStrategyParams.doubleValue(for: "target_profit_pct") ?? -1
+            if targetProfitPct < 0 || targetProfitPct > 100 {
+                errors.append("Persistence Breakout 익절 기준은 0~100% 범위여야 합니다.")
+            }
+            let stopLossPct = activeStrategyParams.doubleValue(for: "stop_loss_pct") ?? 0
+            if stopLossPct <= 0 || stopLossPct > 100 {
+                errors.append("Persistence Breakout 손절 상한은 0 초과 100 이하 범위여야 합니다.")
+            }
+            let maxHoldingMinutes = activeStrategyParams.intValue(for: "max_holding_minutes") ?? 0
+            if !(1...10_080).contains(maxHoldingMinutes) {
+                errors.append("Persistence Breakout 최대 보유 시간은 1~10080분 범위여야 합니다.")
+            }
+            let riskPerTradePct = activeStrategyParams.doubleValue(for: "risk_per_trade_pct") ?? 0
+            if riskPerTradePct <= 0 || riskPerTradePct > 10 {
+                errors.append("Persistence Breakout 거래당 최대 손실 비율은 0 초과 10 이하 범위여야 합니다.")
+            }
+            let maxPositionSizeCap = activeStrategyParams.doubleValue(for: "max_position_size_pct_cap") ?? 0
+            if maxPositionSizeCap <= 0 || maxPositionSizeCap > 100 {
+                errors.append("Persistence Breakout 최대 포지션 상한은 0 초과 100 이하 범위여야 합니다.")
+            }
+            let slippageBufferPct = activeStrategyParams.doubleValue(for: "sizing_slippage_buffer_pct") ?? -1
+            if slippageBufferPct < 0 || slippageBufferPct > 5 {
+                errors.append("Persistence Breakout 슬리피지 버퍼는 0~5% 범위여야 합니다.")
             }
         }
 
@@ -2298,7 +2447,11 @@ final class MonitoringStore: ObservableObject {
             }
         case "strategy.signal_filtered":
             if let payload = decodePayload(StrategySignalFilteredPayload.self, from: event.data) {
-                appendStrategyEvent(payload: payload)
+                appendStrategyEvent(payload: payload, eventType: event.type)
+            }
+        case "strategy.watchlist_updated":
+            if let payload = decodePayload(StrategySignalFilteredPayload.self, from: event.data) {
+                appendStrategyEvent(payload: payload, eventType: event.type)
             }
         case "signal.exit_generated":
             if let payload = decodePayload(SignalExitGeneratedPayload.self, from: event.data) {
@@ -2515,10 +2668,10 @@ final class MonitoringStore: ObservableObject {
         recentSignals = Array(recentSignals.prefix(maxRecentItems))
     }
 
-    private func appendStrategyEvent(payload: StrategySignalFilteredPayload) {
+    private func appendStrategyEvent(payload: StrategySignalFilteredPayload, eventType: String) {
         let row = StrategyEventSnapshotItem(
             eventId: 0,
-            eventType: "strategy.signal_filtered",
+            eventType: eventType,
             code: payload.code,
             symbol: payload.symbol,
             strategyId: payload.strategyId,
@@ -2941,6 +3094,8 @@ final class MonitoringStore: ObservableObject {
             return "상위권 유지"
         case "opening_pullback_reentry":
             return "눌림 후 재상승 진입"
+        case "turnover_persistence_breakout":
+            return "지속성 박스 돌파 진입"
         case "exit_signal":
             return "청산"
         default:
@@ -2969,6 +3124,8 @@ final class MonitoringStore: ObservableObject {
         switch signalType?.lowercased() {
         case "opening_pullback_reentry":
             return "opening_pullback_reentry"
+        case "turnover_persistence_breakout":
+            return "turnover_persistence_breakout"
         case "new_entry", "rank_jump", "rank_maintained":
             return "turnover_surge_momentum"
         default:
@@ -2989,6 +3146,8 @@ final class MonitoringStore: ObservableObject {
             return "Turnover / Surge Momentum"
         case "opening_pullback_reentry":
             return "Opening Pullback Re-entry"
+        case "turnover_persistence_breakout":
+            return "Turnover Persistence Breakout"
         case "intraday_breakout":
             return "Intraday Breakout"
         default:
@@ -3009,6 +3168,8 @@ final class MonitoringStore: ObservableObject {
         switch fallbackSignalType.lowercased() {
         case "opening_pullback_reentry":
             return "개장 초 눌림 후 재상승 진입 조건 충족"
+        case "turnover_persistence_breakout":
+            return "거래대금 상위권 지속성 + VWAP 박스 돌파 조건 충족"
         case "rank_jump":
             return "순위 급상승으로 모멘텀 진입 조건 충족"
         case "new_entry":
