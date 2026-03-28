@@ -1342,8 +1342,11 @@ final class MonitoringStore: ObservableObject {
             if draft.strategyParams[normalizedStrategyId] == nil {
                 draft.strategyParams[normalizedStrategyId] = defaultTurnoverPersistenceBreakoutStrategyParams()
             }
-            if draft.strategyParams[normalizedStrategyId]?["top_n_watch"] != nil {
-                draft.strategyParams[normalizedStrategyId]?["top_n"] = draft.strategyParams[normalizedStrategyId]?["top_n_watch"]
+            if var strategyParams = draft.strategyParams[normalizedStrategyId] {
+                if let topNWatch = strategyParams["top_n_watch"] {
+                    strategyParams["top_n"] = topNWatch
+                    draft.strategyParams[normalizedStrategyId] = strategyParams
+                }
             }
             return
         }
