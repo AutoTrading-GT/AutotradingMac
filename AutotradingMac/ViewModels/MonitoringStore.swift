@@ -526,11 +526,16 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
-    func updateStrategyMaxConcurrentCandidates(_ value: Int) {
+    func updateStrategyMaxConcurrentPositions(_ value: Int) {
         mutateStrategyDraft { draft in
-            draft.risk.maxConcurrentCandidates = min(max(value, 1), 50)
-            draft.basic.risk.maxConcurrentPositions = draft.risk.maxConcurrentCandidates
+            let normalized = min(max(value, 1), 50)
+            draft.risk.maxConcurrentPositions = normalized
+            draft.basic.risk.maxConcurrentPositions = normalized
         }
+    }
+
+    func updateStrategyMaxConcurrentCandidates(_ value: Int) {
+        updateStrategyMaxEntryAttemptsInWindow(value)
     }
 
     func updateStrategyBasicTargetProfitPct(_ value: Double) {
@@ -588,7 +593,23 @@ final class MonitoringStore: ObservableObject {
         mutateStrategyDraft { draft in
             let normalized = min(max(value, 1), 50)
             draft.basic.risk.maxConcurrentPositions = normalized
-            draft.risk.maxConcurrentCandidates = normalized
+            draft.risk.maxConcurrentPositions = normalized
+        }
+    }
+
+    func updateStrategyBasicMaxEntryAttemptsInWindow(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 0), 1_000)
+            draft.basic.risk.maxEntryAttemptsInWindow = normalized
+            draft.risk.maxEntryAttemptsInWindow = normalized
+        }
+    }
+
+    func updateStrategyBasicEntryAttemptWindowMinutes(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 1), 1_440)
+            draft.basic.risk.entryAttemptWindowMinutes = normalized
+            draft.risk.entryAttemptWindowMinutes = normalized
         }
     }
 
@@ -607,10 +628,32 @@ final class MonitoringStore: ObservableObject {
         }
     }
 
-    func updateStrategyConcurrencyWindowMinutes(_ value: Int) {
+    func updateStrategyMaxEntryAttemptsInWindow(_ value: Int) {
         mutateStrategyDraft { draft in
-            draft.risk.concurrencyWindowMinutes = min(max(value, 1), 1_440)
+            let normalized = min(max(value, 0), 1_000)
+            draft.risk.maxEntryAttemptsInWindow = normalized
+            draft.basic.risk.maxEntryAttemptsInWindow = normalized
         }
+    }
+
+    func updateStrategyEntryAttemptWindowMinutes(_ value: Int) {
+        mutateStrategyDraft { draft in
+            let normalized = min(max(value, 1), 1_440)
+            draft.risk.entryAttemptWindowMinutes = normalized
+            draft.basic.risk.entryAttemptWindowMinutes = normalized
+        }
+    }
+
+    func updateStrategyConcurrencyWindowMinutes(_ value: Int) {
+        updateStrategyEntryAttemptWindowMinutes(value)
+    }
+
+    func updateStrategyMaxConcurrentCandidatesLegacy(_ value: Int) {
+        updateStrategyMaxEntryAttemptsInWindow(value)
+    }
+
+    func updateStrategyConcurrencyWindowMinutesLegacy(_ value: Int) {
+        updateStrategyEntryAttemptWindowMinutes(value)
     }
 
     func updateStrategyBlockWhenPositionExists(_ value: Bool) {
@@ -1363,6 +1406,7 @@ final class MonitoringStore: ObservableObject {
         commonRisk["daily_trade_limit_enabled"] = .bool(draft.basic.risk.dailyTradeLimitEnabled)
         commonRisk["daily_trade_limit_count"] = .number(Double(draft.basic.risk.dailyTradeLimitCount))
         commonRisk["max_concurrent_positions"] = .number(Double(draft.basic.risk.maxConcurrentPositions))
+        commonRisk["max_entry_attempts_in_window"] = .number(Double(draft.basic.risk.maxEntryAttemptsInWindow))
         commonRisk["force_close_on_market_close"] = .bool(draft.basic.exit.forceCloseOnMarketClose)
         var normalizedAllowedSignalTypes = strategySupportedSignalTypes.filter(Set(draft.risk.allowedSignalTypes).contains)
         if !normalizedAllowedSignalTypes.contains("opening_pullback_reentry") {
@@ -1374,7 +1418,7 @@ final class MonitoringStore: ObservableObject {
         commonRisk["allowed_signal_types"] = .array(normalizedAllowedSignalTypes.map(JSONValue.string))
         commonRisk["cooldown_minutes"] = .number(Double(draft.risk.cooldownMinutes))
         commonRisk["signal_window_minutes"] = .number(Double(draft.risk.signalWindowMinutes))
-        commonRisk["concurrency_window_minutes"] = .number(Double(draft.risk.concurrencyWindowMinutes))
+        commonRisk["entry_attempt_window_minutes"] = .number(Double(draft.basic.risk.entryAttemptWindowMinutes))
         commonRisk["block_when_position_exists"] = .bool(draft.risk.blockWhenPositionExists)
         draft.commonRiskParams = commonRisk
     }
@@ -1418,10 +1462,15 @@ final class MonitoringStore: ObservableObject {
         draft.signal.enabledSignalTypes = normalizedActiveParams.arrayStringValues(for: "enabled_signal_types") ?? draft.signal.enabledSignalTypes
 
         draft.risk.allowedSignalTypes = draft.commonRiskParams.arrayStringValues(for: "allowed_signal_types") ?? draft.risk.allowedSignalTypes
-        draft.risk.maxConcurrentCandidates = draft.commonRiskParams.intValue(for: "max_concurrent_positions") ?? draft.risk.maxConcurrentCandidates
+        draft.risk.maxConcurrentPositions = draft.commonRiskParams.intValue(for: "max_concurrent_positions") ?? draft.risk.maxConcurrentPositions
+        draft.risk.maxEntryAttemptsInWindow = draft.commonRiskParams.intValue(for: "max_entry_attempts_in_window")
+            ?? draft.commonRiskParams.intValue(for: "max_concurrent_positions")
+            ?? draft.risk.maxEntryAttemptsInWindow
         draft.risk.cooldownMinutes = draft.commonRiskParams.intValue(for: "cooldown_minutes") ?? draft.risk.cooldownMinutes
         draft.risk.signalWindowMinutes = draft.commonRiskParams.intValue(for: "signal_window_minutes") ?? draft.risk.signalWindowMinutes
-        draft.risk.concurrencyWindowMinutes = draft.commonRiskParams.intValue(for: "concurrency_window_minutes") ?? draft.risk.concurrencyWindowMinutes
+        draft.risk.entryAttemptWindowMinutes = draft.commonRiskParams.intValue(for: "entry_attempt_window_minutes")
+            ?? draft.commonRiskParams.intValue(for: "concurrency_window_minutes")
+            ?? draft.risk.entryAttemptWindowMinutes
         draft.risk.blockWhenPositionExists = draft.commonRiskParams.boolValue(for: "block_when_position_exists") ?? draft.risk.blockWhenPositionExists
 
         draft.basic.entry.selectionMode = draft.scanner.defaultMode
@@ -1448,6 +1497,12 @@ final class MonitoringStore: ObservableObject {
         draft.basic.risk.dailyTradeLimitEnabled = draft.commonRiskParams.boolValue(for: "daily_trade_limit_enabled") ?? draft.basic.risk.dailyTradeLimitEnabled
         draft.basic.risk.dailyTradeLimitCount = draft.commonRiskParams.intValue(for: "daily_trade_limit_count") ?? draft.basic.risk.dailyTradeLimitCount
         draft.basic.risk.maxConcurrentPositions = draft.commonRiskParams.intValue(for: "max_concurrent_positions") ?? draft.basic.risk.maxConcurrentPositions
+        draft.basic.risk.maxEntryAttemptsInWindow = draft.commonRiskParams.intValue(for: "max_entry_attempts_in_window")
+            ?? draft.commonRiskParams.intValue(for: "max_concurrent_positions")
+            ?? draft.basic.risk.maxEntryAttemptsInWindow
+        draft.basic.risk.entryAttemptWindowMinutes = draft.commonRiskParams.intValue(for: "entry_attempt_window_minutes")
+            ?? draft.commonRiskParams.intValue(for: "concurrency_window_minutes")
+            ?? draft.basic.risk.entryAttemptWindowMinutes
 
         draft.advanced.scanner = draft.scanner
         draft.advanced.signal = draft.signal
@@ -1690,8 +1745,11 @@ final class MonitoringStore: ObservableObject {
         if !unsupportedRiskTypes.isEmpty {
             errors.append("리스크 허용 신호 유형에 지원되지 않는 값이 포함되어 있습니다.")
         }
-        if !(1...50).contains(risk.maxConcurrentCandidates) {
-            errors.append("최대 동시 후보 수는 1~50 범위여야 합니다.")
+        if !(1...50).contains(risk.maxConcurrentPositions) {
+            errors.append("동시 보유 한도는 1~50 범위여야 합니다.")
+        }
+        if !(0...1_000).contains(risk.maxEntryAttemptsInWindow) {
+            errors.append("최근 진입 시도 제한은 0~1000 범위여야 합니다.")
         }
         if !(1...1_440).contains(risk.cooldownMinutes) {
             errors.append("재진입 대기 시간은 1~1440분 범위여야 합니다.")
@@ -1699,8 +1757,8 @@ final class MonitoringStore: ObservableObject {
         if !(1...1_440).contains(risk.signalWindowMinutes) {
             errors.append("신호 유효 시간은 1~1440분 범위여야 합니다.")
         }
-        if !(1...1_440).contains(risk.concurrencyWindowMinutes) {
-            errors.append("동시성 계산 시간창은 1~1440분 범위여야 합니다.")
+        if !(1...1_440).contains(risk.entryAttemptWindowMinutes) {
+            errors.append("진입 시도 제한 시간창은 1~1440분 범위여야 합니다.")
         }
 
         if !strategySelectionModes.contains(basic.entry.selectionMode) {
@@ -1738,6 +1796,12 @@ final class MonitoringStore: ObservableObject {
         if !(1...50).contains(basic.risk.maxConcurrentPositions) {
             errors.append("동시 보유 종목 수 제한은 1~50 범위여야 합니다.")
         }
+        if !(0...1_000).contains(basic.risk.maxEntryAttemptsInWindow) {
+            errors.append("최근 진입 시도 제한은 0~1000 범위여야 합니다.")
+        }
+        if !(1...1_440).contains(basic.risk.entryAttemptWindowMinutes) {
+            errors.append("진입 시도 제한 시간창은 1~1440분 범위여야 합니다.")
+        }
 
         if basic.entry.selectionMode != scanner.defaultMode {
             errors.append("진입 전략의 후보 선정 방식과 고급 스캐너 기본 기준이 일치해야 합니다.")
@@ -1748,8 +1812,14 @@ final class MonitoringStore: ObservableObject {
         if Set(basic.entry.enabledSignalTypes) != Set(signal.enabledSignalTypes) {
             errors.append("진입 신호 유형과 Signal 활성 신호 유형이 일치해야 합니다.")
         }
-        if basic.risk.maxConcurrentPositions != risk.maxConcurrentCandidates {
-            errors.append("리스크 동시 보유 제한과 고급 Risk 동시 후보 수가 일치해야 합니다.")
+        if basic.risk.maxConcurrentPositions != risk.maxConcurrentPositions {
+            errors.append("리스크 동시 보유 제한과 고급 Risk 동시 보유 한도가 일치해야 합니다.")
+        }
+        if basic.risk.maxEntryAttemptsInWindow != risk.maxEntryAttemptsInWindow {
+            errors.append("최근 진입 시도 제한과 고급 Risk 진입 시도 제한이 일치해야 합니다.")
+        }
+        if basic.risk.entryAttemptWindowMinutes != risk.entryAttemptWindowMinutes {
+            errors.append("진입 시도 제한 시간창과 고급 Risk 시간창이 일치해야 합니다.")
         }
 
         if activeStrategyId == "opening_pullback_reentry" {
@@ -2086,13 +2156,27 @@ final class MonitoringStore: ObservableObject {
                     hasChange = true
                     return draft.basic.risk.maxConcurrentPositions
                 }()
+                let maxEntryAttemptsInWindow: Int? = {
+                    guard draft.basic.risk.maxEntryAttemptsInWindow != base.basic.risk.maxEntryAttemptsInWindow else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.maxEntryAttemptsInWindow
+                }()
+                let entryAttemptWindowMinutes: Int? = {
+                    guard draft.basic.risk.entryAttemptWindowMinutes != base.basic.risk.entryAttemptWindowMinutes else { return nil }
+                    riskChanged = true
+                    hasChange = true
+                    return draft.basic.risk.entryAttemptWindowMinutes
+                }()
                 guard riskChanged else { return nil }
                 return BasicRiskSettingsUpdatePayload(
                     maxLossLimitPct: maxLossLimitPct,
                     positionSizePct: positionSizePct,
                     dailyTradeLimitEnabled: dailyTradeLimitEnabled,
                     dailyTradeLimitCount: dailyTradeLimitCount,
-                    maxConcurrentPositions: maxConcurrentPositions
+                    maxConcurrentPositions: maxConcurrentPositions,
+                    maxEntryAttemptsInWindow: maxEntryAttemptsInWindow,
+                    entryAttemptWindowMinutes: entryAttemptWindowMinutes
                 )
             }()
 
@@ -2198,10 +2282,15 @@ final class MonitoringStore: ObservableObject {
                 hasChange = true
                 return draft.risk.allowedSignalTypes
             }()
-            let maxConcurrent: Int? = {
-                guard draft.risk.maxConcurrentCandidates != base.risk.maxConcurrentCandidates else { return nil }
+            let maxConcurrentPositions: Int? = {
+                guard draft.risk.maxConcurrentPositions != base.risk.maxConcurrentPositions else { return nil }
                 hasChange = true
-                return draft.risk.maxConcurrentCandidates
+                return draft.risk.maxConcurrentPositions
+            }()
+            let maxEntryAttemptsInWindow: Int? = {
+                guard draft.risk.maxEntryAttemptsInWindow != base.risk.maxEntryAttemptsInWindow else { return nil }
+                hasChange = true
+                return draft.risk.maxEntryAttemptsInWindow
             }()
             let cooldown: Int? = {
                 guard draft.risk.cooldownMinutes != base.risk.cooldownMinutes else { return nil }
@@ -2213,10 +2302,10 @@ final class MonitoringStore: ObservableObject {
                 hasChange = true
                 return draft.risk.signalWindowMinutes
             }()
-            let concurrencyWindow: Int? = {
-                guard draft.risk.concurrencyWindowMinutes != base.risk.concurrencyWindowMinutes else { return nil }
+            let entryAttemptWindowMinutes: Int? = {
+                guard draft.risk.entryAttemptWindowMinutes != base.risk.entryAttemptWindowMinutes else { return nil }
                 hasChange = true
-                return draft.risk.concurrencyWindowMinutes
+                return draft.risk.entryAttemptWindowMinutes
             }()
             let blockWhenHolding: Bool? = {
                 guard draft.risk.blockWhenPositionExists != base.risk.blockWhenPositionExists else { return nil }
@@ -2227,10 +2316,11 @@ final class MonitoringStore: ObservableObject {
             guard hasChange else { return nil }
             return RiskSettingsUpdatePayload(
                 allowedSignalTypes: allowed,
-                maxConcurrentCandidates: maxConcurrent,
+                maxConcurrentPositions: maxConcurrentPositions,
+                maxEntryAttemptsInWindow: maxEntryAttemptsInWindow,
                 cooldownMinutes: cooldown,
                 signalWindowMinutes: signalWindow,
-                concurrencyWindowMinutes: concurrencyWindow,
+                entryAttemptWindowMinutes: entryAttemptWindowMinutes,
                 blockWhenPositionExists: blockWhenHolding
             )
         }()

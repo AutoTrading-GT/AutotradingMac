@@ -857,8 +857,11 @@ struct LogsView: View {
         if normalizedReason.contains("cooldown") || normalizedReason.contains("recent") {
             return "\(instrumentName) 재진입 대기 중으로 진입 보류"
         }
-        if normalizedReason.contains("max_concurrent") {
-            return "\(instrumentName) 동시 진입 한도 초과로 진입 보류"
+        if normalizedReason.contains("max_open_positions") {
+            return "\(instrumentName) 동시 보유 한도 초과로 진입 보류"
+        }
+        if normalizedReason.contains("max_entry_attempts_in_window") || normalizedReason.contains("concurrent_candidate_limit") {
+            return "\(instrumentName) 최근 진입 시도 한도 초과로 진입 보류"
         }
         if normalizedReason.contains("signal_type_not_allowed") || normalizedSignalType.contains("maintained") {
             return "\(instrumentName) 관망 신호로 진입 보류"

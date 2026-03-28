@@ -227,7 +227,7 @@ struct SettingsView: View {
                 strategySnapshotCard(
                     title: "공통 리스크",
                     value: "최대 손실 \(DisplayFormatters.percent(draft.basic.risk.maxLossLimitPct)) · 포지션 \(DisplayFormatters.percent(draft.basic.risk.positionSizePct))",
-                    detail: "동시 보유 \(draft.basic.risk.maxConcurrentPositions)개 · 장마감 \(draft.basic.exit.forceCloseOnMarketClose ? "청산" : "유지")",
+                    detail: "동시 보유 \(draft.basic.risk.maxConcurrentPositions)개 · 진입 시도 \(draft.basic.risk.maxEntryAttemptsInWindow)회/\(draft.basic.risk.entryAttemptWindowMinutes)분",
                     tone: .neutral
                 )
                 strategySnapshotCard(
@@ -450,7 +450,7 @@ struct SettingsView: View {
                         third: {
                             strategyBandSegment(
                                 title: "거래 제한 / 장마감 가드",
-                                tooltip: "일일 신규 진입 횟수, 동시 보유 수, 장마감 청산 정책을 함께 관리합니다."
+                                tooltip: "일일 신규 진입 횟수, 실제 동시 보유 수, 최근 진입 시도 제한, 장마감 청산 정책을 함께 관리합니다."
                             ) {
                                 VStack(alignment: .leading, spacing: 12) {
                                     strategyBandToggleControl(
@@ -471,12 +471,31 @@ struct SettingsView: View {
                                         .opacity(basicDailyTradeLimitEnabledValue(defaultValue: draft.basic.risk.dailyTradeLimitEnabled) ? 1.0 : 0.42)
 
                                         strategyBandStepperTile(
-                                            label: "동시 보유 종목 수",
+                                            label: "동시 보유 한도",
                                             value: basicMaxConcurrentPositionsValue(defaultValue: draft.basic.risk.maxConcurrentPositions),
                                             range: 1...50,
                                             step: 1,
                                             unit: "개",
                                             onChange: { store.updateStrategyBasicMaxConcurrentPositions($0) }
+                                        )
+                                    }
+
+                                    HStack(alignment: .top, spacing: 12) {
+                                        strategyBandStepperTile(
+                                            label: "최근 진입 시도 제한",
+                                            value: basicMaxEntryAttemptsInWindowValue(defaultValue: draft.basic.risk.maxEntryAttemptsInWindow),
+                                            range: 0...1_000,
+                                            step: 1,
+                                            unit: "회",
+                                            onChange: { store.updateStrategyBasicMaxEntryAttemptsInWindow($0) }
+                                        )
+                                        strategyBandStepperTile(
+                                            label: "진입 시도 제한 시간창",
+                                            value: basicEntryAttemptWindowMinutesValue(defaultValue: draft.basic.risk.entryAttemptWindowMinutes),
+                                            range: 1...1_440,
+                                            step: 1,
+                                            unit: "분",
+                                            onChange: { store.updateStrategyBasicEntryAttemptWindowMinutes($0) }
                                         )
                                     }
 
@@ -1746,18 +1765,26 @@ struct SettingsView: View {
                 }
             } second: {
                 advancedTuningCard(
-                    title: "동시 후보 제한",
-                    tooltip: "한 번에 너무 많은 승인 후보가 열리는 상황을 막는 보수적 제한입니다.",
+                    title: "동시 보유 / 진입 제한",
+                    tooltip: "동시 보유 한도는 실제 열린 포지션 수를 기준으로, 최근 진입 시도 제한은 과매매 방지용 rolling window 기준으로 동작합니다. 진입 시도 제한을 0으로 두면 비활성화됩니다.",
                     minHeight: 258
                 ) {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandStepperTile(
-                            label: "최대 동시 후보 수",
-                            value: riskMaxConcurrentCandidatesValue(defaultValue: defaultRisk.maxConcurrentCandidates),
+                            label: "동시 보유 한도",
+                            value: riskMaxConcurrentPositionsValue(defaultValue: defaultRisk.maxConcurrentPositions),
                             range: 1...50,
                             step: 1,
                             unit: "개",
-                            onChange: { store.updateStrategyMaxConcurrentCandidates($0) }
+                            onChange: { store.updateStrategyMaxConcurrentPositions($0) }
+                        )
+                        strategyBandStepperTile(
+                            label: "최근 진입 시도 제한",
+                            value: riskMaxEntryAttemptsInWindowValue(defaultValue: defaultRisk.maxEntryAttemptsInWindow),
+                            range: 0...1_000,
+                            step: 1,
+                            unit: "회",
+                            onChange: { store.updateStrategyMaxEntryAttemptsInWindow($0) }
                         )
                         strategyBandToggleControl(
                             title: "보유 시 신규 진입 차단",
@@ -1768,7 +1795,7 @@ struct SettingsView: View {
             } third: {
                 advancedTuningCard(
                     title: "재진입 / 시간 제한",
-                    tooltip: "같은 종목 재진입과 동시성 계산, 신호 유효 시간을 보수적으로 조정합니다.",
+                    tooltip: "같은 종목 재진입 대기, 신호 유효 시간, 최근 진입 시도 시간창을 조정합니다.",
                     minHeight: 258
                 ) {
                     VStack(alignment: .leading, spacing: 10) {
@@ -1789,12 +1816,12 @@ struct SettingsView: View {
                             onChange: { store.updateStrategySignalWindowMinutes($0) }
                         )
                         strategyBandStepperTile(
-                            label: "동시성 계산 시간창",
-                            value: riskConcurrencyWindowMinutesValue(defaultValue: defaultRisk.concurrencyWindowMinutes),
+                            label: "진입 시도 제한 시간창",
+                            value: riskEntryAttemptWindowMinutesValue(defaultValue: defaultRisk.entryAttemptWindowMinutes),
                             range: 1...1_440,
                             step: 1,
                             unit: "분",
-                            onChange: { store.updateStrategyConcurrencyWindowMinutes($0) }
+                            onChange: { store.updateStrategyEntryAttemptWindowMinutes($0) }
                         )
                     }
                 }
@@ -3376,8 +3403,20 @@ struct SettingsView: View {
         currentBasicSettings?.risk.maxConcurrentPositions ?? defaultValue
     }
 
-    private func riskMaxConcurrentCandidatesValue(defaultValue: Int) -> Int {
-        currentRiskSettings?.maxConcurrentCandidates ?? defaultValue
+    private func basicMaxEntryAttemptsInWindowValue(defaultValue: Int) -> Int {
+        currentBasicSettings?.risk.maxEntryAttemptsInWindow ?? defaultValue
+    }
+
+    private func basicEntryAttemptWindowMinutesValue(defaultValue: Int) -> Int {
+        currentBasicSettings?.risk.entryAttemptWindowMinutes ?? defaultValue
+    }
+
+    private func riskMaxConcurrentPositionsValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.maxConcurrentPositions ?? defaultValue
+    }
+
+    private func riskMaxEntryAttemptsInWindowValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.maxEntryAttemptsInWindow ?? defaultValue
     }
 
     private func riskCooldownMinutesValue(defaultValue: Int) -> Int {
@@ -3388,8 +3427,8 @@ struct SettingsView: View {
         currentRiskSettings?.signalWindowMinutes ?? defaultValue
     }
 
-    private func riskConcurrencyWindowMinutesValue(defaultValue: Int) -> Int {
-        currentRiskSettings?.concurrencyWindowMinutes ?? defaultValue
+    private func riskEntryAttemptWindowMinutesValue(defaultValue: Int) -> Int {
+        currentRiskSettings?.entryAttemptWindowMinutes ?? defaultValue
     }
 
     private func riskBlockWhenPositionExistsBinding(defaultValue: Bool) -> Binding<Bool> {

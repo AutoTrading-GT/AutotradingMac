@@ -1377,11 +1377,12 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
         let dailyTradeLimitEnabled = JSONValue.bool(basic.risk.dailyTradeLimitEnabled)
         let dailyTradeLimitCount = JSONValue.number(Double(basic.risk.dailyTradeLimitCount))
         let maxConcurrentPositions = JSONValue.number(Double(basic.risk.maxConcurrentPositions))
+        let maxEntryAttemptsInWindow = JSONValue.number(Double(basic.risk.maxEntryAttemptsInWindow))
         let forceCloseOnMarketClose = JSONValue.bool(basic.exit.forceCloseOnMarketClose)
         let allowedSignalTypesValue = JSONValue.array(allowedSignalTypeValues)
         let cooldownMinutes = JSONValue.number(Double(risk.cooldownMinutes))
         let signalWindowMinutes = JSONValue.number(Double(risk.signalWindowMinutes))
-        let concurrencyWindowMinutes = JSONValue.number(Double(risk.concurrencyWindowMinutes))
+        let entryAttemptWindowMinutes = JSONValue.number(Double(risk.entryAttemptWindowMinutes))
         let blockWhenPositionExists = JSONValue.bool(risk.blockWhenPositionExists)
 
         return [
@@ -1390,11 +1391,12 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
             "daily_trade_limit_enabled": dailyTradeLimitEnabled,
             "daily_trade_limit_count": dailyTradeLimitCount,
             "max_concurrent_positions": maxConcurrentPositions,
+            "max_entry_attempts_in_window": maxEntryAttemptsInWindow,
             "force_close_on_market_close": forceCloseOnMarketClose,
             "allowed_signal_types": allowedSignalTypesValue,
             "cooldown_minutes": cooldownMinutes,
             "signal_window_minutes": signalWindowMinutes,
-            "concurrency_window_minutes": concurrencyWindowMinutes,
+            "entry_attempt_window_minutes": entryAttemptWindowMinutes,
             "block_when_position_exists": blockWhenPositionExists,
         ]
     }
@@ -1435,7 +1437,9 @@ struct BasicStrategySettingsSnapshot: Decodable, Equatable {
                 positionSizePct: 10.0,
                 dailyTradeLimitEnabled: true,
                 dailyTradeLimitCount: 10,
-                maxConcurrentPositions: risk.maxConcurrentCandidates
+                maxConcurrentPositions: risk.maxConcurrentPositions,
+                maxEntryAttemptsInWindow: risk.maxEntryAttemptsInWindow,
+                entryAttemptWindowMinutes: risk.entryAttemptWindowMinutes
             )
         )
     }
@@ -1460,6 +1464,8 @@ struct BasicRiskSettingsSnapshot: Decodable, Equatable {
     var dailyTradeLimitEnabled: Bool
     var dailyTradeLimitCount: Int
     var maxConcurrentPositions: Int
+    var maxEntryAttemptsInWindow: Int
+    var entryAttemptWindowMinutes: Int
 
     enum CodingKeys: String, CodingKey {
         case maxLossLimitPct
@@ -1467,6 +1473,8 @@ struct BasicRiskSettingsSnapshot: Decodable, Equatable {
         case dailyTradeLimitEnabled
         case dailyTradeLimitCount
         case maxConcurrentPositions
+        case maxEntryAttemptsInWindow
+        case entryAttemptWindowMinutes
         // Legacy compatibility keys.
         case positionSizeValue
         case dailyTradeLimit
@@ -1477,13 +1485,17 @@ struct BasicRiskSettingsSnapshot: Decodable, Equatable {
         positionSizePct: Double,
         dailyTradeLimitEnabled: Bool,
         dailyTradeLimitCount: Int,
-        maxConcurrentPositions: Int
+        maxConcurrentPositions: Int,
+        maxEntryAttemptsInWindow: Int,
+        entryAttemptWindowMinutes: Int
     ) {
         self.maxLossLimitPct = maxLossLimitPct
         self.positionSizePct = positionSizePct
         self.dailyTradeLimitEnabled = dailyTradeLimitEnabled
         self.dailyTradeLimitCount = dailyTradeLimitCount
         self.maxConcurrentPositions = maxConcurrentPositions
+        self.maxEntryAttemptsInWindow = maxEntryAttemptsInWindow
+        self.entryAttemptWindowMinutes = entryAttemptWindowMinutes
     }
 
     init(from decoder: Decoder) throws {
@@ -1512,6 +1524,8 @@ struct BasicRiskSettingsSnapshot: Decodable, Equatable {
                 return max(1, legacy)
             }()
         maxConcurrentPositions = container.decodeIntFlexible(forKey: .maxConcurrentPositions) ?? 3
+        maxEntryAttemptsInWindow = container.decodeIntFlexible(forKey: .maxEntryAttemptsInWindow) ?? maxConcurrentPositions
+        entryAttemptWindowMinutes = container.decodeIntFlexible(forKey: .entryAttemptWindowMinutes) ?? 15
     }
 }
 
@@ -1558,11 +1572,15 @@ struct SignalSettingsSnapshot: Decodable, Equatable {
 
 struct RiskSettingsSnapshot: Decodable, Equatable {
     var allowedSignalTypes: [String]
-    var maxConcurrentCandidates: Int
+    var maxConcurrentPositions: Int
+    var maxEntryAttemptsInWindow: Int
     var cooldownMinutes: Int
     var signalWindowMinutes: Int
-    var concurrencyWindowMinutes: Int
+    var entryAttemptWindowMinutes: Int
     var blockWhenPositionExists: Bool
+
+    var maxConcurrentCandidates: Int { maxEntryAttemptsInWindow }
+    var concurrencyWindowMinutes: Int { entryAttemptWindowMinutes }
 }
 
 extension Dictionary where Key == String, Value == JSONValue {
@@ -1663,6 +1681,8 @@ struct BasicRiskSettingsUpdatePayload: Encodable {
     let dailyTradeLimitEnabled: Bool?
     let dailyTradeLimitCount: Int?
     let maxConcurrentPositions: Int?
+    let maxEntryAttemptsInWindow: Int?
+    let entryAttemptWindowMinutes: Int?
 }
 
 struct AdvancedStrategySettingsUpdatePayload: Encodable {
@@ -1700,10 +1720,11 @@ struct SignalSettingsUpdatePayload: Encodable {
 
 struct RiskSettingsUpdatePayload: Encodable {
     let allowedSignalTypes: [String]?
-    let maxConcurrentCandidates: Int?
+    let maxConcurrentPositions: Int?
+    let maxEntryAttemptsInWindow: Int?
     let cooldownMinutes: Int?
     let signalWindowMinutes: Int?
-    let concurrencyWindowMinutes: Int?
+    let entryAttemptWindowMinutes: Int?
     let blockWhenPositionExists: Bool?
 }
 

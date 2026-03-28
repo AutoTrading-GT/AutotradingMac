@@ -184,19 +184,23 @@ final class AutotradingMacTests: XCTestCase {
         store.updateStrategyScannerMinChangePct(3.4)
         store.updateStrategyRankJumpThreshold(5)
         store.updateStrategySignalWindowMinutes(14)
-        store.updateStrategyConcurrencyWindowMinutes(21)
+        store.updateStrategyMaxEntryAttemptsInWindow(4)
+        store.updateStrategyEntryAttemptWindowMinutes(21)
 
         XCTAssertEqual(store.strategyDraft?.basic.entry.topN, 7)
         XCTAssertEqual(store.strategyDraft?.scanner.topN, 7)
         XCTAssertEqual(store.strategyDraft?.signal.topN, 7)
         XCTAssertEqual(store.strategyDraft?.basic.risk.dailyTradeLimitEnabled, true)
         XCTAssertEqual(store.strategyDraft?.basic.risk.dailyTradeLimitCount, 6)
+        XCTAssertEqual(store.strategyDraft?.basic.risk.maxEntryAttemptsInWindow, 4)
+        XCTAssertEqual(store.strategyDraft?.basic.risk.entryAttemptWindowMinutes, 21)
         XCTAssertEqual(store.strategyDraft?.basic.exit.forceCloseOnMarketClose, true)
         XCTAssertEqual(store.strategyDraft?.scanner.minTurnover, 250_000_000, accuracy: 0.0001)
         XCTAssertEqual(store.strategyDraft?.scanner.minChangePct, 3.4, accuracy: 0.0001)
         XCTAssertEqual(store.strategyDraft?.signal.rankJumpThreshold, 5)
         XCTAssertEqual(store.strategyDraft?.risk.signalWindowMinutes, 14)
-        XCTAssertEqual(store.strategyDraft?.risk.concurrencyWindowMinutes, 21)
+        XCTAssertEqual(store.strategyDraft?.risk.maxEntryAttemptsInWindow, 4)
+        XCTAssertEqual(store.strategyDraft?.risk.entryAttemptWindowMinutes, 21)
     }
 
     @MainActor
@@ -1122,10 +1126,11 @@ final class AutotradingMacTests: XCTestCase {
             ),
             risk: RiskSettingsSnapshot(
                 allowedSignalTypes: ["new_entry", "rank_jump"],
-                maxConcurrentCandidates: 3,
+                maxConcurrentPositions: 3,
+                maxEntryAttemptsInWindow: 3,
                 cooldownMinutes: 10,
                 signalWindowMinutes: 10,
-                concurrencyWindowMinutes: 15,
+                entryAttemptWindowMinutes: 15,
                 blockWhenPositionExists: true
             )
         )

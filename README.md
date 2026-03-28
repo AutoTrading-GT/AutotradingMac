@@ -215,7 +215,8 @@
     - 포지션 크기는 단일 입력 `전체 자산 대비 비율(%)`로 고정
     - 일일 거래 제한은 `제한 사용(toggle) + 최대 거래 횟수(number)`로 분리
     - 제한 미사용 상태는 `무제한` 의미이며 sentinel 값(-1)은 UI에 노출하지 않음
-    - 엔진 반영은 `max_concurrent_positions`, `daily_trade_limit_enabled`, `daily_trade_limit_count`, `position_size_pct`, `max_loss_limit_pct`를 적용
+    - 엔진 반영은 `max_concurrent_positions`, `max_entry_attempts_in_window`, `entry_attempt_window_minutes`, `daily_trade_limit_enabled`, `daily_trade_limit_count`, `position_size_pct`, `max_loss_limit_pct`를 적용
+    - `동시 보유 한도`는 실제 open position 수 기준이고, `최근 진입 시도 제한`은 rolling window 안의 anti-overtrading guard다
   - 반영 상태 표시:
     - `현재 전략 요약 > 적용 상태`에서 전체 반영 상태 badge를 우선 표기
     - `마지막 적용`, `일일 거래 제한 상태`, `일일 손실 한도 상태`를 함께 표시
@@ -225,7 +226,7 @@
   - Advanced 섹션:
     - `Scanner`: 최소 거래 필터 + mode별 가중치
     - `Signal`: 세부 신호 임계값 + 활성 유형
-    - `Risk`: 공통 허용 신호 + 동시 후보 제한 + 재진입/시간창
+    - `Risk`: 공통 허용 신호 + 실제 동시 보유 한도 + 최근 진입 시도 제한 + 진입 시도 제한 시간창 + 재진입/시간창
   - 설명 문구 노출 정책:
     - 기본 화면은 한 줄 요약 중심
     - 장문 설명 대신 compact note를 유지

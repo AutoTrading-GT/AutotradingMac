@@ -1157,8 +1157,11 @@ struct DashboardView: View {
         if normalizedReason.contains("daily_loss_limit_reached") {
             return "\(instrumentName) 일일 손실 한도로 차단"
         }
-        if normalizedReason.contains("max_concurrent") {
+        if normalizedReason.contains("max_open_positions") {
             return "\(instrumentName) 동시 보유 한도로 차단"
+        }
+        if normalizedReason.contains("max_entry_attempts_in_window") || normalizedReason.contains("concurrent_candidate_limit") {
+            return "\(instrumentName) 최근 진입 시도 한도로 차단"
         }
         if normalizedReason.contains("already_holding") || normalizedReason.contains("position_exists") || normalizedReason.contains("block_when_position_exists") {
             return "\(instrumentName) 보유 중으로 진입 보류"

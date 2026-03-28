@@ -389,8 +389,11 @@ enum DashboardSignalSummaryBuilder {
         if normalized.contains("position_size_account_value_unavailable") {
             return "계좌 기준값 없음"
         }
-        if normalized.contains("max_concurrent") {
+        if normalized.contains("max_open_positions") {
             return "동시 보유 한도 초과"
+        }
+        if normalized.contains("max_entry_attempts_in_window") || normalized.contains("concurrent_candidate_limit") {
+            return "최근 진입 시도 한도 초과"
         }
         if normalized.contains("stop_loss") {
             return "손절 보호 규칙"

@@ -929,10 +929,11 @@ private struct MarketViewPreviewAPIClient: MonitoringAPIClientProtocol {
             ),
             risk: RiskSettingsSnapshot(
                 allowedSignalTypes: ["new_entry", "rank_jump"],
-                maxConcurrentCandidates: 3,
+                maxConcurrentPositions: 3,
+                maxEntryAttemptsInWindow: 3,
                 cooldownMinutes: 10,
                 signalWindowMinutes: 10,
-                concurrencyWindowMinutes: 15,
+                entryAttemptWindowMinutes: 15,
                 blockWhenPositionExists: true
             )
         )
