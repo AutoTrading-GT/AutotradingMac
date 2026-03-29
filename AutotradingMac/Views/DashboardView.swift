@@ -178,7 +178,7 @@ struct DashboardView: View {
 
             if isWeeklyPerformanceExpanded {
                 Divider()
-                    .overlay(DesignTokens.Colors.panelBorder.opacity(0.45))
+                    .overlay(AppTheme.panelBorder.opacity(0.45))
 
                 if recentDailyPerformanceRows.isEmpty {
                     Text("최근 일별 성과 없음")
