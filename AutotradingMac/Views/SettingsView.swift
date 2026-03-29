@@ -1226,22 +1226,23 @@ struct SettingsView: View {
                     persistenceWatchlistSection()
                     persistenceRuleSection()
                     persistenceBreakoutSection()
+                    persistenceQualitySection()
                     persistenceSizingSection()
                     persistenceExitSection()
 
                     strategyPanel(
                         title: "구현 메모",
-                        subtitle: "v1은 상태형 persistence + breakout 골격 구현이 목적이며, score 최적화와 고급 체결 모델은 아직 없습니다.",
+                        subtitle: "v2는 score/quality/trailing 구조와 관찰성을 추가한 단계이며, 수치 최적화는 아직 보류합니다.",
                         prominence: .secondary
                     ) {
                         VStack(alignment: .leading, spacing: 10) {
                             strategyCompactNote(
                                 title: "현재 적용",
-                                detail: "new_entry/rank_jump는 watchlist admission 재료로만 쓰고, 최종 진입은 persistence + VWAP + box breakout을 모두 통과해야 발생합니다."
+                                detail: "new_entry/rank_jump는 watchlist admission 재료로만 쓰고, 최종 진입은 persistence + quality + VWAP + box breakout을 모두 통과해야 발생합니다."
                             )
                             strategyCompactNote(
-                                title: "현재 제약",
-                                detail: "정교한 persistence score, orderflow quality scoring, trailing exit은 아직 미구현이며 v1은 최소 골격만 연결돼 있습니다."
+                                title: "이번 단계",
+                                detail: "score breakdown, quality hard-filter/score, box/VWAP 세부 상태, trailing exit hook은 들어갔지만 각 수치의 실전 최적화는 아직 아닙니다."
                             )
                         }
                         .padding(.horizontal, 18)
@@ -1332,7 +1333,7 @@ struct SettingsView: View {
     private func persistenceRuleSection() -> some View {
         strategyCategoryBlock(
             title: "Persistence",
-            summary: "watchlist 편입 후 최근 rank 잔류율이 충분해야만 breakout 후보로 남깁니다."
+            summary: "watchlist 편입 후 최근 rank/turnover 지속성을 먼저 통과시키고, 그 위에 보수적 score breakdown을 쌓습니다."
         ) {
             openingStrategyFieldGrid {
                 openingStrategyFieldCard(title: "지속성 기준") {
@@ -1363,15 +1364,74 @@ struct SettingsView: View {
                     }
                 }
 
+                openingStrategyFieldCard(title: "점수 구조") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandNumericField(
+                            label: "최소 총점",
+                            unit: "score",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_score_to_trade",
+                                defaultValue: 60.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "Rank persistence",
+                            unit: "w",
+                            text: activeStrategyDoubleTextBinding(
+                                "rank_persistence_weight",
+                                defaultValue: 30.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "Turnover persistence",
+                            unit: "w",
+                            text: activeStrategyDoubleTextBinding(
+                                "turnover_persistence_weight",
+                                defaultValue: 25.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "Price structure",
+                            unit: "w",
+                            text: activeStrategyDoubleTextBinding(
+                                "price_structure_weight",
+                                defaultValue: 20.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "VWAP",
+                            unit: "w",
+                            text: activeStrategyDoubleTextBinding(
+                                "vwap_weight",
+                                defaultValue: 15.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "Quality",
+                            unit: "w",
+                            text: activeStrategyDoubleTextBinding(
+                                "quality_weight",
+                                defaultValue: 10.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                    }
+                }
+
                 openingStrategyFieldCard(title: "룰 메모") {
                     VStack(alignment: .leading, spacing: 8) {
                         strategyCompactNote(
                             title: "현재 구현",
-                            detail: "`rank_maintained`는 독립 매수신호가 아니라 persistence 계산 재료입니다."
+                            detail: "`rank_maintained`는 독립 매수신호가 아니라 persistence 계산 재료이며, total score는 설명 가능성 강화용 breakdown입니다."
                         )
                         strategyCompactNote(
                             title: "현재 제약",
-                            detail: "100점 만점 persistence score는 아직 없고, v1은 통과/미통과 규칙으로만 판단합니다."
+                            detail: "weight와 threshold는 구조용 기본값일 뿐이고, 장중 비교 검증 전이라 최적화 값으로 간주하지 않습니다."
                         )
                     }
                 }
@@ -1434,6 +1494,15 @@ struct SettingsView: View {
                                 range: 0.1...20.0
                             )
                         )
+                        strategyBandNumericField(
+                            label: "최소 박스 준비도",
+                            unit: "ratio",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_box_ready_ratio",
+                                defaultValue: 0.60,
+                                range: 0.01...1.0
+                            )
+                        )
                     }
                 }
 
@@ -1452,6 +1521,80 @@ struct SettingsView: View {
                         strategyCompactNote(
                             title: "실행 신호",
                             detail: localizedSignalDescription("turnover_persistence_breakout")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistenceQualitySection() -> some View {
+        strategyCategoryBlock(
+            title: "Quality Scoring",
+            summary: "hard reject 조건은 그대로 유지하고, 허용 범위 안에서는 spread / orderbook 상태를 quality score 재료로 함께 사용합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "스프레드") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "스프레드 hard filter",
+                            isOn: activeStrategyBoolBinding("use_spread_filter", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "최대 스프레드",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_spread_pct",
+                                defaultValue: 0.30,
+                                range: 0.01...10.0
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "호가잔량 / 불균형") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "호가잔량 hard filter",
+                            isOn: activeStrategyBoolBinding("use_orderbook_depth_filter", defaultValue: true)
+                        )
+                        strategyBandStepperTile(
+                            label: "최소 매수 1호가 잔량",
+                            value: activeStrategyIntValue("min_best_bid_size", defaultValue: 300),
+                            range: 1...1_000_000,
+                            step: 10,
+                            unit: "주",
+                            onChange: { store.updateActiveStrategyParamInt("min_best_bid_size", value: $0, range: 1...1_000_000) }
+                        )
+                        strategyBandStepperTile(
+                            label: "최소 매도 1호가 잔량",
+                            value: activeStrategyIntValue("min_best_ask_size", defaultValue: 300),
+                            range: 1...1_000_000,
+                            step: 10,
+                            unit: "주",
+                            onChange: { store.updateActiveStrategyParamInt("min_best_ask_size", value: $0, range: 1...1_000_000) }
+                        )
+                        strategyBandNumericField(
+                            label: "최대 호가 불균형",
+                            unit: "ratio",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_orderbook_imbalance_ratio",
+                                defaultValue: 3.0,
+                                range: 1.0...100.0
+                            )
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "관찰 메모") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        strategyCompactNote(
+                            title: "Hard reject",
+                            detail: "임계값을 넘는 spread/depth/imbalance는 즉시 제외합니다."
+                        )
+                        strategyCompactNote(
+                            title: "Quality score",
+                            detail: "허용 범위 안에서는 더 나은 호가 구조일수록 score breakdown에 가점을 줍니다."
                         )
                     }
                 }
@@ -1512,7 +1655,7 @@ struct SettingsView: View {
     private func persistenceExitSection() -> some View {
         strategyCategoryBlock(
             title: "청산",
-            summary: "v1은 보수적인 손절 상한, 기본 익절, hard time stop만 연결합니다."
+            summary: "기본 익절/손절/time stop을 유지하면서, 필요 시 VWAP/최근 저점 trailing hook을 추가합니다."
         ) {
             openingStrategyFieldGrid {
                 openingStrategyFieldCard(title: "익절 / 손절") {
@@ -1547,6 +1690,32 @@ struct SettingsView: View {
                         unit: "분",
                         onChange: { store.updateActiveStrategyParamInt("max_holding_minutes", value: $0, range: 1...10_080) }
                     )
+                }
+
+                openingStrategyFieldCard(title: "Trailing") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "Trailing exit 사용",
+                            isOn: activeStrategyBoolBinding("use_trailing_exit", defaultValue: false)
+                        )
+                        strategySegmentedControl(
+                            options: [
+                                AppSegmentedOption(value: "combined", title: "Combined"),
+                                AppSegmentedOption(value: "prefer_trailing", title: "Prefer Trailing"),
+                            ],
+                            selection: activeStrategyStringBinding("trailing_exit_mode", defaultValue: "combined"),
+                            minSegmentWidth: 130,
+                            height: 38
+                        )
+                        strategyBandToggleControl(
+                            title: "VWAP trailing 사용",
+                            isOn: activeStrategyBoolBinding("vwap_trailing_enabled", defaultValue: true)
+                        )
+                        strategyBandToggleControl(
+                            title: "최근 저점 trailing 사용",
+                            isOn: activeStrategyBoolBinding("recent_low_trailing_enabled", defaultValue: true)
+                        )
+                    }
                 }
             }
         }

@@ -1592,16 +1592,33 @@ final class MonitoringStore: ObservableObject {
             "entry_end_time": .string("14:30"),
             "persistence_lookback_minutes": .number(10),
             "min_presence_ratio": .number(0.60),
+            "rank_persistence_weight": .number(30.0),
+            "turnover_persistence_weight": .number(25.0),
+            "price_structure_weight": .number(20.0),
+            "vwap_weight": .number(15.0),
+            "quality_weight": .number(10.0),
+            "min_score_to_trade": .number(60.0),
             "use_vwap_filter": .bool(true),
             "min_above_vwap_ratio": .number(0.67),
             "allow_reclaim": .bool(true),
             "box_bars_min": .number(3),
             "box_bars_max": .number(5),
             "max_box_retrace_pct": .number(1.8),
+            "min_box_ready_ratio": .number(0.60),
             "breakout_volume_multiplier": .number(1.5),
+            "use_spread_filter": .bool(true),
+            "max_spread_pct": .number(0.30),
+            "use_orderbook_depth_filter": .bool(true),
+            "min_best_bid_size": .number(300),
+            "min_best_ask_size": .number(300),
+            "max_orderbook_imbalance_ratio": .number(3.0),
             "target_profit_pct": .number(3.0),
             "stop_loss_pct": .number(1.5),
             "max_holding_minutes": .number(45),
+            "use_trailing_exit": .bool(false),
+            "trailing_exit_mode": .string("combined"),
+            "vwap_trailing_enabled": .bool(true),
+            "recent_low_trailing_enabled": .bool(true),
             "use_risk_per_trade_sizing": .bool(true),
             "risk_per_trade_pct": .number(0.30),
             "max_position_size_pct_cap": .number(10.0),
@@ -1993,6 +2010,29 @@ final class MonitoringStore: ObservableObject {
             if presenceRatio <= 0 || presenceRatio > 1 {
                 errors.append("Persistence Breakout 최소 잔류 비율은 0 초과 1 이하 범위여야 합니다.")
             }
+            let rankPersistenceWeight = activeStrategyParams.doubleValue(for: "rank_persistence_weight") ?? -1
+            let turnoverPersistenceWeight = activeStrategyParams.doubleValue(for: "turnover_persistence_weight") ?? -1
+            let priceStructureWeight = activeStrategyParams.doubleValue(for: "price_structure_weight") ?? -1
+            let vwapWeight = activeStrategyParams.doubleValue(for: "vwap_weight") ?? -1
+            let qualityWeight = activeStrategyParams.doubleValue(for: "quality_weight") ?? -1
+            for (label, value) in [
+                ("rank persistence", rankPersistenceWeight),
+                ("turnover persistence", turnoverPersistenceWeight),
+                ("price structure", priceStructureWeight),
+                ("VWAP", vwapWeight),
+                ("quality", qualityWeight),
+            ] {
+                if value < 0 || value > 100 {
+                    errors.append("Persistence Breakout \(label) 가중치는 0~100 범위여야 합니다.")
+                }
+            }
+            if rankPersistenceWeight + turnoverPersistenceWeight + priceStructureWeight + vwapWeight + qualityWeight <= 0 {
+                errors.append("Persistence Breakout score 가중치 합계는 0보다 커야 합니다.")
+            }
+            let minScoreToTrade = activeStrategyParams.doubleValue(for: "min_score_to_trade") ?? -1
+            if minScoreToTrade < 0 || minScoreToTrade > 100 {
+                errors.append("Persistence Breakout 최소 총점은 0~100 범위여야 합니다.")
+            }
             let aboveVWAPRatio = activeStrategyParams.doubleValue(for: "min_above_vwap_ratio") ?? 0
             if aboveVWAPRatio <= 0 || aboveVWAPRatio > 1 {
                 errors.append("Persistence Breakout VWAP 위 종가 비율은 0 초과 1 이하 범위여야 합니다.")
@@ -2006,9 +2046,29 @@ final class MonitoringStore: ObservableObject {
             if maxBoxRetracePct <= 0 || maxBoxRetracePct > 20 {
                 errors.append("Persistence Breakout 최대 박스 범위는 0 초과 20 이하 범위여야 합니다.")
             }
+            let minBoxReadyRatio = activeStrategyParams.doubleValue(for: "min_box_ready_ratio") ?? 0
+            if minBoxReadyRatio <= 0 || minBoxReadyRatio > 1 {
+                errors.append("Persistence Breakout 최소 박스 준비도는 0 초과 1 이하 범위여야 합니다.")
+            }
             let breakoutVolumeMultiplier = activeStrategyParams.doubleValue(for: "breakout_volume_multiplier") ?? 0
             if breakoutVolumeMultiplier <= 0 || breakoutVolumeMultiplier > 20 {
                 errors.append("Persistence Breakout 돌파 거래량 배수는 0 초과 20 이하 범위여야 합니다.")
+            }
+            let maxSpreadPct = activeStrategyParams.doubleValue(for: "max_spread_pct") ?? 0
+            if maxSpreadPct <= 0 || maxSpreadPct > 10 {
+                errors.append("Persistence Breakout 최대 스프레드는 0 초과 10 이하 범위여야 합니다.")
+            }
+            let minBestBidSize = activeStrategyParams.intValue(for: "min_best_bid_size") ?? 0
+            if !(1...1_000_000).contains(minBestBidSize) {
+                errors.append("Persistence Breakout 최소 매수호가 잔량은 1~1,000,000주 범위여야 합니다.")
+            }
+            let minBestAskSize = activeStrategyParams.intValue(for: "min_best_ask_size") ?? 0
+            if !(1...1_000_000).contains(minBestAskSize) {
+                errors.append("Persistence Breakout 최소 매도호가 잔량은 1~1,000,000주 범위여야 합니다.")
+            }
+            let maxOrderbookImbalanceRatio = activeStrategyParams.doubleValue(for: "max_orderbook_imbalance_ratio") ?? 0
+            if maxOrderbookImbalanceRatio < 1 || maxOrderbookImbalanceRatio > 100 {
+                errors.append("Persistence Breakout 최대 호가 불균형 비율은 1 이상 100 이하 범위여야 합니다.")
             }
             let targetProfitPct = activeStrategyParams.doubleValue(for: "target_profit_pct") ?? -1
             if targetProfitPct < 0 || targetProfitPct > 100 {
@@ -2021,6 +2081,10 @@ final class MonitoringStore: ObservableObject {
             let maxHoldingMinutes = activeStrategyParams.intValue(for: "max_holding_minutes") ?? 0
             if !(1...10_080).contains(maxHoldingMinutes) {
                 errors.append("Persistence Breakout 최대 보유 시간은 1~10080분 범위여야 합니다.")
+            }
+            let trailingExitMode = activeStrategyParams.stringValue(for: "trailing_exit_mode") ?? ""
+            if !["combined", "prefer_trailing"].contains(trailingExitMode) {
+                errors.append("Persistence Breakout trailing 모드는 combined / prefer_trailing 중 하나여야 합니다.")
             }
             let riskPerTradePct = activeStrategyParams.doubleValue(for: "risk_per_trade_pct") ?? 0
             if riskPerTradePct <= 0 || riskPerTradePct > 10 {

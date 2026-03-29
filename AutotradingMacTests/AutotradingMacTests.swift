@@ -75,6 +75,20 @@ final class AutotradingMacTests: XCTestCase {
             0.60,
             accuracy: 0.0001
         )
+        XCTAssertEqual(
+            snapshot.strategyParams["turnover_persistence_breakout"]?["min_score_to_trade"]?.doubleValue,
+            60.0,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["turnover_persistence_breakout"]?["quality_weight"]?.doubleValue,
+            10.0,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            snapshot.strategyParams["turnover_persistence_breakout"]?["use_trailing_exit"]?.boolValue,
+            false
+        )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("turnover_persistence_breakout") ?? false)

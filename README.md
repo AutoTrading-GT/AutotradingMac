@@ -160,7 +160,8 @@
     - 활성 전략 편집 패널과 공통 리스크/실행 패널은 시각적으로 분리한다
     - `turnover_surge_momentum`는 기존 Basic Strategy + Advanced Settings 편집 UI를 유지한다
     - `opening_pullback_reentry`는 `시간대 / 후보 선정 / 눌림 정의 / 재진입 조건 / 시장제도·거래안전 필터 / 청산` 전용 폼을 사용한다
-    - `turnover_persistence_breakout`는 `watchlist / persistence / breakout / sizing / exit` 전용 폼을 사용한다
+    - `turnover_persistence_breakout`는 `watchlist / persistence / VWAP-box / quality scoring / sizing / exit-trailing` 전용 폼을 사용한다
+    - v2 패널은 score weight, min score, quality hard-filter, trailing hook을 노출하지만 수치 최적화 단계는 아직 아니다
     - `intraday_breakout` 같은 preview 템플릿은 값 미리보기만 제공한다
     - 공통 설정은 전략을 바꿔도 유지되며, 전략 전환과 별도의 패널에서 조정한다
     - `Basic Strategy`는 현재 활성 전략의 편집 패널로서 작은 카드 여러 개 대신 하나의 긴 가로 패널로 정리한다
