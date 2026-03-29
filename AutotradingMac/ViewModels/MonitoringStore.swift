@@ -38,6 +38,7 @@ final class MonitoringStore: ObservableObject {
     @Published private(set) var recentFills: [FillSnapshotItem] = []
     @Published private(set) var currentPositions: [PositionSnapshotItem] = []
     @Published private(set) var recentClosedPositions: [ClosedPositionSnapshotItem] = []
+    @Published private(set) var recentDailyPerformance: [DailyPerformanceSnapshotItem] = []
     @Published private(set) var pnlSummary = PnLSummarySnapshot(
         openPositions: 0,
         unrealizedPnlTotal: nil,
@@ -77,10 +78,12 @@ final class MonitoringStore: ObservableObject {
     private var runtimeRefreshTask: Task<Void, Never>?
     private var livePositionsRefreshTask: Task<Void, Never>?
     private var snapshotRetryTask: Task<Void, Never>?
+    private var dayRolloverMonitorTask: Task<Void, Never>?
     private var chartFetchDebounceTask: Task<Void, Never>?
     private var chartFetchTasks: [String: Task<Void, Never>] = [:]
     private var lastRuntimeRefreshedAt: Date?
     private let runtimeRefreshMinInterval: TimeInterval = 2.0
+    private let dayRolloverCheckIntervalNanoseconds: UInt64 = 60_000_000_000
     private let chartFetchDebounceNanoseconds: UInt64 = 300_000_000
     private let scannerStep = 10
     private let scannerMaxLimit = 30
@@ -98,6 +101,8 @@ final class MonitoringStore: ObservableObject {
     private var appSettingsRefreshTask: Task<Void, Never>?
     private var deliveredNotificationKeys: [String] = []
     private let maxDeliveredNotificationKeys = 200
+    private var lastObservedSeoulDayIdentifier: String?
+    private let seoulTimeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
     private static let iso8601WithFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -134,10 +139,12 @@ final class MonitoringStore: ObservableObject {
     func start() async {
         guard !started else { return }
         started = true
+        updateObservedSeoulDay(referenceDate: Date())
         await reloadSnapshot()
         await reloadAppSettings()
         await refreshNotificationAuthorizationStatus()
         scheduleSnapshotRetryIfNeeded()
+        startDayRolloverMonitorIfNeeded()
         if connectWebSocketOnStart {
             webSocketClient.connect()
         }
@@ -150,6 +157,8 @@ final class MonitoringStore: ObservableObject {
         livePositionsRefreshTask = nil
         snapshotRetryTask?.cancel()
         snapshotRetryTask = nil
+        dayRolloverMonitorTask?.cancel()
+        dayRolloverMonitorTask = nil
         chartFetchDebounceTask?.cancel()
         chartFetchDebounceTask = nil
         apiConnectionStatusClearTask?.cancel()
@@ -1272,6 +1281,7 @@ final class MonitoringStore: ObservableObject {
         recentFills = []
         currentPositions = []
         recentClosedPositions = []
+        recentDailyPerformance = []
         pnlSummary = PnLSummarySnapshot(
             openPositions: 0,
             unrealizedPnlTotal: nil,
@@ -1290,6 +1300,7 @@ final class MonitoringStore: ObservableObject {
         isLoadingSnapshot = false
         lastUpdatedAt = nil
         lastErrorMessage = nil
+        lastObservedSeoulDayIdentifier = nil
         connectionState = .disconnected
     }
 
@@ -1584,45 +1595,45 @@ final class MonitoringStore: ObservableObject {
     private func defaultTurnoverPersistenceBreakoutStrategyParams() -> [String: JSONValue] {
         [
             "selection_mode": .string("turnover"),
-            "top_n": .number(12),
-            "top_n_watch": .number(12),
-            "top_n_trade": .number(8),
+            "top_n": .number(10),
+            "top_n_watch": .number(10),
+            "top_n_trade": .number(6),
             "enabled_signal_types": .array([.string("turnover_persistence_breakout")]),
-            "candidate_start_time": .string("09:05"),
-            "entry_end_time": .string("14:30"),
-            "persistence_lookback_minutes": .number(10),
-            "min_presence_ratio": .number(0.60),
-            "rank_persistence_weight": .number(30.0),
-            "turnover_persistence_weight": .number(25.0),
+            "candidate_start_time": .string("09:25"),
+            "entry_end_time": .string("11:20"),
+            "persistence_lookback_minutes": .number(8),
+            "min_presence_ratio": .number(0.75),
+            "rank_persistence_weight": .number(25.0),
+            "turnover_persistence_weight": .number(20.0),
             "price_structure_weight": .number(20.0),
-            "vwap_weight": .number(15.0),
-            "quality_weight": .number(10.0),
-            "min_score_to_trade": .number(60.0),
+            "vwap_weight": .number(20.0),
+            "quality_weight": .number(15.0),
+            "min_score_to_trade": .number(70.0),
             "use_vwap_filter": .bool(true),
-            "min_above_vwap_ratio": .number(0.67),
-            "allow_reclaim": .bool(true),
+            "min_above_vwap_ratio": .number(0.75),
+            "allow_reclaim": .bool(false),
             "box_bars_min": .number(3),
             "box_bars_max": .number(5),
-            "max_box_retrace_pct": .number(1.8),
-            "min_box_ready_ratio": .number(0.60),
-            "breakout_volume_multiplier": .number(1.5),
+            "max_box_retrace_pct": .number(1.3),
+            "min_box_ready_ratio": .number(0.70),
+            "breakout_volume_multiplier": .number(1.8),
             "use_spread_filter": .bool(true),
-            "max_spread_pct": .number(0.30),
+            "max_spread_pct": .number(0.25),
             "use_orderbook_depth_filter": .bool(true),
             "min_best_bid_size": .number(300),
             "min_best_ask_size": .number(300),
-            "max_orderbook_imbalance_ratio": .number(3.0),
-            "target_profit_pct": .number(3.0),
-            "stop_loss_pct": .number(1.5),
-            "max_holding_minutes": .number(45),
-            "use_trailing_exit": .bool(false),
+            "max_orderbook_imbalance_ratio": .number(2.5),
+            "target_profit_pct": .number(2.2),
+            "stop_loss_pct": .number(1.1),
+            "max_holding_minutes": .number(30),
+            "use_trailing_exit": .bool(true),
             "trailing_exit_mode": .string("combined"),
             "vwap_trailing_enabled": .bool(true),
             "recent_low_trailing_enabled": .bool(true),
             "use_risk_per_trade_sizing": .bool(true),
-            "risk_per_trade_pct": .number(0.30),
-            "max_position_size_pct_cap": .number(10.0),
-            "sizing_slippage_buffer_pct": .number(0.15),
+            "risk_per_trade_pct": .number(0.25),
+            "max_position_size_pct_cap": .number(7.0),
+            "sizing_slippage_buffer_pct": .number(0.20),
         ]
     }
 
@@ -2501,7 +2512,9 @@ final class MonitoringStore: ObservableObject {
         recentFills = snapshot.recentFills
         currentPositions = snapshot.currentPositions
         recentClosedPositions = snapshot.recentClosedPositions
+        recentDailyPerformance = snapshot.recentDailyPerformance
         pnlSummary = snapshot.pnlSummary
+        updateObservedSeoulDay(referenceDate: Date())
         ensureSelectedScannerCode()
         scheduleChartFetchForSelectedSymbol(force: false)
     }
@@ -3474,6 +3487,43 @@ final class MonitoringStore: ObservableObject {
 
     private func parseISODate(_ raw: String) -> Date? {
         Self.iso8601WithFractional.date(from: raw) ?? Self.iso8601Basic.date(from: raw)
+    }
+
+    private func startDayRolloverMonitorIfNeeded() {
+        guard dayRolloverMonitorTask == nil else { return }
+        dayRolloverMonitorTask = Task { @MainActor [weak self] in
+            while let self, self.started, !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: self.dayRolloverCheckIntervalNanoseconds)
+                guard !Task.isCancelled, self.started else { break }
+                await self.refreshSnapshotForDayChangeIfNeeded()
+            }
+            self?.dayRolloverMonitorTask = nil
+        }
+    }
+
+    func refreshSnapshotForDayChangeIfNeeded(referenceDate: Date = Date()) async {
+        let currentIdentifier = seoulDayIdentifier(for: referenceDate)
+        guard let lastObservedSeoulDayIdentifier else {
+            self.lastObservedSeoulDayIdentifier = currentIdentifier
+            return
+        }
+        guard currentIdentifier != lastObservedSeoulDayIdentifier else { return }
+        self.lastObservedSeoulDayIdentifier = currentIdentifier
+        await reloadSnapshot()
+    }
+
+    private func updateObservedSeoulDay(referenceDate: Date) {
+        lastObservedSeoulDayIdentifier = seoulDayIdentifier(for: referenceDate)
+    }
+
+    private func seoulDayIdentifier(for referenceDate: Date) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = seoulTimeZone
+        let components = calendar.dateComponents([.year, .month, .day], from: referenceDate)
+        let year = components.year ?? 0
+        let month = components.month ?? 0
+        let day = components.day ?? 0
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 
     private func scheduleRuntimeRefresh() {

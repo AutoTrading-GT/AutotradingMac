@@ -7,6 +7,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject private var store: MonitoringStore
+    @State private var isWeeklyPerformanceExpanded = false
 
     var body: some View {
         ScrollView {
@@ -20,7 +21,7 @@ struct DashboardView: View {
     }
 
     private var metricsRow: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             dashboardMetricCard(
                 label: "총 평가금액",
                 value: totalEvaluationText,
@@ -43,15 +44,7 @@ struct DashboardView: View {
                 secondarySeparator: nil,
                 valueColor: trendForValue(todayTotalPnLValue).color
             )
-            dashboardMetricCard(
-                label: "최근 7일 승률",
-                value: winRateText,
-                change: winRateChangeText,
-                trend: .flat,
-                iconSystemName: "target",
-                secondaryValue: weeklyRealizedPnLText,
-                secondaryTrend: trendForValue(weeklyRealizedPnLSum)
-            )
+            weeklyWinRateMetricCard
         }
     }
 
@@ -121,6 +114,110 @@ struct DashboardView: View {
         .padding(DesignTokens.Layout.panelInnerPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appPanelStyle()
+    }
+
+    private var weeklyWinRateMetricCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text("최근 7일 승률")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Image(systemName: "target")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+                Spacer(minLength: 0)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isWeeklyPerformanceExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isWeeklyPerformanceExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let weeklyRealizedPnLText {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(winRateText)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(DesignTokens.Colors.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    Text("|")
+                        .font(.headline.weight(.light))
+                        .foregroundStyle(DesignTokens.Colors.textQuaternary.opacity(0.45))
+
+                    Text(weeklyRealizedPnLText)
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(trendForValue(weeklyRealizedPnLSum).color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            } else {
+                Text(winRateText)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+
+            if let winRateChangeText {
+                HStack(spacing: 6) {
+                    Text(winRateChangeText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(DesignTokens.Colors.textSecondary)
+                    Spacer(minLength: 0)
+                }
+            } else {
+                Text(" ")
+                    .font(.caption)
+            }
+
+            if isWeeklyPerformanceExpanded {
+                Divider()
+                    .overlay(DesignTokens.Colors.panelBorder.opacity(0.45))
+
+                if recentDailyPerformanceRows.isEmpty {
+                    Text("최근 일별 성과 없음")
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.Colors.textTertiary)
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(recentDailyPerformanceRows) { item in
+                            dailyPerformanceRow(item)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(DesignTokens.Layout.panelInnerPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appPanelStyle()
+    }
+
+    private func dailyPerformanceRow(_ item: DailyPerformanceSnapshotItem) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(formattedDailyPerformanceDate(item.date))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                Text("\(item.wins)승 \(item.losses)패 · \(item.tradeCount)건")
+                    .font(.caption2)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            }
+            Spacer(minLength: 12)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(DisplayFormatters.pnl(item.pnl))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(trendForValue(item.pnl).color)
+                Text(item.winRate.map { "승률 \(DisplayFormatters.percent($0))" } ?? "승률 -")
+                    .font(.caption2)
+                    .foregroundStyle(DesignTokens.Colors.textSecondary)
+            }
+        }
     }
 
     private var contentColumns: some View {
@@ -872,7 +969,10 @@ struct DashboardView: View {
     private var cashText: String { DisplayFormatters.krw(accountSummary?.cashBalance) }
 
     private var todayTotalPnLValue: Double? {
-        store.strategyGroupApplyStatus("risk")?.effectiveValue.doubleValue(for: "today_total_pnl")
+        if let available = store.runtime?.todayTotalPnlAvailable, available == false {
+            return nil
+        }
+        return store.runtime?.todayTotalPnl
     }
 
     private var todayTotalPnLText: String { DisplayFormatters.pnl(todayTotalPnLValue) }
@@ -896,10 +996,10 @@ struct DashboardView: View {
     }
 
     private var winRateValue: Double? {
-        let closed = weeklyClosedPositionsForCurrentMode.compactMap(\.realizedPnl)
-        guard !closed.isEmpty else { return nil }
-        let wins = closed.filter { $0 > 0 }.count
-        return (Double(wins) / Double(closed.count)) * 100.0
+        let tradeCount = recentDailyPerformanceRows.reduce(0) { $0 + $1.tradeCount }
+        guard tradeCount > 0 else { return nil }
+        let wins = recentDailyPerformanceRows.reduce(0) { $0 + $1.wins }
+        return (Double(wins) / Double(tradeCount)) * 100.0
     }
 
     private var winRateText: String {
@@ -909,11 +1009,11 @@ struct DashboardView: View {
 
     private var winRateChangeText: String? {
         guard winRateValue != nil else { return nil }
-        return "기준: \(currentOrderModeLabel) · 최근 7일"
+        return "기준: \(currentOrderModeLabel) · 최근 거래일"
     }
 
     private var weeklyRealizedPnLSum: Double? {
-        let pnls = weeklyClosedPositionsForCurrentMode.compactMap(\.realizedPnl)
+        let pnls = recentDailyPerformanceRows.compactMap(\.pnl)
         guard !pnls.isEmpty else { return nil }
         return pnls.reduce(0.0, +)
     }
@@ -961,15 +1061,12 @@ struct DashboardView: View {
         }
     }
 
-    private var weeklyClosedPositionsForCurrentMode: [ClosedPositionSnapshotItem] {
-        let cutoff = Date().addingTimeInterval(-(7 * 24 * 60 * 60))
-        return store.recentClosedPositions.filter { row in
-            guard row.createdAt >= cutoff else { return false }
-            let rowMode = (row.orderMode ?? row.executionMode ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-            return rowMode == currentOrderModeForWinRate
-        }
+    private var recentDailyPerformanceRows: [DailyPerformanceSnapshotItem] {
+        Array(store.recentDailyPerformance.prefix(7))
+    }
+
+    private func formattedDailyPerformanceDate(_ raw: String) -> String {
+        raw.replacingOccurrences(of: "-", with: ".")
     }
 
     private var lastScanText: String {

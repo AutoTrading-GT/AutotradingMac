@@ -16,6 +16,7 @@ struct MonitoringSnapshotResponse: Decodable {
     let recentFills: [FillSnapshotItem]
     let currentPositions: [PositionSnapshotItem]
     let recentClosedPositions: [ClosedPositionSnapshotItem]
+    let recentDailyPerformance: [DailyPerformanceSnapshotItem]
     let pnlSummary: PnLSummarySnapshot
     let limits: [String: Int]
 
@@ -30,6 +31,7 @@ struct MonitoringSnapshotResponse: Decodable {
         case recentFills
         case currentPositions
         case recentClosedPositions
+        case recentDailyPerformance
         case pnlSummary
         case limits
     }
@@ -47,6 +49,7 @@ struct MonitoringSnapshotResponse: Decodable {
         recentFills = Self.decodeLossyArray(FillSnapshotItem.self, from: container, forKey: .recentFills)
         currentPositions = Self.decodeLossyArray(PositionSnapshotItem.self, from: container, forKey: .currentPositions)
         recentClosedPositions = Self.decodeLossyArray(ClosedPositionSnapshotItem.self, from: container, forKey: .recentClosedPositions)
+        recentDailyPerformance = Self.decodeLossyArray(DailyPerformanceSnapshotItem.self, from: container, forKey: .recentDailyPerformance)
         pnlSummary = (try? container.decode(PnLSummarySnapshot.self, forKey: .pnlSummary))
             ?? PnLSummarySnapshot(openPositions: 0, unrealizedPnlTotal: nil, realizedPnlRecentTotal: nil, recentClosedCount: 0)
         limits = (try? container.decode([String: Int].self, forKey: .limits)) ?? [:]
@@ -92,6 +95,9 @@ struct RuntimeStatusSnapshot: Decodable {
     var startupStatus: String
     var startupError: String?
     var activeWsClients: Int
+    var todayPnlDate: String?
+    var todayTotalPnl: Double?
+    var todayTotalPnlAvailable: Bool?
     var accountSummary: AccountSummarySnapshot?
     var workers: WorkersSnapshot
 
@@ -123,6 +129,9 @@ struct RuntimeStatusSnapshot: Decodable {
         startupStatus: String,
         startupError: String?,
         activeWsClients: Int,
+        todayPnlDate: String?,
+        todayTotalPnl: Double?,
+        todayTotalPnlAvailable: Bool?,
         accountSummary: AccountSummarySnapshot?,
         workers: WorkersSnapshot
     ) {
@@ -153,6 +162,9 @@ struct RuntimeStatusSnapshot: Decodable {
         self.startupStatus = startupStatus
         self.startupError = startupError
         self.activeWsClients = activeWsClients
+        self.todayPnlDate = todayPnlDate
+        self.todayTotalPnl = todayTotalPnl
+        self.todayTotalPnlAvailable = todayTotalPnlAvailable
         self.accountSummary = accountSummary
         self.workers = workers
     }
@@ -185,6 +197,9 @@ struct RuntimeStatusSnapshot: Decodable {
         startupStatus: "unknown",
         startupError: nil,
         activeWsClients: 0,
+        todayPnlDate: nil,
+        todayTotalPnl: nil,
+        todayTotalPnlAvailable: nil,
         accountSummary: nil,
         workers: WorkersSnapshot.fallback
     )
@@ -217,6 +232,9 @@ struct RuntimeStatusSnapshot: Decodable {
         case startupStatus
         case startupError
         case activeWsClients
+        case todayPnlDate
+        case todayTotalPnl
+        case todayTotalPnlAvailable
         case accountSummary
         case workers
     }
@@ -253,6 +271,9 @@ struct RuntimeStatusSnapshot: Decodable {
         startupStatus = container.decodeStringFlexible(forKey: .startupStatus) ?? "unknown"
         startupError = container.decodeStringFlexible(forKey: .startupError)
         activeWsClients = container.decodeIntFlexible(forKey: .activeWsClients) ?? 0
+        todayPnlDate = container.decodeStringFlexible(forKey: .todayPnlDate)
+        todayTotalPnl = container.decodeDoubleFlexible(forKey: .todayTotalPnl)
+        todayTotalPnlAvailable = container.decodeBoolFlexible(forKey: .todayTotalPnlAvailable)
         accountSummary = try? container.decodeIfPresent(AccountSummarySnapshot.self, forKey: .accountSummary)
         workers = (try? container.decode(WorkersSnapshot.self, forKey: .workers)) ?? WorkersSnapshot.fallback
     }
@@ -1322,45 +1343,45 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
             ],
             "turnover_persistence_breakout": [
                 "selection_mode": .string("turnover"),
-                "top_n": .number(12),
-                "top_n_watch": .number(12),
-                "top_n_trade": .number(8),
+                "top_n": .number(10),
+                "top_n_watch": .number(10),
+                "top_n_trade": .number(6),
                 "enabled_signal_types": .array([.string("turnover_persistence_breakout")]),
-                "candidate_start_time": .string("09:05"),
-                "entry_end_time": .string("14:30"),
-                "persistence_lookback_minutes": .number(10),
-                "min_presence_ratio": .number(0.60),
-                "rank_persistence_weight": .number(30.0),
-                "turnover_persistence_weight": .number(25.0),
+                "candidate_start_time": .string("09:25"),
+                "entry_end_time": .string("11:20"),
+                "persistence_lookback_minutes": .number(8),
+                "min_presence_ratio": .number(0.75),
+                "rank_persistence_weight": .number(25.0),
+                "turnover_persistence_weight": .number(20.0),
                 "price_structure_weight": .number(20.0),
-                "vwap_weight": .number(15.0),
-                "quality_weight": .number(10.0),
-                "min_score_to_trade": .number(60.0),
+                "vwap_weight": .number(20.0),
+                "quality_weight": .number(15.0),
+                "min_score_to_trade": .number(70.0),
                 "use_vwap_filter": .bool(true),
-                "min_above_vwap_ratio": .number(0.67),
-                "allow_reclaim": .bool(true),
+                "min_above_vwap_ratio": .number(0.75),
+                "allow_reclaim": .bool(false),
                 "box_bars_min": .number(3),
                 "box_bars_max": .number(5),
-                "max_box_retrace_pct": .number(1.8),
-                "min_box_ready_ratio": .number(0.60),
-                "breakout_volume_multiplier": .number(1.5),
+                "max_box_retrace_pct": .number(1.3),
+                "min_box_ready_ratio": .number(0.70),
+                "breakout_volume_multiplier": .number(1.8),
                 "use_spread_filter": .bool(true),
-                "max_spread_pct": .number(0.30),
+                "max_spread_pct": .number(0.25),
                 "use_orderbook_depth_filter": .bool(true),
                 "min_best_bid_size": .number(300),
                 "min_best_ask_size": .number(300),
-                "max_orderbook_imbalance_ratio": .number(3.0),
-                "target_profit_pct": .number(3.0),
-                "stop_loss_pct": .number(1.5),
-                "max_holding_minutes": .number(45),
-                "use_trailing_exit": .bool(false),
+                "max_orderbook_imbalance_ratio": .number(2.5),
+                "target_profit_pct": .number(2.2),
+                "stop_loss_pct": .number(1.1),
+                "max_holding_minutes": .number(30),
+                "use_trailing_exit": .bool(true),
                 "trailing_exit_mode": .string("combined"),
                 "vwap_trailing_enabled": .bool(true),
                 "recent_low_trailing_enabled": .bool(true),
                 "use_risk_per_trade_sizing": .bool(true),
-                "risk_per_trade_pct": .number(0.30),
-                "max_position_size_pct_cap": .number(10.0),
-                "sizing_slippage_buffer_pct": .number(0.15),
+                "risk_per_trade_pct": .number(0.25),
+                "max_position_size_pct_cap": .number(7.0),
+                "sizing_slippage_buffer_pct": .number(0.20),
             ],
             "intraday_breakout": [
                 "breakout_window_minutes": .number(15),
@@ -1936,6 +1957,17 @@ struct PnLSummarySnapshot: Decodable {
     var unrealizedPnlTotal: Double?
     var realizedPnlRecentTotal: Double?
     var recentClosedCount: Int
+}
+
+struct DailyPerformanceSnapshotItem: Decodable, Identifiable {
+    let date: String
+    let pnl: Double?
+    let winRate: Double?
+    let tradeCount: Int
+    let wins: Int
+    let losses: Int
+
+    var id: String { date }
 }
 
 struct RuntimeMetricCard: Identifiable {

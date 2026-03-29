@@ -21,8 +21,10 @@
   - Runtime / Workers
 - 앱 시작 시 `GET /api/monitoring/snapshot` 1회 로드
 - 이후 `ws://.../ws/events` delta 스트림 반영
+- KST day rollover를 감지하면 `MonitoringStore`가 snapshot을 다시 불러와 `Today 평가손익`이 이전 거래일 값에 고정되지 않게 유지한다.
 - snapshot에는 `recent_strategy_events`가 포함되며, websocket `strategy.signal_filtered` 이벤트도 별도로 반영
 - snapshot/websocket은 `strategy.watchlist_updated`도 반영해 상태형 전략의 watchlist admission 변화를 보여준다.
+- snapshot에는 `recent_daily_performance`가 포함되며, Dashboard `최근 7일 승률` 카드 확장 시 최근 거래일별 `손익/승률/승패수/거래수`를 보여준다.
 - 페이지별 SwiftUI `#Preview` 지원
   - Dashboard / Scanner / Chart / Stategy / Logs / Settings / Dev
   - Dev 하위(`Signals / Risk`, `Orders / Fills`, `Positions / PnL`, `Runtime / Workers`) 및 `GlobalTopBarView` 포함

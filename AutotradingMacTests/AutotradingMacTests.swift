@@ -68,26 +68,26 @@ final class AutotradingMacTests: XCTestCase {
         )
         XCTAssertEqual(
             snapshot.strategyParams["turnover_persistence_breakout"]?["top_n_watch"]?.intValue,
-            12
+            10
         )
         XCTAssertEqual(
             snapshot.strategyParams["turnover_persistence_breakout"]?["min_presence_ratio"]?.doubleValue,
-            0.60,
+            0.75,
             accuracy: 0.0001
         )
         XCTAssertEqual(
             snapshot.strategyParams["turnover_persistence_breakout"]?["min_score_to_trade"]?.doubleValue,
-            60.0,
+            70.0,
             accuracy: 0.0001
         )
         XCTAssertEqual(
             snapshot.strategyParams["turnover_persistence_breakout"]?["quality_weight"]?.doubleValue,
-            10.0,
+            15.0,
             accuracy: 0.0001
         )
         XCTAssertEqual(
             snapshot.strategyParams["turnover_persistence_breakout"]?["use_trailing_exit"]?.boolValue,
-            false
+            true
         )
         XCTAssertEqual(snapshot.commonRiskParams["position_size_pct"]?.doubleValue, 10.0)
         XCTAssertTrue(snapshot.commonRiskParams["allowed_signal_types"]?.arrayStringValues?.contains("opening_pullback_reentry") ?? false)
@@ -393,6 +393,103 @@ final class AutotradingMacTests: XCTestCase {
         try await Task.sleep(nanoseconds: 180_000_000)
 
         XCTAssertEqual(await counter.currentValue(), 1)
+    }
+
+    @MainActor
+    func test_monitoringStore_appliesRecentDailyPerformanceFromSnapshot() async throws {
+        let strategySnapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: strategySnapshot,
+            defaults: strategySnapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let snapshot = try Self.makeMonitoringSnapshotResponse(
+            orderMode: "paper",
+            accountMode: "paper",
+            currentPositions: [],
+            todayTotalPnl: nil,
+            todayTotalPnlAvailable: false,
+            todayPnlDate: "2026-03-29",
+            recentDailyPerformance: [
+                [
+                    "date": "2026-03-28",
+                    "pnl": 200.0,
+                    "win_rate": 100.0,
+                    "trade_count": 1,
+                    "wins": 1,
+                    "losses": 0,
+                ],
+                [
+                    "date": "2026-03-27",
+                    "pnl": 50.0,
+                    "win_rate": 50.0,
+                    "trade_count": 2,
+                    "wins": 1,
+                    "losses": 1,
+                ],
+            ]
+        )
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(
+                strategyEnvelope: envelope,
+                snapshot: snapshot,
+                runtimeSnapshot: snapshot.runtime
+            ),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService()
+        )
+
+        await store.reloadSnapshot()
+
+        XCTAssertEqual(store.runtime?.todayPnlDate, "2026-03-29")
+        XCTAssertEqual(store.runtime?.todayTotalPnlAvailable, false)
+        XCTAssertEqual(store.recentDailyPerformance.count, 2)
+        XCTAssertEqual(store.recentDailyPerformance.first?.date, "2026-03-28")
+        XCTAssertEqual(store.recentDailyPerformance.first?.pnl ?? 0, 200.0, accuracy: 0.0001)
+    }
+
+    @MainActor
+    func test_monitoringStore_reloadsSnapshotWhenSeoulDayChanges() async throws {
+        let strategySnapshot = Self.makeStrategySettingsSnapshot()
+        let envelope = StrategySettingsResponseEnvelope(
+            data: strategySnapshot,
+            defaults: strategySnapshot,
+            applyPolicy: "저장된 값은 엔진 재시작 없이 다음 평가 사이클부터 반영됩니다.",
+            updatedAt: Date()
+        )
+        let snapshot = try Self.makeMonitoringSnapshotResponse(
+            orderMode: "paper",
+            accountMode: "paper",
+            currentPositions: []
+        )
+        let counter = SnapshotFetchCounter()
+        let store = MonitoringStore(
+            apiClient: MockMonitoringAPIClient(
+                strategyEnvelope: envelope,
+                snapshot: snapshot,
+                runtimeSnapshot: snapshot.runtime,
+                onFetchSnapshot: {
+                    await counter.increment()
+                }
+            ),
+            webSocketClient: MonitoringWebSocketClient(url: URL(string: "ws://127.0.0.1/ws/events")!),
+            localNotificationService: MockLocalNotificationService(),
+            connectWebSocketOnStart: false
+        )
+
+        await store.reloadSnapshot()
+        XCTAssertEqual(await counter.currentValue(), 1)
+
+        await store.refreshSnapshotForDayChangeIfNeeded(
+            referenceDate: ISO8601DateFormatter().date(from: "2026-03-29T02:00:00+09:00")!
+        )
+        XCTAssertEqual(await counter.currentValue(), 1)
+
+        await store.refreshSnapshotForDayChangeIfNeeded(
+            referenceDate: ISO8601DateFormatter().date(from: "2026-03-30T00:05:00+09:00")!
+        )
+        XCTAssertEqual(await counter.currentValue(), 2)
     }
 
     func test_resultFeedReducer_prefersCloseOverOrderAndFillInSameFlow() {
@@ -996,6 +1093,9 @@ final class AutotradingMacTests: XCTestCase {
                 startupStatus: "ready",
                 startupError: nil,
                 activeWsClients: 1,
+                todayPnlDate: nil,
+                todayTotalPnl: nil,
+                todayTotalPnlAvailable: nil,
                 accountSummary: nil,
                 workers: .fallback
             ),
@@ -1054,6 +1154,9 @@ final class AutotradingMacTests: XCTestCase {
                 startupStatus: "ready",
                 startupError: nil,
                 activeWsClients: 1,
+                todayPnlDate: nil,
+                todayTotalPnl: nil,
+                todayTotalPnlAvailable: nil,
                 accountSummary: nil,
                 workers: .fallback
             ),
@@ -1098,6 +1201,9 @@ final class AutotradingMacTests: XCTestCase {
                 startupStatus: "error",
                 startupError: "KIS auth failed: unauthorized",
                 activeWsClients: 0,
+                todayPnlDate: nil,
+                todayTotalPnl: nil,
+                todayTotalPnlAvailable: nil,
                 accountSummary: nil,
                 workers: .fallback
             ),
@@ -1153,7 +1259,11 @@ final class AutotradingMacTests: XCTestCase {
     private static func makeMonitoringSnapshotResponse(
         orderMode: String,
         accountMode: String,
-        currentPositions: [[String: Any]]
+        currentPositions: [[String: Any]],
+        todayTotalPnl: Double? = 544.0,
+        todayTotalPnlAvailable: Bool = true,
+        todayPnlDate: String = "2026-03-25",
+        recentDailyPerformance: [[String: Any]] = []
     ) throws -> MonitoringSnapshotResponse {
         let jsonObject: [String: Any] = [
             "runtime": [
@@ -1170,6 +1280,9 @@ final class AutotradingMacTests: XCTestCase {
                 "startup_ok": true,
                 "startup_status": "ok",
                 "active_ws_clients": 1,
+                "today_pnl_date": todayPnlDate,
+                "today_total_pnl": todayTotalPnl ?? NSNull(),
+                "today_total_pnl_available": todayTotalPnlAvailable,
                 "workers": [
                     "summary": [
                         "count": 4,
@@ -1191,6 +1304,7 @@ final class AutotradingMacTests: XCTestCase {
             "recent_fills": [],
             "current_positions": currentPositions,
             "recent_closed_positions": [],
+            "recent_daily_performance": recentDailyPerformance,
             "pnl_summary": [
                 "open_positions": 0,
                 "unrealized_pnl_total": NSNull(),
