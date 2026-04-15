@@ -48,6 +48,7 @@ struct DashboardView: View {
             )
             weeklyWinRateMetricCard
         }
+        .zIndex(isWeeklyPerformanceExpanded ? 30 : 0)
     }
 
     private func dashboardMetricCard(
