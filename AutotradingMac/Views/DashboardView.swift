@@ -14,10 +14,6 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 metricsRow
-                if isWeeklyPerformanceExpanded {
-                    weeklyPerformanceDetailPanel
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
                 accountStatusRow
                 contentColumns
             }
@@ -181,14 +177,21 @@ struct DashboardView: View {
                     .font(.caption)
             }
 
+            if isWeeklyPerformanceExpanded {
+                weeklyPerformanceDropdownContent
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(DesignTokens.Layout.panelInnerPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appPanelStyle()
     }
 
-    private var weeklyPerformanceDetailPanel: some View {
+    private var weeklyPerformanceDropdownContent: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .overlay(AppTheme.panelBorder.opacity(0.45))
+
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("최근 거래일 상세")
                     .font(.subheadline.weight(.semibold))
@@ -197,30 +200,29 @@ struct DashboardView: View {
                     .font(.caption)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
                 Spacer(minLength: 0)
-                Button("접기") {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        isWeeklyPerformanceExpanded = false
-                    }
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
             }
 
             if recentDailyPerformanceRows.isEmpty {
                 Text("최근 일별 성과 없음")
                     .font(.caption)
                     .foregroundStyle(DesignTokens.Colors.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(DesignTokens.Colors.surface1.opacity(0.52))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else {
                 VStack(spacing: 10) {
                     ForEach(recentDailyPerformanceRows) { item in
                         dailyPerformanceRow(item)
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(DesignTokens.Colors.surface1.opacity(0.52))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
-        .padding(DesignTokens.Layout.panelInnerPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .appPanelStyle()
     }
 
     private func dailyPerformanceRow(_ item: DailyPerformanceSnapshotItem) -> some View {
