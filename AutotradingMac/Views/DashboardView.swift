@@ -223,7 +223,7 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(DesignTokens.Colors.surface1.opacity(0.52))
+                    .background(DesignTokens.Colors.bgBase)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             } else {
                 VStack(spacing: 10) {
@@ -233,7 +233,7 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(DesignTokens.Colors.surface1.opacity(0.52))
+                .background(DesignTokens.Colors.bgBase)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
@@ -241,16 +241,7 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            DesignTokens.Colors.surface2.opacity(0.98),
-                            DesignTokens.Colors.surface1.opacity(0.92),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .fill(DesignTokens.Colors.bgElevated)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -333,6 +324,7 @@ struct DashboardView: View {
         dashboardPanel(title: "스캔 종목", subtitle: scannerPanelSubtitle, noPadding: true) {
             if visibleScannerItems.isEmpty {
                 panelEmptyState(scannerEmptyStateText)
+                    .frame(minHeight: DashboardPanelLayout.alignedBodyMinHeight, alignment: .topLeading)
             } else {
                 VStack(spacing: 0) {
                     ForEach(visibleScannerItems) { item in
@@ -370,6 +362,7 @@ struct DashboardView: View {
                         }
                     }
                 }
+                .frame(minHeight: DashboardPanelLayout.alignedBodyMinHeight, alignment: .top)
             }
         }
     }
@@ -419,6 +412,7 @@ struct DashboardView: View {
         dashboardPanel(title: "매매 신호", subtitle: signalsPanelSubtitle, noPadding: true) {
             if visibleSignalItems.isEmpty {
                 panelEmptyState(signalsEmptyStateText)
+                    .frame(minHeight: DashboardPanelLayout.alignedBodyMinHeight, alignment: .topLeading)
             } else {
                 VStack(spacing: 0) {
                     ForEach(visibleSignalItems) { item in
@@ -456,9 +450,12 @@ struct DashboardView: View {
                                 StatusBadge(text: item.status.label, tone: statusTone(item.status))
                                     .frame(width: DashboardSignalColumns.statusWidth, alignment: .center)
                             }
+                            .frame(minHeight: DashboardScannerColumns.rowMinHeight, alignment: .center)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
+                .frame(minHeight: DashboardPanelLayout.alignedBodyMinHeight, alignment: .top)
             }
         }
     }
@@ -1344,6 +1341,14 @@ private enum DashboardSignalColumns {
     static let sellChangeWidth: CGFloat = 62
     static let actionWidth: CGFloat = 56
     static let statusWidth: CGFloat = 74
+}
+
+private enum DashboardPanelLayout {
+    private static let visibleRowCount: CGFloat = 6
+    private static let dividerHeight: CGFloat = 1
+    static let alignedBodyMinHeight: CGFloat =
+        ((DashboardScannerColumns.rowMinHeight + (DesignTokens.Layout.rowVerticalPadding * 2)) * visibleRowCount)
+        + (dividerHeight * visibleRowCount)
 }
 
 private struct ScannerItem: Identifiable {

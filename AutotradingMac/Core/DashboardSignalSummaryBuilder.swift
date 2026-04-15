@@ -270,7 +270,7 @@ enum DashboardSignalSummaryBuilder {
             .compactMap { candidates in
                 candidates.max(by: isLessImportant)
             }
-            .sorted(by: { $0.timestamp > $1.timestamp })
+            .sorted(by: isHigherPriorityForDisplay)
             .prefix(limit)
             .map {
                 DashboardSignalSummaryRow(
@@ -542,6 +542,22 @@ enum DashboardSignalSummaryBuilder {
             return lhs.timestamp < rhs.timestamp
         }
         return lhs.priority < rhs.priority
+    }
+
+    private static func isHigherPriorityForDisplay(_ lhs: Candidate, _ rhs: Candidate) -> Bool {
+        if lhs.timestamp != rhs.timestamp {
+            return lhs.timestamp > rhs.timestamp
+        }
+        if lhs.priority != rhs.priority {
+            return lhs.priority > rhs.priority
+        }
+        if lhs.action != rhs.action {
+            return lhs.action.rawValue < rhs.action.rawValue
+        }
+        if lhs.code != rhs.code {
+            return lhs.code < rhs.code
+        }
+        return lhs.summary < rhs.summary
     }
 
     private struct Candidate {
