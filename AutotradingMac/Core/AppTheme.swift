@@ -36,6 +36,7 @@ extension View {
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(AppTheme.panelBorder, lineWidth: 1)
+                    .allowsHitTesting(false)
             )
             .overlay(alignment: .top) {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -48,6 +49,7 @@ extension View {
                     )
                     .frame(height: 34)
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    .allowsHitTesting(false)
             }
             .shadow(color: AppTheme.panelShadow, radius: 8, x: 0, y: 3)
     }
@@ -61,6 +63,7 @@ extension View {
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(AppTheme.surfaceBorder, lineWidth: 1)
+                    .allowsHitTesting(false)
             )
     }
 
@@ -82,6 +85,7 @@ extension View {
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(DesignTokens.Colors.borderSubtle.opacity(0.95), lineWidth: 1)
+                    .allowsHitTesting(false)
             )
             .shadow(color: Color.black.opacity(0.16), radius: 6, x: 0, y: 2)
     }
