@@ -7,12 +7,17 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject private var store: MonitoringStore
-    @State private var isWeeklyPerformanceExpanded = false
+    @SceneStorage("dashboard.weeklyPerformanceExpanded")
+    private var isWeeklyPerformanceExpanded = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignTokens.Layout.sectionGap) {
                 metricsRow
+                if isWeeklyPerformanceExpanded {
+                    weeklyPerformanceDetailPanel
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 accountStatusRow
                 contentColumns
             }
@@ -176,19 +181,39 @@ struct DashboardView: View {
                     .font(.caption)
             }
 
-            if isWeeklyPerformanceExpanded {
-                Divider()
-                    .overlay(AppTheme.panelBorder.opacity(0.45))
+        }
+        .padding(DesignTokens.Layout.panelInnerPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appPanelStyle()
+    }
 
-                if recentDailyPerformanceRows.isEmpty {
-                    Text("최근 일별 성과 없음")
-                        .font(.caption)
-                        .foregroundStyle(DesignTokens.Colors.textTertiary)
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(recentDailyPerformanceRows) { item in
-                            dailyPerformanceRow(item)
-                        }
+    private var weeklyPerformanceDetailPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("최근 거래일 상세")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DesignTokens.Colors.textPrimary)
+                Text("최근 순 · \(currentOrderModeLabel)")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+                Spacer(minLength: 0)
+                Button("접기") {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isWeeklyPerformanceExpanded = false
+                    }
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+            }
+
+            if recentDailyPerformanceRows.isEmpty {
+                Text("최근 일별 성과 없음")
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.Colors.textTertiary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(recentDailyPerformanceRows) { item in
+                        dailyPerformanceRow(item)
                     }
                 }
             }
