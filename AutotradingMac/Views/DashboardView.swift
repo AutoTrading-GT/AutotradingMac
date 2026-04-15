@@ -9,6 +9,7 @@ struct DashboardView: View {
     @EnvironmentObject private var store: MonitoringStore
     @SceneStorage("dashboard.weeklyPerformanceExpanded")
     private var isWeeklyPerformanceExpanded = false
+    @State private var weeklyWinRateCardHeight: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -176,22 +177,34 @@ struct DashboardView: View {
                 Text(" ")
                     .font(.caption)
             }
-
-            if isWeeklyPerformanceExpanded {
-                weeklyPerformanceDropdownContent
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
         .padding(DesignTokens.Layout.panelInnerPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appPanelStyle()
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        weeklyWinRateCardHeight = proxy.size.height
+                    }
+                    .onChange(of: proxy.size.height) { _, newValue in
+                        weeklyWinRateCardHeight = newValue
+                    }
+            }
+        )
+        .overlay(alignment: .topLeading) {
+            if isWeeklyPerformanceExpanded {
+                weeklyPerformanceDropdownOverlay
+                    .offset(y: weeklyWinRateCardHeight + 8)
+                    .zIndex(20)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .zIndex(isWeeklyPerformanceExpanded ? 20 : 0)
     }
 
-    private var weeklyPerformanceDropdownContent: some View {
+    private var weeklyPerformanceDropdownOverlay: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Divider()
-                .overlay(AppTheme.panelBorder.opacity(0.45))
-
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("최근 거래일 상세")
                     .font(.subheadline.weight(.semibold))
@@ -223,6 +236,27 @@ struct DashboardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            DesignTokens.Colors.surface2.opacity(0.98),
+                            DesignTokens.Colors.surface1.opacity(0.92),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(AppTheme.panelBorder.opacity(0.95), lineWidth: 1)
+                .allowsHitTesting(false)
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
     }
 
     private func dailyPerformanceRow(_ item: DailyPerformanceSnapshotItem) -> some View {
