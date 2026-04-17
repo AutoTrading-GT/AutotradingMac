@@ -4045,11 +4045,10 @@ struct SettingsView: View {
 
     private var riskDailyTradeLimitBadgeText: String {
         let configuredRisk = store.strategyDraft?.basic.risk
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
-        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+        let enabled = riskRuntimeValue("daily_trade_limit_enabled")?.boolValue
             ?? configuredRisk?.dailyTradeLimitEnabled
             ?? false
-        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+        let remaining = riskRuntimeValue("daily_trade_limit_remaining")?.intValue
 
         if !enabled {
             return "무제한"
@@ -4062,11 +4061,10 @@ struct SettingsView: View {
 
     private var riskDailyTradeLimitTone: StatusTone {
         let configuredRisk = store.strategyDraft?.basic.risk
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
-        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+        let enabled = riskRuntimeValue("daily_trade_limit_enabled")?.boolValue
             ?? configuredRisk?.dailyTradeLimitEnabled
             ?? false
-        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+        let remaining = riskRuntimeValue("daily_trade_limit_remaining")?.intValue
 
         if !enabled {
             return .neutral
@@ -4079,16 +4077,15 @@ struct SettingsView: View {
 
     private var riskDailyTradeLimitSnapshotText: String {
         let configuredRisk = store.strategyDraft?.basic.risk
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
 
-        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+        let enabled = riskRuntimeValue("daily_trade_limit_enabled")?.boolValue
             ?? configuredRisk?.dailyTradeLimitEnabled
             ?? false
-        let limit = effective?["daily_trade_limit_count"]?.intValue
+        let limit = riskRuntimeValue("daily_trade_limit_count")?.intValue
             ?? configuredRisk?.dailyTradeLimitCount
             ?? 0
-        let todayUsed = effective?["today_trade_count"]?.intValue
-        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+        let todayUsed = riskRuntimeValue("today_trade_count")?.intValue
+        let remaining = riskRuntimeValue("daily_trade_limit_remaining")?.intValue
 
         if !enabled {
             return "무제한"
@@ -4104,16 +4101,15 @@ struct SettingsView: View {
 
     private var riskDailyTradeLimitRuntimeText: String {
         let configuredRisk = store.strategyDraft?.basic.risk
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
 
-        let enabled = effective?["daily_trade_limit_enabled"]?.boolValue
+        let enabled = riskRuntimeValue("daily_trade_limit_enabled")?.boolValue
             ?? configuredRisk?.dailyTradeLimitEnabled
             ?? false
-        let limit = effective?["daily_trade_limit_count"]?.intValue
+        let limit = riskRuntimeValue("daily_trade_limit_count")?.intValue
             ?? configuredRisk?.dailyTradeLimitCount
             ?? 0
-        let todayUsed = effective?["today_trade_count"]?.intValue
-        let remaining = effective?["daily_trade_limit_remaining"]?.intValue
+        let todayUsed = riskRuntimeValue("today_trade_count")?.intValue
+        let remaining = riskRuntimeValue("daily_trade_limit_remaining")?.intValue
 
         if !enabled {
             return "무제한"
@@ -4129,14 +4125,13 @@ struct SettingsView: View {
 
     private var riskDailyLossRuntimeText: String {
         let configuredRisk = store.strategyDraft?.basic.risk
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
 
-        let maxLossLimitPct = effective?["max_loss_limit_pct"]?.doubleValue
+        let maxLossLimitPct = riskRuntimeValue("max_loss_limit_pct")?.doubleValue
             ?? configuredRisk?.maxLossLimitPct
             ?? 0.0
-        let todayLossPct = effective?["today_loss_pct"]?.doubleValue
-        let todayTotalPnl = effective?["today_total_pnl"]?.doubleValue
-        let reached = effective?["daily_loss_limit_reached"]?.boolValue ?? false
+        let todayLossPct = riskRuntimeValue("today_loss_pct")?.doubleValue
+        let todayTotalPnl = riskRuntimeValue("today_total_pnl")?.doubleValue
+        let reached = riskRuntimeValue("daily_loss_limit_reached")?.boolValue ?? false
 
         let limitText = DisplayFormatters.percent(maxLossLimitPct)
         if let todayLossPct {
@@ -4154,14 +4149,13 @@ struct SettingsView: View {
 
     private var riskDailyLossSnapshotText: String {
         let configuredRisk = store.strategyDraft?.basic.risk
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
 
-        let maxLossLimitPct = effective?["max_loss_limit_pct"]?.doubleValue
+        let maxLossLimitPct = riskRuntimeValue("max_loss_limit_pct")?.doubleValue
             ?? configuredRisk?.maxLossLimitPct
             ?? 0.0
-        let todayLossPct = effective?["today_loss_pct"]?.doubleValue ?? 0.0
+        let todayLossPct = riskRuntimeValue("today_loss_pct")?.doubleValue ?? 0.0
 
-        if effective?["today_loss_pct"]?.doubleValue == nil {
+        if riskRuntimeValue("today_loss_pct")?.doubleValue == nil {
             return "\(currentOrderModeSummaryText) 한도 \(DisplayFormatters.percent(maxLossLimitPct))"
         }
         return "\(currentOrderModeSummaryText) 손실률 \(DisplayFormatters.percent(todayLossPct)) / 한도 \(DisplayFormatters.percent(maxLossLimitPct))"
@@ -4172,26 +4166,31 @@ struct SettingsView: View {
     }
 
     private var riskDailyLossRuntimeBadgeText: String {
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
         let prefix = currentOrderModeShortLabel
-        if (effective?["daily_loss_limit_reached"]?.boolValue ?? false) {
+        if (riskRuntimeValue("daily_loss_limit_reached")?.boolValue ?? false) {
             return "\(prefix) 한도"
         }
-        if effective?["today_loss_pct"]?.doubleValue == nil {
+        if riskRuntimeValue("today_loss_pct")?.doubleValue == nil {
             return "\(prefix) 대기"
         }
         return "\(prefix) 정상"
     }
 
     private var riskDailyLossRuntimeTone: StatusTone {
-        let effective = store.strategyGroupApplyStatus("risk")?.effectiveValue
-        if (effective?["daily_loss_limit_reached"]?.boolValue ?? false) {
+        if (riskRuntimeValue("daily_loss_limit_reached")?.boolValue ?? false) {
             return .danger
         }
-        if effective?["today_loss_pct"]?.doubleValue == nil {
+        if riskRuntimeValue("today_loss_pct")?.doubleValue == nil {
             return .warning
         }
         return .neutral
+    }
+
+    private func riskRuntimeValue(_ key: String) -> JSONValue? {
+        if let runtimeValue = store.runtime?.workers.workers["risk"]?[key] {
+            return runtimeValue
+        }
+        return store.strategyGroupApplyStatus("risk")?.effectiveValue?[key]
     }
 
     private var currentOrderModeShortLabel: String {
