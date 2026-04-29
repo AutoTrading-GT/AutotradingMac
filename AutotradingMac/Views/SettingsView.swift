@@ -1552,27 +1552,65 @@ struct SettingsView: View {
                     }
                 }
 
-                openingStrategyFieldCard(title: "호가잔량 / 불균형") {
+                openingStrategyFieldCard(title: "호가금액 depth / 불균형") {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandToggleControl(
-                            title: "호가잔량 hard filter",
-                            isOn: activeStrategyBoolBinding("use_orderbook_depth_filter", defaultValue: true)
+                            title: "호가금액 depth hard filter",
+                            isOn: activeStrategyBoolBinding("use_orderbook_value_depth_filter", defaultValue: true)
                         )
-                        strategyBandStepperTile(
-                            label: "최소 매수 1호가 잔량",
-                            value: activeStrategyIntValue("min_best_bid_size", defaultValue: 300),
-                            range: 1...1_000_000,
-                            step: 10,
-                            unit: "주",
-                            onChange: { store.updateActiveStrategyParamInt("min_best_bid_size", value: $0, range: 1...1_000_000) }
+                        strategyBandNumericField(
+                            label: "최소 매수 L1 금액",
+                            unit: "KRW",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_l1_bid_value_krw",
+                                defaultValue: 15_000_000.0,
+                                range: 1...10_000_000_000
+                            )
                         )
-                        strategyBandStepperTile(
-                            label: "최소 매도 1호가 잔량",
-                            value: activeStrategyIntValue("min_best_ask_size", defaultValue: 300),
-                            range: 1...1_000_000,
-                            step: 10,
-                            unit: "주",
-                            onChange: { store.updateActiveStrategyParamInt("min_best_ask_size", value: $0, range: 1...1_000_000) }
+                        strategyBandNumericField(
+                            label: "최소 매도 L1 금액",
+                            unit: "KRW",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_l1_ask_value_krw",
+                                defaultValue: 15_000_000.0,
+                                range: 1...10_000_000_000
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최소 매수 L5 금액",
+                            unit: "KRW",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_l5_bid_value_krw",
+                                defaultValue: 80_000_000.0,
+                                range: 1...100_000_000_000
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최소 매도 L5 금액",
+                            unit: "KRW",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_l5_ask_value_krw",
+                                defaultValue: 80_000_000.0,
+                                range: 1...100_000_000_000
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "L1 / 주문금액 비율",
+                            unit: "x",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_l1_depth_to_order_value_ratio",
+                                defaultValue: 1.0,
+                                range: 0.01...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "L5 / 주문금액 비율",
+                            unit: "x",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_l5_depth_to_order_value_ratio",
+                                defaultValue: 3.0,
+                                range: 0.01...100.0
+                            )
                         )
                         strategyBandNumericField(
                             label: "최대 호가 불균형",

@@ -198,7 +198,7 @@
     - 눌림 정의: `pullback_retrace_min/max_pct`, `pullback_bars_min/max`
     - 재진입 조건: `reentry_volume_multiplier`, `use_vwap_filter`, `require_vwap_reclaim`
     - 시장제도 / 거래안전 필터: `exclude_recently_listed_enabled/days`, `exclude_short_term_overheated_enabled`, `exclude_market_warning_enabled`, `exclude_recent_vi_enabled`, `recent_vi_lookback_minutes`
-    - 체결 품질 필터: `use_spread_filter`, `max_spread_pct`, `use_orderbook_depth_filter`, `min_best_bid_size`, `min_best_ask_size`, `max_orderbook_imbalance_ratio`
+    - 체결 품질 필터: `use_spread_filter`, `max_spread_pct`, `use_orderbook_value_depth_filter`, `min_l1_bid_value_krw`, `min_l1_ask_value_krw`, `min_l5_bid_value_krw`, `min_l5_ask_value_krw`, `min_l1_depth_to_order_value_ratio`, `min_l5_depth_to_order_value_ratio`, `max_orderbook_imbalance_ratio`
     - 포지션 사이징: `use_risk_per_trade_sizing`, `risk_per_trade_pct`, `max_position_size_pct_cap`, `sizing_slippage_buffer_pct`
     - 청산: `initial_stop_pct`, `first_take_profit_r_multiple`, `first_take_profit_partial_ratio`, `time_stop_soft_minutes`, `time_stop_hard_minutes`
   - 1차 구현 범위/제약:

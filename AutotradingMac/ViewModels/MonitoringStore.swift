@@ -1576,9 +1576,13 @@ final class MonitoringStore: ObservableObject {
             "recent_vi_lookback_minutes": .number(15),
             "use_spread_filter": .bool(true),
             "max_spread_pct": .number(0.30),
-            "use_orderbook_depth_filter": .bool(true),
-            "min_best_bid_size": .number(300),
-            "min_best_ask_size": .number(300),
+            "use_orderbook_value_depth_filter": .bool(true),
+            "min_l1_bid_value_krw": .number(15_000_000.0),
+            "min_l1_ask_value_krw": .number(15_000_000.0),
+            "min_l5_bid_value_krw": .number(80_000_000.0),
+            "min_l5_ask_value_krw": .number(80_000_000.0),
+            "min_l1_depth_to_order_value_ratio": .number(1.0),
+            "min_l5_depth_to_order_value_ratio": .number(3.0),
             "max_orderbook_imbalance_ratio": .number(3.0),
             "use_risk_per_trade_sizing": .bool(true),
             "risk_per_trade_pct": .number(0.30),
@@ -2069,13 +2073,29 @@ final class MonitoringStore: ObservableObject {
             if maxSpreadPct <= 0 || maxSpreadPct > 10 {
                 errors.append("Persistence Breakout 최대 스프레드는 0 초과 10 이하 범위여야 합니다.")
             }
-            let minBestBidSize = activeStrategyParams.intValue(for: "min_best_bid_size") ?? 0
-            if !(1...1_000_000).contains(minBestBidSize) {
-                errors.append("Persistence Breakout 최소 매수호가 잔량은 1~1,000,000주 범위여야 합니다.")
+            let minL1BidValueKRW = activeStrategyParams.doubleValue(for: "min_l1_bid_value_krw") ?? 0
+            if minL1BidValueKRW <= 0 || minL1BidValueKRW > 10_000_000_000 {
+                errors.append("Persistence Breakout 최소 매수 L1 금액은 0 초과 100억 이하 범위여야 합니다.")
             }
-            let minBestAskSize = activeStrategyParams.intValue(for: "min_best_ask_size") ?? 0
-            if !(1...1_000_000).contains(minBestAskSize) {
-                errors.append("Persistence Breakout 최소 매도호가 잔량은 1~1,000,000주 범위여야 합니다.")
+            let minL1AskValueKRW = activeStrategyParams.doubleValue(for: "min_l1_ask_value_krw") ?? 0
+            if minL1AskValueKRW <= 0 || minL1AskValueKRW > 10_000_000_000 {
+                errors.append("Persistence Breakout 최소 매도 L1 금액은 0 초과 100억 이하 범위여야 합니다.")
+            }
+            let minL5BidValueKRW = activeStrategyParams.doubleValue(for: "min_l5_bid_value_krw") ?? 0
+            if minL5BidValueKRW <= 0 || minL5BidValueKRW > 100_000_000_000 {
+                errors.append("Persistence Breakout 최소 매수 L5 금액은 0 초과 1000억 이하 범위여야 합니다.")
+            }
+            let minL5AskValueKRW = activeStrategyParams.doubleValue(for: "min_l5_ask_value_krw") ?? 0
+            if minL5AskValueKRW <= 0 || minL5AskValueKRW > 100_000_000_000 {
+                errors.append("Persistence Breakout 최소 매도 L5 금액은 0 초과 1000억 이하 범위여야 합니다.")
+            }
+            let minL1DepthToOrderValueRatio = activeStrategyParams.doubleValue(for: "min_l1_depth_to_order_value_ratio") ?? 0
+            if minL1DepthToOrderValueRatio <= 0 || minL1DepthToOrderValueRatio > 100 {
+                errors.append("Persistence Breakout L1 / 주문금액 비율은 0 초과 100 이하 범위여야 합니다.")
+            }
+            let minL5DepthToOrderValueRatio = activeStrategyParams.doubleValue(for: "min_l5_depth_to_order_value_ratio") ?? 0
+            if minL5DepthToOrderValueRatio <= 0 || minL5DepthToOrderValueRatio > 100 {
+                errors.append("Persistence Breakout L5 / 주문금액 비율은 0 초과 100 이하 범위여야 합니다.")
             }
             let maxOrderbookImbalanceRatio = activeStrategyParams.doubleValue(for: "max_orderbook_imbalance_ratio") ?? 0
             if maxOrderbookImbalanceRatio < 1 || maxOrderbookImbalanceRatio > 100 {
