@@ -1225,6 +1225,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     persistenceWatchlistSection()
                     persistenceRuleSection()
+                    persistenceMarketSafetySection()
                     persistenceBreakoutSection()
                     persistenceQualitySection()
                     persistenceSizingSection()
@@ -1521,6 +1522,83 @@ struct SettingsView: View {
                         strategyCompactNote(
                             title: "실행 신호",
                             detail: localizedSignalDescription("turnover_persistence_breakout")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func persistenceMarketSafetySection() -> some View {
+        strategyCategoryBlock(
+            title: "Market Safety",
+            summary: "최근 VI, 신규상장, 단기과열, 투자경고/위험은 hard reject하고, 투자주의는 기본적으로 점수 감점으로 처리합니다."
+        ) {
+            openingStrategyFieldGrid {
+                openingStrategyFieldCard(title: "시장제도 차단") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "최근 VI 제외",
+                            isOn: activeStrategyBoolBinding("exclude_recent_vi_enabled", defaultValue: true)
+                        )
+                        strategyBandStepperTile(
+                            label: "VI 확인 시간",
+                            value: activeStrategyIntValue("recent_vi_lookback_minutes", defaultValue: 10),
+                            range: 1...120,
+                            step: 1,
+                            unit: "분",
+                            onChange: { store.updateActiveStrategyParamInt("recent_vi_lookback_minutes", value: $0, range: 1...120) }
+                        )
+                        strategyBandToggleControl(
+                            title: "단기과열 제외",
+                            isOn: activeStrategyBoolBinding("exclude_short_term_overheated_enabled", defaultValue: true)
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "경보 / 신규상장") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "투자경고 제외",
+                            isOn: activeStrategyBoolBinding("exclude_investment_warning_enabled", defaultValue: true)
+                        )
+                        strategyBandToggleControl(
+                            title: "투자위험 제외",
+                            isOn: activeStrategyBoolBinding("exclude_investment_risk_enabled", defaultValue: true)
+                        )
+                        strategyBandToggleControl(
+                            title: "신규상장 제외",
+                            isOn: activeStrategyBoolBinding("exclude_recently_listed_enabled", defaultValue: true)
+                        )
+                        strategyBandStepperTile(
+                            label: "제외 일수",
+                            value: activeStrategyIntValue("exclude_recently_listed_days", defaultValue: 10),
+                            range: 1...60,
+                            step: 1,
+                            unit: "거래일",
+                            onChange: { store.updateActiveStrategyParamInt("exclude_recently_listed_days", value: $0, range: 1...60) }
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "투자주의 처리") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "투자주의 hard reject",
+                            isOn: activeStrategyBoolBinding("exclude_investment_caution_enabled", defaultValue: false)
+                        )
+                        strategyBandNumericField(
+                            label: "점수 감점",
+                            unit: "score",
+                            text: activeStrategyDoubleTextBinding(
+                                "investment_caution_score_penalty",
+                                defaultValue: 10.0,
+                                range: 0.0...100.0
+                            )
+                        )
+                        strategyCompactNote(
+                            title: "기본 정책",
+                            detail: "투자주의는 기본적으로 hard reject가 아니라 total persistence score 감점만 적용합니다."
                         )
                     }
                 }

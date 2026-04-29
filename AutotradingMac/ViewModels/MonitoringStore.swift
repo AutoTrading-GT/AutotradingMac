@@ -1613,6 +1613,15 @@ final class MonitoringStore: ObservableObject {
             "vwap_weight": .number(22.0),
             "quality_weight": .number(20.0),
             "min_score_to_trade": .number(78.0),
+            "exclude_recently_listed_enabled": .bool(true),
+            "exclude_recently_listed_days": .number(10),
+            "exclude_short_term_overheated_enabled": .bool(true),
+            "exclude_investment_warning_enabled": .bool(true),
+            "exclude_investment_risk_enabled": .bool(true),
+            "exclude_investment_caution_enabled": .bool(false),
+            "investment_caution_score_penalty": .number(10.0),
+            "exclude_recent_vi_enabled": .bool(true),
+            "recent_vi_lookback_minutes": .number(10),
             "use_vwap_filter": .bool(true),
             "min_above_vwap_ratio": .number(0.80),
             "allow_reclaim": .bool(false),
@@ -2056,6 +2065,18 @@ final class MonitoringStore: ObservableObject {
             let minScoreToTrade = activeStrategyParams.doubleValue(for: "min_score_to_trade") ?? -1
             if minScoreToTrade < 0 || minScoreToTrade > 100 {
                 errors.append("Persistence Breakout 최소 총점은 0~100 범위여야 합니다.")
+            }
+            let recentlyListedDays = activeStrategyParams.intValue(for: "exclude_recently_listed_days") ?? 0
+            if !(1...60).contains(recentlyListedDays) {
+                errors.append("Persistence Breakout 신규상장 제외 일수는 1~60거래일 범위여야 합니다.")
+            }
+            let recentVILookbackMinutes = activeStrategyParams.intValue(for: "recent_vi_lookback_minutes") ?? 0
+            if !(1...120).contains(recentVILookbackMinutes) {
+                errors.append("Persistence Breakout 최근 VI 확인 시간은 1~120분 범위여야 합니다.")
+            }
+            let investmentCautionScorePenalty = activeStrategyParams.doubleValue(for: "investment_caution_score_penalty") ?? -1
+            if investmentCautionScorePenalty < 0 || investmentCautionScorePenalty > 100 {
+                errors.append("Persistence Breakout 투자주의 점수 감점은 0~100점 범위여야 합니다.")
             }
             let aboveVWAPRatio = activeStrategyParams.doubleValue(for: "min_above_vwap_ratio") ?? 0
             if aboveVWAPRatio <= 0 || aboveVWAPRatio > 1 {
