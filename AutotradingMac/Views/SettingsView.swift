@@ -1634,12 +1634,25 @@ struct SettingsView: View {
                                 range: 0.01...100.0
                             )
                         )
+                        strategyBandToggleControl(
+                            title: "L5 호가 불균형 필터",
+                            isOn: activeStrategyBoolBinding("use_l5_orderbook_imbalance_filter", defaultValue: true)
+                        )
                         strategyBandNumericField(
-                            label: "최대 호가 불균형",
+                            label: "최대 L5 ask/bid 비율",
                             unit: "ratio",
                             text: activeStrategyDoubleTextBinding(
-                                "max_orderbook_imbalance_ratio",
-                                defaultValue: 3.0,
+                                "max_l5_ask_to_bid_ratio",
+                                defaultValue: 2.2,
+                                range: 1.0...100.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최대 L5 bid/ask 비율",
+                            unit: "ratio",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_l5_bid_to_ask_ratio",
+                                defaultValue: 4.0,
                                 range: 1.0...100.0
                             )
                         )

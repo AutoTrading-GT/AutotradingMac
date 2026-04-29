@@ -981,11 +981,31 @@ struct StrategyTemplateSnapshot: Decodable, Equatable, Identifiable {
                         wired: true
                     ),
                     StrategyConfigurableFieldSnapshot(
-                        fieldId: "max_orderbook_imbalance_ratio",
-                        label: "최대 호가 불균형",
+                        fieldId: "use_l5_orderbook_imbalance_filter",
+                        label: "L5 호가 불균형 필터",
+                        inputType: "bool",
+                        group: "execution_quality",
+                        description: "1~5호가 누적 금액 기준 비대칭을 hard reject와 quality score에 사용합니다.",
+                        options: nil,
+                        unit: nil,
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_l5_ask_to_bid_ratio",
+                        label: "최대 L5 ask/bid 비율",
                         inputType: "float",
                         group: "execution_quality",
-                        description: "최우선 양방향 호가 잔량 비율이 이 값을 넘으면 진입을 막습니다.",
+                        description: "매도호가 누적 금액이 매수호가 누적 금액보다 과도하게 두꺼울 때 차단하는 상한입니다.",
+                        options: nil,
+                        unit: "x",
+                        wired: true
+                    ),
+                    StrategyConfigurableFieldSnapshot(
+                        fieldId: "max_l5_bid_to_ask_ratio",
+                        label: "최대 L5 bid/ask 비율",
+                        inputType: "float",
+                        group: "execution_quality",
+                        description: "매수호가 누적 금액이 매도호가 누적 금액보다 비정상적으로 두꺼울 때 차단하는 상한입니다.",
                         options: nil,
                         unit: "x",
                         wired: true
@@ -1451,7 +1471,9 @@ struct StrategySettingsSnapshot: Decodable, Equatable {
                 "min_l5_ask_value_krw": .number(80_000_000.0),
                 "min_l1_depth_to_order_value_ratio": .number(1.0),
                 "min_l5_depth_to_order_value_ratio": .number(3.0),
-                "max_orderbook_imbalance_ratio": .number(3.0),
+                "use_l5_orderbook_imbalance_filter": .bool(true),
+                "max_l5_ask_to_bid_ratio": .number(2.2),
+                "max_l5_bid_to_ask_ratio": .number(4.0),
                 "target_profit_pct": .number(4.5),
                 "stop_loss_pct": .number(2.2),
                 "max_holding_minutes": .number(25),

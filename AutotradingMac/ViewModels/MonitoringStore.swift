@@ -1633,7 +1633,9 @@ final class MonitoringStore: ObservableObject {
             "min_l5_ask_value_krw": .number(80_000_000.0),
             "min_l1_depth_to_order_value_ratio": .number(1.0),
             "min_l5_depth_to_order_value_ratio": .number(3.0),
-            "max_orderbook_imbalance_ratio": .number(3.0),
+            "use_l5_orderbook_imbalance_filter": .bool(true),
+            "max_l5_ask_to_bid_ratio": .number(2.2),
+            "max_l5_bid_to_ask_ratio": .number(4.0),
             "target_profit_pct": .number(4.5),
             "stop_loss_pct": .number(2.2),
             "max_holding_minutes": .number(25),
@@ -2115,9 +2117,13 @@ final class MonitoringStore: ObservableObject {
             if minL5DepthToOrderValueRatio <= 0 || minL5DepthToOrderValueRatio > 100 {
                 errors.append("Persistence Breakout L5 / 주문금액 비율은 0 초과 100 이하 범위여야 합니다.")
             }
-            let maxOrderbookImbalanceRatio = activeStrategyParams.doubleValue(for: "max_orderbook_imbalance_ratio") ?? 0
-            if maxOrderbookImbalanceRatio < 1 || maxOrderbookImbalanceRatio > 100 {
-                errors.append("Persistence Breakout 최대 호가 불균형 비율은 1 이상 100 이하 범위여야 합니다.")
+            let maxL5AskToBidRatio = activeStrategyParams.doubleValue(for: "max_l5_ask_to_bid_ratio") ?? 0
+            if maxL5AskToBidRatio < 1 || maxL5AskToBidRatio > 100 {
+                errors.append("Persistence Breakout 최대 L5 ask/bid 비율은 1 이상 100 이하 범위여야 합니다.")
+            }
+            let maxL5BidToAskRatio = activeStrategyParams.doubleValue(for: "max_l5_bid_to_ask_ratio") ?? 0
+            if maxL5BidToAskRatio < 1 || maxL5BidToAskRatio > 100 {
+                errors.append("Persistence Breakout 최대 L5 bid/ask 비율은 1 이상 100 이하 범위여야 합니다.")
             }
             let targetProfitPct = activeStrategyParams.doubleValue(for: "target_profit_pct") ?? -1
             if targetProfitPct < 0 || targetProfitPct > 100 {
