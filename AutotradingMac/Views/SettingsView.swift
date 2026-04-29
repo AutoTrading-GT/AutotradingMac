@@ -1293,7 +1293,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandStepperTile(
                             label: "관찰 범위",
-                            value: activeStrategyIntValue("top_n_watch", defaultValue: 12),
+                            value: activeStrategyIntValue("top_n_watch", defaultValue: 15),
                             range: 1...30,
                             step: 1,
                             unit: "Top-N",
@@ -1301,7 +1301,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "진입 허용 순위",
-                            value: activeStrategyIntValue("top_n_trade", defaultValue: 8),
+                            value: activeStrategyIntValue("top_n_trade", defaultValue: 10),
                             range: 1...30,
                             step: 1,
                             unit: "Top-N",
@@ -1314,13 +1314,13 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandTextField(
                             label: "감시 시작",
-                            placeholder: "09:05",
+                            placeholder: "09:28",
                             unit: "KST",
                             text: activeStrategyStringBinding("candidate_start_time")
                         )
                         strategyBandTextField(
                             label: "진입 종료",
-                            placeholder: "14:30",
+                            placeholder: "11:10",
                             unit: "KST",
                             text: activeStrategyStringBinding("entry_end_time")
                         )
@@ -1357,7 +1357,7 @@ struct SettingsView: View {
                             unit: "ratio",
                             text: activeStrategyDoubleTextBinding(
                                 "min_presence_ratio",
-                                defaultValue: 0.60,
+                                defaultValue: 0.80,
                                 range: 0.01...1.0
                             )
                         )
@@ -1371,7 +1371,7 @@ struct SettingsView: View {
                             unit: "score",
                             text: activeStrategyDoubleTextBinding(
                                 "min_score_to_trade",
-                                defaultValue: 60.0,
+                                defaultValue: 78.0,
                                 range: 0.0...100.0
                             )
                         )
@@ -1380,7 +1380,7 @@ struct SettingsView: View {
                             unit: "w",
                             text: activeStrategyDoubleTextBinding(
                                 "rank_persistence_weight",
-                                defaultValue: 30.0,
+                                defaultValue: 18.0,
                                 range: 0.0...100.0
                             )
                         )
@@ -1389,7 +1389,7 @@ struct SettingsView: View {
                             unit: "w",
                             text: activeStrategyDoubleTextBinding(
                                 "turnover_persistence_weight",
-                                defaultValue: 25.0,
+                                defaultValue: 22.0,
                                 range: 0.0...100.0
                             )
                         )
@@ -1398,7 +1398,7 @@ struct SettingsView: View {
                             unit: "w",
                             text: activeStrategyDoubleTextBinding(
                                 "price_structure_weight",
-                                defaultValue: 20.0,
+                                defaultValue: 18.0,
                                 range: 0.0...100.0
                             )
                         )
@@ -1407,7 +1407,7 @@ struct SettingsView: View {
                             unit: "w",
                             text: activeStrategyDoubleTextBinding(
                                 "vwap_weight",
-                                defaultValue: 15.0,
+                                defaultValue: 22.0,
                                 range: 0.0...100.0
                             )
                         )
@@ -1416,7 +1416,7 @@ struct SettingsView: View {
                             unit: "w",
                             text: activeStrategyDoubleTextBinding(
                                 "quality_weight",
-                                defaultValue: 10.0,
+                                defaultValue: 20.0,
                                 range: 0.0...100.0
                             )
                         )
@@ -1442,7 +1442,7 @@ struct SettingsView: View {
     private func persistenceBreakoutSection() -> some View {
         strategyCategoryBlock(
             title: "VWAP / Box Breakout",
-            summary: "최종 진입은 VWAP 상태와 최근 3~5개 1분봉 box 상단 돌파가 함께 확인될 때만 허용합니다."
+            summary: "최종 진입은 VWAP 상태와 최근 4~8개 1분봉 box 상단 돌파가 함께 확인될 때만 허용합니다."
         ) {
             openingStrategyFieldGrid {
                 openingStrategyFieldCard(title: "VWAP 조건") {
@@ -1456,13 +1456,13 @@ struct SettingsView: View {
                             unit: "ratio",
                             text: activeStrategyDoubleTextBinding(
                                 "min_above_vwap_ratio",
-                                defaultValue: 0.67,
+                                defaultValue: 0.80,
                                 range: 0.01...1.0
                             )
                         )
                         strategyBandToggleControl(
                             title: "VWAP 재회복 허용",
-                            isOn: activeStrategyBoolBinding("allow_reclaim", defaultValue: true)
+                            isOn: activeStrategyBoolBinding("allow_reclaim", defaultValue: false)
                         )
                     }
                 }
@@ -1471,7 +1471,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandStepperTile(
                             label: "최소 봉 수",
-                            value: activeStrategyIntValue("box_bars_min", defaultValue: 3),
+                            value: activeStrategyIntValue("box_bars_min", defaultValue: 4),
                             range: 2...20,
                             step: 1,
                             unit: "봉",
@@ -1479,7 +1479,7 @@ struct SettingsView: View {
                         )
                         strategyBandStepperTile(
                             label: "최대 봉 수",
-                            value: activeStrategyIntValue("box_bars_max", defaultValue: 5),
+                            value: activeStrategyIntValue("box_bars_max", defaultValue: 8),
                             range: 2...30,
                             step: 1,
                             unit: "봉",
@@ -1490,7 +1490,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "max_box_retrace_pct",
-                                defaultValue: 1.8,
+                                defaultValue: 2.2,
                                 range: 0.1...20.0
                             )
                         )
@@ -1499,7 +1499,7 @@ struct SettingsView: View {
                             unit: "ratio",
                             text: activeStrategyDoubleTextBinding(
                                 "min_box_ready_ratio",
-                                defaultValue: 0.60,
+                                defaultValue: 0.75,
                                 range: 0.01...1.0
                             )
                         )
@@ -1513,7 +1513,7 @@ struct SettingsView: View {
                             unit: "x",
                             text: activeStrategyDoubleTextBinding(
                                 "breakout_volume_multiplier",
-                                defaultValue: 1.5,
+                                defaultValue: 1.6,
                                 range: 0.1...20.0
                             )
                         )
@@ -1545,7 +1545,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "max_spread_pct",
-                                defaultValue: 0.30,
+                                defaultValue: 0.25,
                                 range: 0.01...10.0
                             )
                         )
@@ -1619,7 +1619,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "risk_per_trade_pct",
-                                defaultValue: 0.30,
+                                defaultValue: 0.20,
                                 range: 0.01...10.0
                             )
                         )
@@ -1633,7 +1633,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "max_position_size_pct_cap",
-                                defaultValue: 10.0,
+                                defaultValue: 5.0,
                                 range: 0.1...100.0
                             )
                         )
@@ -1642,7 +1642,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "sizing_slippage_buffer_pct",
-                                defaultValue: 0.15,
+                                defaultValue: 0.30,
                                 range: 0.0...5.0
                             )
                         )
@@ -1665,7 +1665,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "target_profit_pct",
-                                defaultValue: 3.0,
+                                defaultValue: 4.5,
                                 range: 0.0...100.0
                             )
                         )
@@ -1674,7 +1674,7 @@ struct SettingsView: View {
                             unit: "%",
                             text: activeStrategyDoubleTextBinding(
                                 "stop_loss_pct",
-                                defaultValue: 1.5,
+                                defaultValue: 2.2,
                                 range: 0.1...100.0
                             )
                         )
@@ -1684,7 +1684,7 @@ struct SettingsView: View {
                 openingStrategyFieldCard(title: "시간청산") {
                     strategyBandStepperTile(
                         label: "최대 보유 시간",
-                        value: activeStrategyIntValue("max_holding_minutes", defaultValue: 45),
+                        value: activeStrategyIntValue("max_holding_minutes", defaultValue: 25),
                         range: 1...10_080,
                         step: 1,
                         unit: "분",
@@ -1696,7 +1696,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandToggleControl(
                             title: "Trailing exit 사용",
-                            isOn: activeStrategyBoolBinding("use_trailing_exit", defaultValue: false)
+                            isOn: activeStrategyBoolBinding("use_trailing_exit", defaultValue: true)
                         )
                         strategySegmentedControl(
                             options: [
