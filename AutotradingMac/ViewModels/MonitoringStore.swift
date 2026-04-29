@@ -1626,6 +1626,12 @@ final class MonitoringStore: ObservableObject {
             "max_day_return_at_entry_pct": .number(20.0),
             "min_day_return_at_entry_pct": .number(1.0),
             "min_remaining_to_upper_limit_pct": .number(6.0),
+            "use_nxt_premarket_context": .bool(true),
+            "block_if_nxt_premarket_return_lte_pct": .number(-1.5),
+            "block_if_nxt_premarket_return_gte_pct": .number(7.0),
+            "require_above_nxt_premarket_vwap_when_premarket_hot": .bool(true),
+            "nxt_premarket_hot_return_pct": .number(5.0),
+            "nxt_premarket_score_bonus_max": .number(5.0),
             "use_vwap_filter": .bool(true),
             "min_above_vwap_ratio": .number(0.80),
             "allow_reclaim": .bool(false),
@@ -2092,6 +2098,25 @@ final class MonitoringStore: ObservableObject {
             let minRemainingToUpperLimitPct = activeStrategyParams.doubleValue(for: "min_remaining_to_upper_limit_pct") ?? -1
             if minRemainingToUpperLimitPct < 0 || minRemainingToUpperLimitPct > 30 {
                 errors.append("Persistence Breakout 최소 상한가 잔여폭은 0~30% 범위여야 합니다.")
+            }
+            let blockIfNXTPremarketReturnLTEPct = activeStrategyParams.doubleValue(for: "block_if_nxt_premarket_return_lte_pct") ?? -100
+            if blockIfNXTPremarketReturnLTEPct < -30 || blockIfNXTPremarketReturnLTEPct > 30 {
+                errors.append("Persistence Breakout 프리마켓 약세 차단 기준은 -30~30% 범위여야 합니다.")
+            }
+            let blockIfNXTPremarketReturnGTEPct = activeStrategyParams.doubleValue(for: "block_if_nxt_premarket_return_gte_pct") ?? -1
+            if blockIfNXTPremarketReturnGTEPct < 0 || blockIfNXTPremarketReturnGTEPct > 30 {
+                errors.append("Persistence Breakout 프리마켓 과열 차단 기준은 0~30% 범위여야 합니다.")
+            }
+            if blockIfNXTPremarketReturnLTEPct >= blockIfNXTPremarketReturnGTEPct {
+                errors.append("Persistence Breakout 프리마켓 약세 차단 기준은 과열 차단 기준보다 작아야 합니다.")
+            }
+            let nxtPremarketHotReturnPct = activeStrategyParams.doubleValue(for: "nxt_premarket_hot_return_pct") ?? -1
+            if nxtPremarketHotReturnPct < 0 || nxtPremarketHotReturnPct > 30 {
+                errors.append("Persistence Breakout 프리마켓 hot 기준은 0~30% 범위여야 합니다.")
+            }
+            let nxtPremarketScoreBonusMax = activeStrategyParams.doubleValue(for: "nxt_premarket_score_bonus_max") ?? -1
+            if nxtPremarketScoreBonusMax < 0 || nxtPremarketScoreBonusMax > 20 {
+                errors.append("Persistence Breakout 프리마켓 점수 보너스 상한은 0~20점 범위여야 합니다.")
             }
             let investmentCautionScorePenalty = activeStrategyParams.doubleValue(for: "investment_caution_score_penalty") ?? -1
             if investmentCautionScorePenalty < 0 || investmentCautionScorePenalty > 100 {

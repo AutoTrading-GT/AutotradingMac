@@ -1617,6 +1617,58 @@ struct SettingsView: View {
                     }
                 }
 
+                openingStrategyFieldCard(title: "NXT 프리마켓") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "프리마켓 컨텍스트 사용",
+                            isOn: activeStrategyBoolBinding("use_nxt_premarket_context", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "프리마켓 약세 차단",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "block_if_nxt_premarket_return_lte_pct",
+                                defaultValue: -1.5,
+                                range: -30.0...30.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "프리마켓 과열 차단",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "block_if_nxt_premarket_return_gte_pct",
+                                defaultValue: 7.0,
+                                range: 0.0...30.0
+                            )
+                        )
+                        strategyBandToggleControl(
+                            title: "프리마켓 과열 시 VWAP 유지 요구",
+                            isOn: activeStrategyBoolBinding(
+                                "require_above_nxt_premarket_vwap_when_premarket_hot",
+                                defaultValue: true
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "프리마켓 hot 기준",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "nxt_premarket_hot_return_pct",
+                                defaultValue: 5.0,
+                                range: 0.0...30.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "프리마켓 보너스 상한",
+                            unit: "score",
+                            text: activeStrategyDoubleTextBinding(
+                                "nxt_premarket_score_bonus_max",
+                                defaultValue: 5.0,
+                                range: 0.0...20.0
+                            )
+                        )
+                    }
+                }
+
                 openingStrategyFieldCard(title: "투자주의 처리") {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandToggleControl(
