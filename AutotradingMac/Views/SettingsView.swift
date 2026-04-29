@@ -1532,7 +1532,7 @@ struct SettingsView: View {
     private func persistenceMarketSafetySection() -> some View {
         strategyCategoryBlock(
             title: "Market Safety",
-            summary: "최근 VI, 신규상장, 단기과열, 투자경고/위험은 hard reject하고, 투자주의는 기본적으로 점수 감점으로 처리합니다."
+            summary: "최근 VI, 신규상장, 단기과열, 투자경고/위험, 가격제한폭 근접은 hard reject하고, 투자주의는 기본적으로 점수 감점으로 처리합니다."
         ) {
             openingStrategyFieldGrid {
                 openingStrategyFieldCard(title: "시장제도 차단") {
@@ -1577,6 +1577,42 @@ struct SettingsView: View {
                             step: 1,
                             unit: "거래일",
                             onChange: { store.updateActiveStrategyParamInt("exclude_recently_listed_days", value: $0, range: 1...60) }
+                        )
+                    }
+                }
+
+                openingStrategyFieldCard(title: "가격제한폭 근접") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "가격제한폭 가드 사용",
+                            isOn: activeStrategyBoolBinding("use_price_limit_guard", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "최대 당일 상승률",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_day_return_at_entry_pct",
+                                defaultValue: 20.0,
+                                range: 0.0...30.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최소 당일 상승률",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_day_return_at_entry_pct",
+                                defaultValue: 1.0,
+                                range: 0.0...30.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최소 상한가 잔여폭",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "min_remaining_to_upper_limit_pct",
+                                defaultValue: 6.0,
+                                range: 0.0...30.0
+                            )
                         )
                     }
                 }

@@ -1622,6 +1622,10 @@ final class MonitoringStore: ObservableObject {
             "investment_caution_score_penalty": .number(10.0),
             "exclude_recent_vi_enabled": .bool(true),
             "recent_vi_lookback_minutes": .number(10),
+            "use_price_limit_guard": .bool(true),
+            "max_day_return_at_entry_pct": .number(20.0),
+            "min_day_return_at_entry_pct": .number(1.0),
+            "min_remaining_to_upper_limit_pct": .number(6.0),
             "use_vwap_filter": .bool(true),
             "min_above_vwap_ratio": .number(0.80),
             "allow_reclaim": .bool(false),
@@ -2073,6 +2077,21 @@ final class MonitoringStore: ObservableObject {
             let recentVILookbackMinutes = activeStrategyParams.intValue(for: "recent_vi_lookback_minutes") ?? 0
             if !(1...120).contains(recentVILookbackMinutes) {
                 errors.append("Persistence Breakout 최근 VI 확인 시간은 1~120분 범위여야 합니다.")
+            }
+            let maxDayReturnAtEntryPct = activeStrategyParams.doubleValue(for: "max_day_return_at_entry_pct") ?? -1
+            if maxDayReturnAtEntryPct < 0 || maxDayReturnAtEntryPct > 30 {
+                errors.append("Persistence Breakout 최대 당일 상승률은 0~30% 범위여야 합니다.")
+            }
+            let minDayReturnAtEntryPct = activeStrategyParams.doubleValue(for: "min_day_return_at_entry_pct") ?? -1
+            if minDayReturnAtEntryPct < 0 || minDayReturnAtEntryPct > 30 {
+                errors.append("Persistence Breakout 최소 당일 상승률은 0~30% 범위여야 합니다.")
+            }
+            if minDayReturnAtEntryPct > maxDayReturnAtEntryPct {
+                errors.append("Persistence Breakout 최소 당일 상승률은 최대 당일 상승률보다 클 수 없습니다.")
+            }
+            let minRemainingToUpperLimitPct = activeStrategyParams.doubleValue(for: "min_remaining_to_upper_limit_pct") ?? -1
+            if minRemainingToUpperLimitPct < 0 || minRemainingToUpperLimitPct > 30 {
+                errors.append("Persistence Breakout 최소 상한가 잔여폭은 0~30% 범위여야 합니다.")
             }
             let investmentCautionScorePenalty = activeStrategyParams.doubleValue(for: "investment_caution_score_penalty") ?? -1
             if investmentCautionScorePenalty < 0 || investmentCautionScorePenalty > 100 {
