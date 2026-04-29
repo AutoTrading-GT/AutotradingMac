@@ -1549,6 +1549,28 @@ struct SettingsView: View {
                                 range: 0.01...10.0
                             )
                         )
+                        strategyBandToggleControl(
+                            title: "tick 기준 스프레드 필터",
+                            isOn: activeStrategyBoolBinding("use_spread_tick_filter", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "최대 spread tick 수",
+                            unit: "ticks",
+                            text: activeStrategyIntegerBinding(
+                                "max_spread_ticks",
+                                defaultValue: 2,
+                                range: 1...100
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "만점 spread tick 수",
+                            unit: "ticks",
+                            text: activeStrategyIntegerBinding(
+                                "full_quality_spread_ticks",
+                                defaultValue: 1,
+                                range: 1...100
+                            )
+                        )
                     }
                 }
 

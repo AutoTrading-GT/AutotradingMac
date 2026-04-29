@@ -1623,9 +1623,16 @@ final class MonitoringStore: ObservableObject {
             "breakout_volume_multiplier": .number(1.6),
             "use_spread_filter": .bool(true),
             "max_spread_pct": .number(0.25),
-            "use_orderbook_depth_filter": .bool(true),
-            "min_best_bid_size": .number(300),
-            "min_best_ask_size": .number(300),
+            "use_spread_tick_filter": .bool(true),
+            "max_spread_ticks": .number(2),
+            "full_quality_spread_ticks": .number(1),
+            "use_orderbook_value_depth_filter": .bool(true),
+            "min_l1_bid_value_krw": .number(15_000_000.0),
+            "min_l1_ask_value_krw": .number(15_000_000.0),
+            "min_l5_bid_value_krw": .number(80_000_000.0),
+            "min_l5_ask_value_krw": .number(80_000_000.0),
+            "min_l1_depth_to_order_value_ratio": .number(1.0),
+            "min_l5_depth_to_order_value_ratio": .number(3.0),
             "max_orderbook_imbalance_ratio": .number(3.0),
             "target_profit_pct": .number(4.5),
             "stop_loss_pct": .number(2.2),
@@ -2072,6 +2079,17 @@ final class MonitoringStore: ObservableObject {
             let maxSpreadPct = activeStrategyParams.doubleValue(for: "max_spread_pct") ?? 0
             if maxSpreadPct <= 0 || maxSpreadPct > 10 {
                 errors.append("Persistence Breakout 최대 스프레드는 0 초과 10 이하 범위여야 합니다.")
+            }
+            let maxSpreadTicks = activeStrategyParams.intValue(for: "max_spread_ticks") ?? 0
+            if maxSpreadTicks < 1 || maxSpreadTicks > 100 {
+                errors.append("Persistence Breakout 최대 spread tick 수는 1~100 범위여야 합니다.")
+            }
+            let fullQualitySpreadTicks = activeStrategyParams.intValue(for: "full_quality_spread_ticks") ?? 0
+            if fullQualitySpreadTicks < 1 || fullQualitySpreadTicks > 100 {
+                errors.append("Persistence Breakout 만점 spread tick 수는 1~100 범위여야 합니다.")
+            }
+            if fullQualitySpreadTicks > maxSpreadTicks {
+                errors.append("Persistence Breakout 만점 spread tick 수는 최대 spread tick 수 이하여야 합니다.")
             }
             let minL1BidValueKRW = activeStrategyParams.doubleValue(for: "min_l1_bid_value_krw") ?? 0
             if minL1BidValueKRW <= 0 || minL1BidValueKRW > 10_000_000_000 {
