@@ -1638,6 +1638,9 @@ final class MonitoringStore: ObservableObject {
             "block_if_kospi_intraday_return_lte_pct": .number(-1.50),
             "block_if_kosdaq_intraday_return_lte_pct": .number(-1.80),
             "index_risk_cooldown_minutes": .number(10),
+            "use_stock_intraday_vol_filter": .bool(true),
+            "max_1m_atr_10_pct": .number(0.75),
+            "max_10m_high_low_range_pct": .number(5.0),
             "use_vwap_filter": .bool(true),
             "min_above_vwap_ratio": .number(0.80),
             "allow_reclaim": .bool(false),
@@ -2172,6 +2175,14 @@ final class MonitoringStore: ObservableObject {
             let indexRiskCooldownMinutes = activeStrategyParams.intValue(for: "index_risk_cooldown_minutes") ?? 0
             if indexRiskCooldownMinutes < 1 || indexRiskCooldownMinutes > 120 {
                 errors.append("Persistence Breakout 시장 급락 쿨다운은 1~120분 범위여야 합니다.")
+            }
+            let max1mATR10Pct = activeStrategyParams.doubleValue(for: "max_1m_atr_10_pct") ?? 0
+            if max1mATR10Pct <= 0 || max1mATR10Pct > 20 {
+                errors.append("Persistence Breakout 최대 1분 ATR(10) 비율은 0 초과 20 이하 범위여야 합니다.")
+            }
+            let max10mHighLowRangePct = activeStrategyParams.doubleValue(for: "max_10m_high_low_range_pct") ?? 0
+            if max10mHighLowRangePct <= 0 || max10mHighLowRangePct > 30 {
+                errors.append("Persistence Breakout 최대 10분 고저 범위는 0 초과 30 이하 범위여야 합니다.")
             }
             let maxSpreadTicks = activeStrategyParams.intValue(for: "max_spread_ticks") ?? 0
             if maxSpreadTicks < 1 || maxSpreadTicks > 100 {

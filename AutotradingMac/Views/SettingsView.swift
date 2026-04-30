@@ -1723,6 +1723,33 @@ struct SettingsView: View {
                     }
                 }
 
+                openingStrategyFieldCard(title: "종목 장중 변동성") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "장중 변동성 필터 사용",
+                            isOn: activeStrategyBoolBinding("use_stock_intraday_vol_filter", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "최대 1분 ATR(10)",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_1m_atr_10_pct",
+                                defaultValue: 0.75,
+                                range: 0.01...20.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "최대 10분 고저 범위",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "max_10m_high_low_range_pct",
+                                defaultValue: 5.0,
+                                range: 0.01...30.0
+                            )
+                        )
+                    }
+                }
+
                 openingStrategyFieldCard(title: "투자주의 처리") {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandToggleControl(
