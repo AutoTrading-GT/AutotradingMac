@@ -1632,6 +1632,12 @@ final class MonitoringStore: ObservableObject {
             "require_above_nxt_premarket_vwap_when_premarket_hot": .bool(true),
             "nxt_premarket_hot_return_pct": .number(5.0),
             "nxt_premarket_score_bonus_max": .number(5.0),
+            "use_index_risk_filter": .bool(true),
+            "block_if_kospi_5m_return_lte_pct": .number(-0.80),
+            "block_if_kosdaq_5m_return_lte_pct": .number(-1.00),
+            "block_if_kospi_intraday_return_lte_pct": .number(-1.50),
+            "block_if_kosdaq_intraday_return_lte_pct": .number(-1.80),
+            "index_risk_cooldown_minutes": .number(10),
             "use_vwap_filter": .bool(true),
             "min_above_vwap_ratio": .number(0.80),
             "allow_reclaim": .bool(false),
@@ -2146,6 +2152,26 @@ final class MonitoringStore: ObservableObject {
             let maxSpreadPct = activeStrategyParams.doubleValue(for: "max_spread_pct") ?? 0
             if maxSpreadPct <= 0 || maxSpreadPct > 10 {
                 errors.append("Persistence Breakout 최대 스프레드는 0 초과 10 이하 범위여야 합니다.")
+            }
+            let blockIfKospi5mReturnLTEPct = activeStrategyParams.doubleValue(for: "block_if_kospi_5m_return_lte_pct") ?? 1
+            if blockIfKospi5mReturnLTEPct < -10 || blockIfKospi5mReturnLTEPct > 0 {
+                errors.append("Persistence Breakout KOSPI 5분 하락 차단 기준은 -10~0% 범위여야 합니다.")
+            }
+            let blockIfKosdaq5mReturnLTEPct = activeStrategyParams.doubleValue(for: "block_if_kosdaq_5m_return_lte_pct") ?? 1
+            if blockIfKosdaq5mReturnLTEPct < -10 || blockIfKosdaq5mReturnLTEPct > 0 {
+                errors.append("Persistence Breakout KOSDAQ 5분 하락 차단 기준은 -10~0% 범위여야 합니다.")
+            }
+            let blockIfKospiIntradayReturnLTEPct = activeStrategyParams.doubleValue(for: "block_if_kospi_intraday_return_lte_pct") ?? 1
+            if blockIfKospiIntradayReturnLTEPct < -10 || blockIfKospiIntradayReturnLTEPct > 0 {
+                errors.append("Persistence Breakout KOSPI 장중 하락 차단 기준은 -10~0% 범위여야 합니다.")
+            }
+            let blockIfKosdaqIntradayReturnLTEPct = activeStrategyParams.doubleValue(for: "block_if_kosdaq_intraday_return_lte_pct") ?? 1
+            if blockIfKosdaqIntradayReturnLTEPct < -10 || blockIfKosdaqIntradayReturnLTEPct > 0 {
+                errors.append("Persistence Breakout KOSDAQ 장중 하락 차단 기준은 -10~0% 범위여야 합니다.")
+            }
+            let indexRiskCooldownMinutes = activeStrategyParams.intValue(for: "index_risk_cooldown_minutes") ?? 0
+            if indexRiskCooldownMinutes < 1 || indexRiskCooldownMinutes > 120 {
+                errors.append("Persistence Breakout 시장 급락 쿨다운은 1~120분 범위여야 합니다.")
             }
             let maxSpreadTicks = activeStrategyParams.intValue(for: "max_spread_ticks") ?? 0
             if maxSpreadTicks < 1 || maxSpreadTicks > 100 {

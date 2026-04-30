@@ -1669,6 +1669,60 @@ struct SettingsView: View {
                     }
                 }
 
+                openingStrategyFieldCard(title: "시장 급락") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strategyBandToggleControl(
+                            title: "지수 급락 필터 사용",
+                            isOn: activeStrategyBoolBinding("use_index_risk_filter", defaultValue: true)
+                        )
+                        strategyBandNumericField(
+                            label: "KOSPI 5분 하락 차단",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "block_if_kospi_5m_return_lte_pct",
+                                defaultValue: -0.80,
+                                range: -10.0...0.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "KOSDAQ 5분 하락 차단",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "block_if_kosdaq_5m_return_lte_pct",
+                                defaultValue: -1.00,
+                                range: -10.0...0.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "KOSPI 장중 하락 차단",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "block_if_kospi_intraday_return_lte_pct",
+                                defaultValue: -1.50,
+                                range: -10.0...0.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "KOSDAQ 장중 하락 차단",
+                            unit: "%",
+                            text: activeStrategyDoubleTextBinding(
+                                "block_if_kosdaq_intraday_return_lte_pct",
+                                defaultValue: -1.80,
+                                range: -10.0...0.0
+                            )
+                        )
+                        strategyBandNumericField(
+                            label: "차단 후 쿨다운",
+                            unit: "분",
+                            text: activeStrategyIntegerBinding(
+                                "index_risk_cooldown_minutes",
+                                defaultValue: 10,
+                                range: 1...120
+                            )
+                        )
+                    }
+                }
+
                 openingStrategyFieldCard(title: "투자주의 처리") {
                     VStack(alignment: .leading, spacing: 12) {
                         strategyBandToggleControl(
