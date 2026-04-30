@@ -97,7 +97,18 @@ enum AppConnectionStatusResolver {
 
         if let authDetail = firstMatchingDetail(
             in: [runtime?.startupError, runtime?.engineLastError, lastErrorMessage],
-            where: isAuthenticationIssue
+            where: { detail in
+                let normalized = detail.lowercased()
+                return normalized.contains("401")
+                    || normalized.contains("403")
+                    || normalized.contains("unauthorized")
+                    || normalized.contains("forbidden")
+                    || normalized.contains("auth")
+                    || normalized.contains("credential")
+                    || normalized.contains("token")
+                    || normalized.contains("app key")
+                    || normalized.contains("secret")
+            }
         ) {
             return AppConnectionStatusSnapshot(
                 kind: .authenticationFailure,
@@ -172,19 +183,6 @@ enum AppConnectionStatusResolver {
             return true
         }
         return runtime.readinessStatus.lowercased() != "ready"
-    }
-
-    private static func isAuthenticationIssue(_ detail: String) -> Bool {
-        let normalized = detail.lowercased()
-        return normalized.contains("401")
-            || normalized.contains("403")
-            || normalized.contains("unauthorized")
-            || normalized.contains("forbidden")
-            || normalized.contains("auth")
-            || normalized.contains("credential")
-            || normalized.contains("token")
-            || normalized.contains("app key")
-            || normalized.contains("secret")
     }
 
     private static func firstMatchingDetail(

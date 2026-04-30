@@ -268,9 +268,34 @@ enum DashboardSignalSummaryBuilder {
 
         return candidatesByCode.values
             .compactMap { candidates in
-                candidates.max(by: isLessImportant)
+                candidates.max { lhs, rhs in
+                    if lhs.action == rhs.action {
+                        let delta = abs(lhs.timestamp.timeIntervalSince(rhs.timestamp))
+                        if delta <= flowCoalescingWindow, lhs.priority != rhs.priority {
+                            return lhs.priority < rhs.priority
+                        }
+                    }
+                    if lhs.timestamp != rhs.timestamp {
+                        return lhs.timestamp < rhs.timestamp
+                    }
+                    return lhs.priority < rhs.priority
+                }
             }
-            .sorted(by: isHigherPriorityForDisplay)
+            .sorted { lhs, rhs in
+                if lhs.timestamp != rhs.timestamp {
+                    return lhs.timestamp > rhs.timestamp
+                }
+                if lhs.priority != rhs.priority {
+                    return lhs.priority > rhs.priority
+                }
+                if lhs.action != rhs.action {
+                    return lhs.action.rawValue < rhs.action.rawValue
+                }
+                if lhs.code != rhs.code {
+                    return lhs.code < rhs.code
+                }
+                return lhs.summary < rhs.summary
+            }
             .prefix(limit)
             .map {
                 DashboardSignalSummaryRow(
@@ -528,36 +553,6 @@ enum DashboardSignalSummaryBuilder {
 
     private static func normalize(_ value: String?) -> String {
         (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    }
-
-    private static func isLessImportant(_ lhs: Candidate, _ rhs: Candidate) -> Bool {
-        if lhs.action == rhs.action {
-            let delta = abs(lhs.timestamp.timeIntervalSince(rhs.timestamp))
-            if delta <= flowCoalescingWindow, lhs.priority != rhs.priority {
-                return lhs.priority < rhs.priority
-            }
-        }
-
-        if lhs.timestamp != rhs.timestamp {
-            return lhs.timestamp < rhs.timestamp
-        }
-        return lhs.priority < rhs.priority
-    }
-
-    private static func isHigherPriorityForDisplay(_ lhs: Candidate, _ rhs: Candidate) -> Bool {
-        if lhs.timestamp != rhs.timestamp {
-            return lhs.timestamp > rhs.timestamp
-        }
-        if lhs.priority != rhs.priority {
-            return lhs.priority > rhs.priority
-        }
-        if lhs.action != rhs.action {
-            return lhs.action.rawValue < rhs.action.rawValue
-        }
-        if lhs.code != rhs.code {
-            return lhs.code < rhs.code
-        }
-        return lhs.summary < rhs.summary
     }
 
     private struct Candidate {

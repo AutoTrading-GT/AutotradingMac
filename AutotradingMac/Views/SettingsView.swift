@@ -2332,7 +2332,7 @@ struct SettingsView: View {
                         .lineLimit(1)
                 }
                 Text(
-                    "저장: \(store.strategyUpdatedAt.map(DisplayFormatters.dateTime) ?? "-")  |  적용: \(store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "-")"
+                    "저장: \(formattedDateTime(store.strategyUpdatedAt))  |  적용: \(formattedDateTime(store.strategyLastAppliedAt))"
                 )
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(DesignTokens.Colors.textQuaternary)
@@ -3823,6 +3823,25 @@ struct SettingsView: View {
         )
     }
 
+    private func activeStrategyIntegerBinding(
+        _ key: String,
+        defaultValue: Int,
+        range: ClosedRange<Int>
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                String(currentActiveStrategyParams.intValue(for: key) ?? defaultValue)
+            },
+            set: {
+                store.updateActiveStrategyParamInt(
+                    key,
+                    value: parseOptionalDouble($0).map(Int.init) ?? defaultValue,
+                    range: range
+                )
+            }
+        )
+    }
+
     private func activeStrategyDoubleTextBinding(
         _ key: String,
         defaultValue: Double,
@@ -3857,6 +3876,14 @@ struct SettingsView: View {
                 store.updateActiveStrategyParamOptionalInt(key, value: value, range: range)
             }
         )
+    }
+
+    private func formattedDateTime(_ value: Date?, fallback: String = "-") -> String {
+        guard let value else { return fallback }
+        var style = Date.FormatStyle(date: .numeric, time: .standard)
+        style.locale = Locale(identifier: "ko_KR")
+        style.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
+        return value.formatted(style)
     }
 
     private var basicSelectionModeBinding: Binding<String> {
@@ -4360,7 +4387,7 @@ struct SettingsView: View {
     }
 
     private var strategyLastAppliedSummaryText: String {
-        store.strategyLastAppliedAt.map(DisplayFormatters.dateTime) ?? "아직 적용 이력 없음"
+        formattedDateTime(store.strategyLastAppliedAt, fallback: "아직 적용 이력 없음")
     }
 
     private var riskDailyTradeLimitBadgeText: String {
@@ -4510,7 +4537,7 @@ struct SettingsView: View {
         if let runtimeValue = store.runtime?.workers.workers["risk"]?[key] {
             return runtimeValue
         }
-        return store.strategyGroupApplyStatus("risk")?.effectiveValue?[key]
+        return store.strategyGroupApplyStatus("risk")?.effectiveValue[key]
     }
 
     private var currentOrderModeShortLabel: String {
@@ -4968,7 +4995,7 @@ struct SettingsView: View {
         guard let dataManagement = store.appSettings?.dataManagement else { return "-" }
         let summary = dataManagement.lastCleanupSummary ?? "아직 실행 기록이 없습니다."
         guard let lastRun = dataManagement.lastCleanupAt else { return summary }
-        return "\(summary) · \(DisplayFormatters.dateTime(lastRun))"
+        return "\(summary) · \(formattedDateTime(lastRun))"
     }
 
     private var backupStatusText: String {
@@ -4977,9 +5004,9 @@ struct SettingsView: View {
         let mode = backupModeLabel(dataManagement.backupMode)
         if let lastRun = dataManagement.lastBackupAt {
             if mode.isEmpty {
-                return "\(summary) · \(DisplayFormatters.dateTime(lastRun))"
+                return "\(summary) · \(formattedDateTime(lastRun))"
             }
-            return "\(summary) · \(mode) · \(DisplayFormatters.dateTime(lastRun))"
+            return "\(summary) · \(mode) · \(formattedDateTime(lastRun))"
         }
         if mode.isEmpty {
             return summary

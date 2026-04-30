@@ -30,9 +30,22 @@
 		B56EB7822F6BC71800898235 /* AutotradingMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutotradingMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B9A72F1D3C8E41A100A1F001 /* Exceptions for "AutotradingMac" folder in "AutotradingMac" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B56EB76A2F6BC71600898235 /* AutotradingMac */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B56EB76D2F6BC71600898235 /* AutotradingMac */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B9A72F1D3C8E41A100A1F001 /* Exceptions for "AutotradingMac" folder in "AutotradingMac" target */,
+			);
 			path = AutotradingMac;
 			sourceTree = "<group>";
 		};
